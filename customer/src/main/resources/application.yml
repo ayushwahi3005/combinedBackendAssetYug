@@ -1,0 +1,14 @@
+application:
+  security:
+    jwt:
+      secret-key: 9a8yxfpo15vRQ30k2kGHCHanStQ8vVrcocxvwFPVG7CMLOt5JfNb0toxK45hcWfF
+#      expiration: 86400000 # a day
+      expiration: 300000
+      refresh-token:
+        expiration: 300000
+#        expiration: 604800000 # 7 days
+logging:
+  level:
+    org:
+      springframework:
+        security: DEBUG
