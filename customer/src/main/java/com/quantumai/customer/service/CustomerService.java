@@ -17,8 +17,8 @@ public interface CustomerService {
 	public CustomerDTO getCustomer(String email) throws Exception;
 	public CustomerSubscribedDTO getCustomerSubscription(String email) throws NoSubscriptionError ;
 	public void addSubscription(String email) throws Exception;
-	public AuthenticationResponseDTO authenticate(AuthenticationRequestDTO authenticationRequestDTO) throws Exception;
-	public AuthenticationResponseDTO getLoginToken(String email) throws UserNotFound;
+	public AuthenticationResponseDTO authenticate(AuthenticationRequestDTO authenticationRequestDTO,String deviceId) throws Exception;
+	public AuthenticationResponseDTO getLoginToken(String email,String deviceId) throws UserNotFound;
 	public void addCompanyInformation(CompanyInformation companyInformation);
 	public CompanyInformation getcompanyInformation(String companyId);
 	public CompanyIdDTO getCompanyId(String email);

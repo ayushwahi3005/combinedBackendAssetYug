@@ -4,6 +4,7 @@ import java.lang.System.Logger;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.Bin;
 import com.quantumai.customer.entity.ImportHistory;
@@ -13,11 +14,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.web.bind.annotation.*;
-
+import com.quantumai.customer.service.ActiveSessionService;
 import com.quantumai.customer.entity.CompanyInformation;
 import com.quantumai.customer.service.CustomerService;
 
-@CrossOrigin(origins = "**")
+@CrossOrigin(origins = "**",allowedHeaders = {"device-id"})
 @RestController
 @RequestMapping("/customer")
 public class CustomerAPI {
@@ -25,7 +26,9 @@ public class CustomerAPI {
 	@Autowired
 	private CustomerService customerService;
 
-	
+	@Autowired
+	private ActiveSessionService activeSessionService;
+
 	@GetMapping(value="/working")
 	public ResponseEntity<String> working() throws Exception {
 		
@@ -38,17 +41,17 @@ public class CustomerAPI {
 		
 		return  ResponseEntity.ok(customerService.addCustomer(customerDTO));
 	}
-	@PostMapping(value="/authenticate")
-	public ResponseEntity<AuthenticationResponseDTO> authenticate(@RequestBody AuthenticationRequestDTO authenticationRequestDTO) throws Exception{
+	@PostMapping(value="/authenticate/{deviceId}")
+	public ResponseEntity<AuthenticationResponseDTO> authenticate(@RequestBody AuthenticationRequestDTO authenticationRequestDTO,@PathVariable String deviceId) throws Exception{
 		
 		
 		
-		return ResponseEntity.ok(customerService.authenticate(authenticationRequestDTO));
+		return ResponseEntity.ok(customerService.authenticate(authenticationRequestDTO,deviceId));
 	}
-	@GetMapping(value="/getLoginToken/{email}")
-	public ResponseEntity<AuthenticationResponseDTO> getLoginToken(@PathVariable String email) throws Exception {
+	@GetMapping(value="/getLoginToken/{email}/{deviceId}")
+	public ResponseEntity<AuthenticationResponseDTO> getLoginToken(@PathVariable String email,@PathVariable String deviceId) throws Exception {
 		
-		return ResponseEntity.ok(customerService.getLoginToken(email));
+		return ResponseEntity.ok(customerService.getLoginToken(email,deviceId));
 	}
 
 	@GetMapping(value="/get/{email}")
@@ -60,6 +63,35 @@ public class CustomerAPI {
 	public CustomerSubscribedDTO getCustomerSubscribed(@PathVariable String email ) throws Exception {
 		return customerService.getCustomerSubscription(email);
 	}
+	@PostMapping(value="/isSameBrowserAndDevice")
+	public ResponseEntity<Boolean> isSameBrowserAndDevice(@RequestBody JsonNode jsonNode) throws Exception {
+		String userId=jsonNode.get("userId").asText();
+		String deviceId=jsonNode.get("deviceId").asText();
+		String userAgent=jsonNode.get("userAgent").asText();
+		return ResponseEntity.ok(activeSessionService.isSameBrowserAndDevice(userId,deviceId,userAgent));
+	}
+	@PostMapping(value="/addLoggedIn")
+	public void addLoggedIn(@RequestBody JsonNode jsonNode) throws Exception{
+		if(jsonNode!=null) {
+			String userId = jsonNode.get("userId").asText();
+			String deviceId = jsonNode.get("deviceId").asText();
+			String userAgent = jsonNode.get("userAgent").asText();
+
+			activeSessionService.createOrUpdateSession(userId, null, userAgent, deviceId);
+		}
+
+
+	}
+	@DeleteMapping(value="/removeSession/{userId}")
+	public void removeSession(@PathVariable String userId) throws Exception{
+
+
+			activeSessionService.removeSession(userId);
+
+
+
+	}
+
 	@PostMapping(value="/addCompanyInformation")
 	public ResponseEntity<CompanyInformation> addCompanyInformation(@RequestBody CompanyInformation companyInformation) throws Exception{
 		customerService.addCompanyInformation(companyInformation);

@@ -58,5 +58,7 @@ public interface AssetsService {
 	public void deleteCategory(String id);
 	public AssetCategory getCategoryListById(String companyId,String id);
 	public List<AssetCategory> getActiveCategoryList(String companyId);
+	public List<AssetsDTO> getActiveAssets(String companyId);
+	public Map<String,List<AssetsDTO>> getAssetByCategory(String companyId);
 	
 }

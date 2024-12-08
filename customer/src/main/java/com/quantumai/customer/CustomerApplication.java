@@ -24,7 +24,7 @@ import java.time.LocalDateTime;
 
 @EnableScheduling
 @SpringBootApplication
-@EnableWebMvc // Ensure Web MVC is enabled for global CORS configuration
+//@EnableWebMvc // Ensure Web MVC is enabled for global CORS configuration
 public class CustomerApplication {
 
     public static void main(String[] args) {
@@ -54,7 +54,7 @@ public class CustomerApplication {
 //                        .allowedOrigins("http://localhost:4200") // Allow requests from this origin
 //                        .allowedMethods("GET", "POST", "PUT", "DELETE") // Allow specific HTTP methods
 //                        .allowedHeaders("*") // Allow all headers
-//                        .exposedHeaders("Authorization") // Expose additional headers if needed
+//                        .exposedHeaders("*") // Expose additional headers if needed
 //                        .allowCredentials(true); // Allow sending credentials (e.g., cookies)
 //            }
 //        };
@@ -66,21 +66,22 @@ public class CustomerApplication {
 //        source.registerCorsConfiguration("/**", new CorsConfiguration().applyPermitDefaultValues());
 //        return source;
 //    }
-    @Bean
-    WebMvcConfigurer corsConfigurer() {
-	        return new WebMvcConfigurer() {
-	            @Override
-	            public void addCorsMappings(CorsRegistry registry) {
-	            	registry.addMapping("/**")
-	                .allowedOrigins("**")
-	                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-	                .allowedHeaders("*", "Authorization","Content-Type", "Date", "Total-Count", "loginInfo","jwt_token")
-                    .exposedHeaders("Content-Type", "Date", "Total-Count", "loginInfo", "jwt_token","Authorization")
-	                .allowCredentials(true)
-	                .maxAge(3600);
-	            }
-	        };
-	    }
+//    @Bean
+//    WebMvcConfigurer corsConfigurer() {
+//	        return new WebMvcConfigurer() {
+//	            @Override
+//	            public void addCorsMappings(CorsRegistry registry) {
+//	            	registry.addMapping("/**")
+//	                .allowedOrigins("**")
+//
+//	                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+//	                .allowedHeaders( "Authorization","Content-Type", "Date", "Total-Count", "loginInfo","jwt_token","Device-ID","device-id")
+//                    .exposedHeaders("*","Content-Type", "Date", "Total-Count", "loginInfo", "jwt_token","Authorization","Device-ID","device-id")
+//	                .allowCredentials(true)
+//	                .maxAge(3600);
+//	            }
+//	        };
+//	    }
 
 	@Scheduled(cron = "0 0 0 * * ?") // Runs daily at midnight
 	public void updateAllSubscriptionExpiry() {

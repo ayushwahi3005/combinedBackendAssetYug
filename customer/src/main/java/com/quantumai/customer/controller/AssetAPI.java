@@ -1334,4 +1334,17 @@ public class AssetAPI {
 
     }
 
+    @GetMapping(value = "/getActiveAssets/{companyId}")
+    public List<AssetsDTO> getActiveAssets(@PathVariable String companyId){
+        return assetsService.getActiveAssets(companyId);
+
+
+    }
+    @GetMapping(value = "/getAssetByCategory/{companyId}")
+    public Map<String,List<AssetsDTO>> getAssetByCategory(@PathVariable String companyId){
+        return assetsService.getAssetByCategory(companyId);
+
+
+    }
+
 }

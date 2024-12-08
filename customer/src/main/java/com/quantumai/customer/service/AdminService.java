@@ -9,7 +9,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 
 public interface AdminService {
 
-    public Admin login(Admin admin) throws Exception;
+    public AuthenticationResponseDTO login(Admin admin,String deviceId) throws Exception;
 
     public void updatePassword(AdminResetPassword adminResetPassword) throws Exception;
 
@@ -20,8 +20,8 @@ public interface AdminService {
     public boolean validateOtp(String email, String otp);
     public void clearOtp(String email);
 
-    public AuthenticationResponseDTO authenticate(AuthenticationRequestDTO authenticationRequestDTO) throws Exception;
-    public AuthenticationResponseDTO getLoginToken(String email) throws UserNotFound;
+    public AuthenticationResponseDTO authenticate(AuthenticationRequestDTO authenticationRequestDTO,String deviceId) throws Exception;
+    public AuthenticationResponseDTO getLoginToken(String email,String deviceId) throws UserNotFound;
 
 
 }

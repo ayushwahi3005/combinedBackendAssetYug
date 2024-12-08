@@ -21,6 +21,7 @@ public interface UserService {
 	public List<UsersDTO> getAllUsers(String companyId);
 	public void registerUser(Users user) throws UserException;
 	public UsersDTO getUsers(String companyId,String email);
+	public void updateUser(UsersDTO usersDTO);
 	public List<UsersDTO> getAllUsersByRole(String role,String companyId);
 	public void deleteUser(String companyId,String email,String authHeader) throws  FirebaseAuthException, UserCannotDeletedException, Exception;
 //	public UserDTO resendMail(String email,String companyId);

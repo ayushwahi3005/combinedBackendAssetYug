@@ -6,14 +6,17 @@ import com.quantumai.customer.dto.AssetsDTO;
 import com.quantumai.customer.dto.AuthenticationRequestDTO;
 import com.quantumai.customer.dto.AuthenticationResponseDTO;
 import com.quantumai.customer.entity.Admin;
+import com.quantumai.customer.entity.Plans;
 import com.quantumai.customer.entity.Users;
 import com.quantumai.customer.exception.UserException;
 import com.quantumai.customer.service.AdminService;
+import com.quantumai.customer.service.SubscriptionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -25,12 +28,15 @@ public class AdminAPI {
 
     @Autowired
     private AdminService adminService;
-    @PostMapping("/login")
-    public void login(@RequestBody Admin admin) throws Exception {
+
+    @Autowired
+    private SubscriptionService subscriptionService;
+    @PostMapping("/login/{deviceId}")
+    public AuthenticationResponseDTO login(@RequestBody Admin admin,@PathVariable  String deviceId) throws Exception {
 
 
 
-        adminService.login(admin);
+        return adminService.login(admin,deviceId);
 
     }
     @PostMapping("/resetPassword")
@@ -69,17 +75,43 @@ public class AdminAPI {
         return ResponseEntity.ok(isValid);
     }
 
-    @PostMapping(value="/authenticate")
-    public ResponseEntity<AuthenticationResponseDTO> authenticate(@RequestBody AuthenticationRequestDTO authenticationRequestDTO) throws Exception{
+    @PostMapping(value="/authenticate/{deviceId}")
+    public ResponseEntity<AuthenticationResponseDTO> authenticate(@RequestBody AuthenticationRequestDTO authenticationRequestDTO,@PathVariable String deviceId) throws Exception{
 
 
         log.info("Email and Password {} {}",authenticationRequestDTO.getEmail(),authenticationRequestDTO.getPassword());
-        return ResponseEntity.ok(adminService.authenticate(authenticationRequestDTO));
+        return ResponseEntity.ok(adminService.authenticate(authenticationRequestDTO,deviceId));
     }
 
-    @GetMapping(value="/getLoginToken/{email}")
-    public ResponseEntity<AuthenticationResponseDTO> getLoginToken(@PathVariable String email) throws Exception {
+    @GetMapping(value="/getLoginToken/{email}/{deviceId}")
+    public ResponseEntity<AuthenticationResponseDTO> getLoginToken(@PathVariable String email,@PathVariable String deviceId) throws Exception {
 
-        return ResponseEntity.ok(adminService.getLoginToken(email));
+        return ResponseEntity.ok(adminService.getLoginToken(email,deviceId));
+    }
+    @PostMapping("/addPlan")
+    public void addPlan(@RequestBody Plans plan){
+//        System.out.println("----------->"+plan);
+        subscriptionService.addPlan(plan);
+    }
+
+    @PutMapping("/updatePlan")
+    public void updatePlan(@RequestBody Plans plan){
+//        System.out.println("----------->"+plan);
+        subscriptionService.updatePlan(plan);
+    }
+    @DeleteMapping("/deletePlan/{id}")
+    public void deletePlan(@PathVariable String id){
+//        System.out.println("----------->"+id);
+        subscriptionService.deletePlan(id);
+    }
+    @GetMapping("/getPlan/{id}")
+    public Plans getPlan(@PathVariable String id){
+//        System.out.println("----------->"+id);
+        return subscriptionService.getPlan(id);
+    }
+    @GetMapping("/getAllPlan")
+    public List<Plans> getAllPlan(){
+//        System.out.println("----------->"+id);
+        return subscriptionService.getAllPlan();
     }
 }

@@ -136,18 +136,18 @@ public class CustomerServiceImpl implements CustomerService {
 	}
 
 	@Override
-	public AuthenticationResponseDTO authenticate(AuthenticationRequestDTO authenticationRequestDTO) throws Exception {
+	public AuthenticationResponseDTO authenticate(AuthenticationRequestDTO authenticationRequestDTO,String deviceId) throws Exception {
 		// TODO Auto-generated method stub
 		authenticationManager.authenticate(
 				new UsernamePasswordAuthenticationToken(authenticationRequestDTO.getEmail(),authenticationRequestDTO.getPassword())
 				);
 		var user=customerRepository.findByEmail(authenticationRequestDTO.getEmail()).orElseThrow(()->new Exception("Not Present"));
-		var jwtToken=jwtService.generateToken(user);
+		var jwtToken=jwtService.generateToken(user,deviceId);
 		return AuthenticationResponseDTO.builder().token(jwtToken).build();
 	}
 
 	@Override
-	public AuthenticationResponseDTO getLoginToken(String email) throws UserNotFound {
+	public AuthenticationResponseDTO getLoginToken(String email,String deviceId) throws UserNotFound {
 		// TODO Auto-generated method stub
 		Optional<Customer> customer=customerRepository.findByEmail(email);
 		System.out.println("////"+customer);
@@ -155,7 +155,7 @@ public class CustomerServiceImpl implements CustomerService {
 			throw new UserNotFound("User Not Associated to any company");
 		}
 //		System.out.print(customer);
-		var jwtToken=jwtService.generateToken(customer.get());
+		var jwtToken=jwtService.generateToken(customer.get(),deviceId);
 		
 		
 		return AuthenticationResponseDTO.builder().token(jwtToken).role(customer.get().getRole()).build();

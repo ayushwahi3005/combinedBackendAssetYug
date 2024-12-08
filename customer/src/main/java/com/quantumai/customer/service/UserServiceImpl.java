@@ -143,6 +143,18 @@ public class UserServiceImpl implements UserService{
 		return usersDTO;
 	}
 
+	@Override
+	public void updateUser(UsersDTO usersDTO) {
+		Optional<Users> optionaluser=usersRepository.findByCompanyIdAndEmail(usersDTO.getCompanyId(), usersDTO.getEmail());
+		Users users=modelMapper.map(usersDTO,Users.class);
+        optionaluser.ifPresent(value -> {users.setId(value.getId());
+		users.setEmail(value.getEmail());
+		});
+		usersRepository.save(users);
+
+
+	}
+
 
 	@Override
 	public List<UsersDTO> getAllUsersByRole(String role,String companyId) {

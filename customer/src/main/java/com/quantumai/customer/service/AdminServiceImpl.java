@@ -13,6 +13,7 @@ import com.quantumai.customer.security.JwtService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -39,7 +40,7 @@ public class AdminServiceImpl implements AdminService {
     private JavaMailSender mailSender;
 
     @Autowired
-//    @Qualifier("adminAuthenticationProvider")
+//	@Qualifier("adminAuthProvider")
     private AuthenticationManager authenticationManager;
 
 
@@ -50,12 +51,12 @@ public class AdminServiceImpl implements AdminService {
     private final Map<String, String> otpStorage = new HashMap<>();
 
     @Override
-    public Admin login(Admin admin) throws Exception {
+    public AuthenticationResponseDTO login(Admin admin,String deviceId) throws Exception {
         List<Admin> adminList=adminRepository.findAll();
         if(!adminList.isEmpty()) {
             Admin admin1 = adminList.get(0);
             if(passwordEncoder.matches(admin.getPassword(),admin1.getPassword())&&admin.getEmail().equals(admin1.getEmail())){
-                return admin;
+                return getLoginToken(admin.getEmail(),deviceId);
             }
             else{
                 return null;
@@ -134,24 +135,24 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public AuthenticationResponseDTO authenticate(AuthenticationRequestDTO authenticationRequestDTO) throws Exception {
+    public AuthenticationResponseDTO authenticate(AuthenticationRequestDTO authenticationRequestDTO,String deviceId) throws Exception {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(authenticationRequestDTO.getEmail(),authenticationRequestDTO.getPassword())
         );
         var user=adminRepository.findByEmail(authenticationRequestDTO.getEmail()).orElseThrow(()->new Exception("Not Present"));
-        var jwtToken=jwtService.generateToken(user);
+        var jwtToken=jwtService.generateToken(user,deviceId);
         return AuthenticationResponseDTO.builder().token(jwtToken).build();
     }
 
     @Override
-    public AuthenticationResponseDTO getLoginToken(String email) throws UserNotFound {
+    public AuthenticationResponseDTO getLoginToken(String email,String deviceId) throws UserNotFound {
         Optional<Admin> admin=adminRepository.findByEmail(email);
         System.out.println("////"+admin);
         if(admin.isEmpty()) {
-            throw new UserNotFound("User Not Associated to any company");
+            throw new UserNotFound("User Not Found");
         }
 //		System.out.print(customer);
-        var jwtToken=jwtService.generateToken(admin.get());
+        var jwtToken=jwtService.generateToken(admin.get(),deviceId);
 
 
         return AuthenticationResponseDTO.builder().token(jwtToken).role(admin.get().getRole()).build();

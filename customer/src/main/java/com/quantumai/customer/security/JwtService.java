@@ -37,10 +37,10 @@ public class JwtService {
 	    return claimsResolver.apply(claims);
 	  }
 
-	  public String generateToken(UserDetails userDetails) {
+	  public String generateToken(UserDetails userDetails,String deviceId) {
 		  Map<String,Object> myMap=new HashMap<String,Object>();
 		  myMap.put("Role", userDetails.getAuthorities());
-	    return generateToken(myMap, userDetails);
+	    return generateToken(myMap, userDetails,deviceId);
 	  }
 	public String generateTokenForInvite(Mail mail) {
 
@@ -60,24 +60,27 @@ public class JwtService {
 
 	  public String generateToken(
 	      Map<String, Object> extraClaims,
-	      UserDetails userDetails
+	      UserDetails userDetails,
+		  String deviceId
 	  ) {
 		 
-	    return buildToken(extraClaims, userDetails, jwtExpiration);
+	    return buildToken(extraClaims, userDetails,deviceId, jwtExpiration);
 	  }
 
 	  public String generateRefreshToken(
-	      UserDetails userDetails
+	      UserDetails userDetails,
+		  String deviceId
 	  ) {
 		Map<String,Object> myMap=new HashMap<String,Object>();
 		myMap.put("Role", userDetails.getAuthorities());
 
-	    return buildToken(myMap, userDetails, refreshExpiration);
+	    return buildToken(myMap, userDetails,deviceId, refreshExpiration);
 	  }
 
 	  private String buildToken(
 	          Map<String, Object> extraClaims,
 	          UserDetails userDetails,
+			  String deviceId,
 	          long expiration
 	  ) {
 		 
@@ -87,9 +90,13 @@ public class JwtService {
 	            .setSubject(userDetails.getUsername())
 	            .setIssuedAt(new Date(System.currentTimeMillis()))
 	            .setExpiration(new Date(System.currentTimeMillis() + expiration))
+				.claim("deviceId",deviceId)
 	            .signWith(getSignInKey(), SignatureAlgorithm.HS256)
 	            .compact();
 	  }
+	public String extractCustomClaim(String token, String claimKey) {
+		return extractAllClaims(token).get(claimKey, String.class);
+	}
 
 	  public boolean isTokenValid(String token, UserDetails userDetails) {
 	    final String userEmail = extractUserEmail(token);
@@ -104,7 +111,7 @@ public class JwtService {
 	    return extractClaim(token, Claims::getExpiration);
 	  }
 
-	  private Claims extractAllClaims(String token) {
+	  public Claims extractAllClaims(String token) {
 	    return Jwts
 	        .parserBuilder()
 	        .setSigningKey(getSignInKey())

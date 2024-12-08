@@ -277,7 +277,7 @@ public class AssetsServiceImpl implements AssetsService {
 //			//System.out.println("--------------------------------------------"+x.getDate());
 //		});
 //		//System.out.println("--------------------------------------------"+checkInOutDTO.getDetailsList().size());
-		List<AssetCheckInOut> checkInOutList=checkInOutRepository.findByAssetId(checkInDTO.getAssetId());
+		Optional<AssetCheckInOut> checkInOutList=checkInOutRepository.findByAssetId(checkInDTO.getAssetId());
 	
 		
 		if(checkInOutList.isEmpty()) {
@@ -327,7 +327,7 @@ public class AssetsServiceImpl implements AssetsService {
 	@Override
 	public List<AssetCheckInOutDTO> getCheckOutInList(String assetId) {
 		// TODO Auto-generated method stub
-		List<AssetCheckInOut>  checkInOutList=checkInOutRepository.findByAssetId(assetId);
+		Optional<AssetCheckInOut>  checkInOutList=checkInOutRepository.findByAssetId(assetId);
 		List<AssetCheckInOutDTO>  checkInOutDTOList=new ArrayList<>();
 		if(!checkInOutList.isEmpty()) {
 			
@@ -902,21 +902,28 @@ public class AssetsServiceImpl implements AssetsService {
 		AtomicReference<Integer> checkOut = new AtomicReference<>(0);
 		List<AssetCheckInOutDTO> assetCheckInOutDTOList=new ArrayList<>();
 		assetsList.stream().forEach((data)->{
-			List<AssetCheckInOut> assetCheckInOutDTOmyList=checkInOutRepository.findByAssetId(data.getId());
-			assetCheckInOutDTOmyList.forEach((checkList)->{
-
-				checkList.getDetailsList().forEach((ele)->{
-					if(ele.getStatus().equals("Checked In")){
-						checkIn.getAndSet(checkIn.get() + 1);
-					}
-					else{
-						checkOut.getAndSet(checkOut.get() + 1);
-					}
-
-				});
-			});
+			Optional<AssetCheckInOut> assetCheckInOutDTO=checkInOutRepository.findByAssetId(data.getId());
+			if(assetCheckInOutDTO.isPresent()&&assetCheckInOutDTO.get().getStatus().equals("Checked Out")){
+				checkIn.getAndSet(checkIn.get() + 1);
+			}
+			else{
+				checkOut.getAndSet(checkOut.get() + 1);
+			}
+//			assetCheckInOutDTOmyList.forEach((checkList)->{
+//
+//				checkList.getDetailsList().forEach((ele)->{
+//					if(ele.getStatus().equals("Checked Out")){
+//						checkIn.getAndSet(checkIn.get() + 1);
+//					}
+//					else{
+//						checkOut.getAndSet(checkOut.get() + 1);
+//					}
+//
+//				});
+//			});
 
 		});
+		System.out.println("===>"+checkIn.get()+" "+checkOut.get());
 		CheckInCheckOutCountDTO checkInCheckOutCountDTO=new CheckInCheckOutCountDTO();
 		checkInCheckOutCountDTO.setCheckIn(checkIn.get());
 		checkInCheckOutCountDTO.setCheckOut(checkOut.get());
@@ -996,6 +1003,48 @@ public class AssetsServiceImpl implements AssetsService {
 	public List<AssetCategory> getActiveCategoryList(String companyId) {
 		List<AssetCategory> categoryList= assetCategoryRepository.findByCompanyIdAndStatus(companyId,"active");
 		return categoryList;
+	}
+
+	@Override
+	public List<AssetsDTO> getActiveAssets(String companyId) {
+		List<Assets> assetList=assetsRepository.findByCompanyId(companyId);
+		List<AssetsDTO> filteredList=new ArrayList<>();
+		assetList.stream().forEach((ele)->{
+			if(ele.getStatus().equals("active")){
+				AssetsDTO assetsDTO=modelMapper.map(ele,AssetsDTO.class);
+
+				filteredList.add(assetsDTO);
+			}
+		});
+		return filteredList;
+
+	}
+
+	@Override
+	public Map<String,List<AssetsDTO>> getAssetByCategory(String companyId) {
+		List<Assets> assetList=assetsRepository.findByCompanyId(companyId);
+		List<AssetCategory> assetCategoryList=assetCategoryRepository.findByCompanyId(companyId);
+		Map<String,List<AssetsDTO>> categoryAssetMap=new HashMap<>();
+		List<AssetsDTO> filteredList=new ArrayList<>();
+		assetCategoryList.forEach((category)->{
+			assetList.forEach((asset)->{
+				if(asset.getCategory().equals(category.getName())) {
+					if (categoryAssetMap.containsKey(category.getName())) {
+						List<AssetsDTO> assetsDTOList = categoryAssetMap.get(category.getName());
+						AssetsDTO assetsDTO = modelMapper.map(asset, AssetsDTO.class);
+						assetsDTOList.add(assetsDTO);
+						categoryAssetMap.put(category.getName(), assetsDTOList);
+					} else {
+						AssetsDTO assetsDTO = modelMapper.map(asset, AssetsDTO.class);
+						List<AssetsDTO> assetsDTOList = new ArrayList<>();
+						assetsDTOList.add(assetsDTO);
+						categoryAssetMap.put(category.getName(), assetsDTOList);
+					}
+				}
+			});
+
+        });
+		return categoryAssetMap;
 	}
 
 }

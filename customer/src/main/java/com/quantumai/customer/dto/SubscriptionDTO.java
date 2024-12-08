@@ -20,4 +20,5 @@ public class SubscriptionDTO {
     private LocalDate subscriptionDate;
     private LocalDate expiryDate;
     private SubscriptionPlan subscriptionPlan;
+    private Double amount;
 }
