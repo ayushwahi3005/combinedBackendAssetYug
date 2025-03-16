@@ -5,6 +5,6 @@ import lombok.Data;
 @Data
 public class ExcelDatabaseColumnMapping {
 
-	private String excelColumn;
-	private String databaseColumn;
+  private String excelColumn;
+  private String databaseColumn;
 }

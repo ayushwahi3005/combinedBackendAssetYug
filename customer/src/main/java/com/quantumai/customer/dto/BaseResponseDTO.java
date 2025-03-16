@@ -5,7 +5,6 @@ import lombok.Data;
 @Data
 public class BaseResponseDTO {
 
-	private String message;
-	private boolean isSucess;
-	
+  private String message;
+  private boolean isSucess;
 }

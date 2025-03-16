@@ -7,16 +7,12 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @Data
 @Document
 public class CompanyCustomerExtraFields {
-	
 
-	@Id
-	private String id;
+  @Id private String id;
 
-	private String name;
-	private String value;
-	private String companyCustomerId;
-	private String type;
-	private String companyId;
-	
-	
+  private String name;
+  private String value;
+  private String companyCustomerId;
+  private String type;
+  private String companyId;
 }

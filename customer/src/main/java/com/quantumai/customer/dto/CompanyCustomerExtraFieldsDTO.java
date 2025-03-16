@@ -4,11 +4,11 @@ import lombok.Data;
 
 @Data
 public class CompanyCustomerExtraFieldsDTO {
-	private String id;
+  private String id;
 
-	private String name;
-	private String value;
-	private String companyCustomerId;
-	private String type;
-	private String companyId;
+  private String name;
+  private String value;
+  private String companyCustomerId;
+  private String type;
+  private String companyId;
 }

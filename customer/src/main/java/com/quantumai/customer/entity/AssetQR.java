@@ -8,11 +8,9 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @Data
 public class AssetQR {
 
-	@Id
-	private String id;
-	private String type;
-	private String custom;
-	private String optional;
-	private String companyId;
-	
+  @Id private String id;
+  private String type;
+  private String custom;
+  private String optional;
+  private String companyId;
 }

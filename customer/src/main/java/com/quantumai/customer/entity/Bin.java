@@ -7,10 +7,9 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @Data
 @Document
 public class Bin {
-    @Id
-    String id;
-    String location;
-    String binNumber;
-    private StatusEnum status;
-    String companyId;
+  @Id String id;
+  String location;
+  String binNumber;
+  private StatusEnum status;
+  String companyId;
 }

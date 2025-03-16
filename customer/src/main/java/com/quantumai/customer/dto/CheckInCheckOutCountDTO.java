@@ -5,6 +5,6 @@ import lombok.Data;
 @Data
 public class CheckInCheckOutCountDTO {
 
-    Integer checkIn;
-    Integer checkOut;
+  Integer checkIn;
+  Integer checkOut;
 }

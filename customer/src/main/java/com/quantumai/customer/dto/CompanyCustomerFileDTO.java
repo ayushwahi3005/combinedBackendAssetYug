@@ -4,8 +4,8 @@ import lombok.Data;
 
 @Data
 public class CompanyCustomerFileDTO {
-	private String id;
-	private String companyCustomerId;
-	private String fileName;
-	private byte[] file;
+  private String id;
+  private String companyCustomerId;
+  private String fileName;
+  private byte[] file;
 }

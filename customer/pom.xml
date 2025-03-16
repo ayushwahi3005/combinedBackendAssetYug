@@ -151,6 +151,13 @@
 			<artifactId>firebase-admin</artifactId>
 			<version>8.1.0</version>
 		</dependency>
+
+		<dependency>
+			<groupId>com.diffplug.spotless</groupId>
+			<artifactId>spotless-maven-plugin</artifactId>
+			<version>2.43.0</version>
+		</dependency>
+
 	</dependencies>
 
 	<build>
@@ -165,6 +172,23 @@
 							<artifactId>lombok</artifactId>
 						</exclude>
 					</excludes>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>com.diffplug.spotless</groupId>
+				<artifactId>spotless-maven-plugin</artifactId>
+				<version>2.43.0</version>
+				<executions>
+					<execution>
+						<goals>
+							<goal>apply</goal> <!-- or "check" based on your need -->
+						</goals>
+					</execution>
+				</executions>
+				<configuration>
+					<java>
+						<googleJavaFormat/>
+					</java>
 				</configuration>
 			</plugin>
 		</plugins>

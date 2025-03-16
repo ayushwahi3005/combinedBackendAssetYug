@@ -1,14 +1,11 @@
 package com.quantumai.customer.dto;
 
-import lombok.Data;
-
-import com.quantumai.customer.entity.Role;
-
 import lombok.Builder;
+import lombok.Data;
 
 @Data
 @Builder
 public class AuthenticationResponseDTO {
-	private String token;
-	private String role;
+  private String token;
+  private String role;
 }

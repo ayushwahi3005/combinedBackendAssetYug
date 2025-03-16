@@ -1,11 +1,10 @@
 package com.quantumai.customer.repository;
 
 import com.quantumai.customer.entity.Location;
+import java.util.List;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
-import java.util.List;
+public interface LocationRepository extends MongoRepository<Location, String> {
 
-public interface LocationRepository extends MongoRepository<Location,String> {
-
-    List<Location> findByCompanyId(String id);
+  List<Location> findByCompanyId(String id);
 }

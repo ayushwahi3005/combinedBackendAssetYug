@@ -6,9 +6,9 @@ import lombok.Data;
 @Data
 public class BinDTO {
 
-    String id;
-    String location;
-    String binNumber;
-    private StatusEnum status;
-    String companyId;
+  String id;
+  String location;
+  String binNumber;
+  private StatusEnum status;
+  String companyId;
 }

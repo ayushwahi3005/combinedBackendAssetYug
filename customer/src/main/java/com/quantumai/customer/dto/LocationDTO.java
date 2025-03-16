@@ -4,13 +4,13 @@ import lombok.Data;
 
 @Data
 public class LocationDTO {
-    private String id;
-    private String companyId;
-    private String parentLocation;
-    private String address;
-    private String apartment;
-    private String city;
-    private String state;
-    private String status;
-    private Integer zipCode;
+  private String id;
+  private String companyId;
+  private String parentLocation;
+  private String address;
+  private String apartment;
+  private String city;
+  private String state;
+  private String status;
+  private Integer zipCode;
 }

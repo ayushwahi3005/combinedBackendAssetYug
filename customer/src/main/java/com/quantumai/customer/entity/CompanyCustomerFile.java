@@ -8,9 +8,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @Document
 public class CompanyCustomerFile {
 
-	@Id
-	private String id;
-	private String companyCustomerId;
-	private String fileName;
-	private byte[] file;
+  @Id private String id;
+  private String companyCustomerId;
+  private String fileName;
+  private byte[] file;
 }

@@ -1,6 +1,6 @@
 package com.quantumai.customer.entity;
 
 public enum SubscriptionPlan {
-    MONTHLY,
-    ANNUAL;
+  MONTHLY,
+  ANNUAL;
 }

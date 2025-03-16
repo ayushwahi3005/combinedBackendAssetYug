@@ -8,18 +8,13 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @Data
 public class ImportHistory {
 
-    @Id
-    private String id;
-    private String fileName;
-    private String date;
-    private String status;
-    private Long complete;
-    private String recordType;
-    private String message;
-    private String executedBy;
-    private String companyId;
-
-
-
-
+  @Id private String id;
+  private String fileName;
+  private String date;
+  private String status;
+  private Long complete;
+  private String recordType;
+  private String message;
+  private String executedBy;
+  private String companyId;
 }

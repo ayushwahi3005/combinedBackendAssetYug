@@ -8,11 +8,10 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @Document
 public class CompanyCustomerMandatoryFields {
 
-	@Id
-	private String id;
-	private String name;
-	private boolean mandatory;
-	private String email;
-	private String type;
-	private String companyId;
+  @Id private String id;
+  private String name;
+  private boolean mandatory;
+  private String email;
+  private String type;
+  private String companyId;
 }

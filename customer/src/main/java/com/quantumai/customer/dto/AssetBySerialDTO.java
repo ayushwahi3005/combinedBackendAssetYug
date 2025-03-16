@@ -5,6 +5,6 @@ import lombok.Data;
 @Data
 public class AssetBySerialDTO {
 
-    String companyId;
-    String serialNumber;
+  String companyId;
+  String serialNumber;
 }

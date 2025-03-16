@@ -5,6 +5,6 @@ import lombok.Data;
 @Data
 public class CompanyIdDTO {
 
-	private String id;
-	private String companyName;
+  private String id;
+  private String companyName;
 }

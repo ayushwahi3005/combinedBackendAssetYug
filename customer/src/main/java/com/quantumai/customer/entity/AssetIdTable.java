@@ -8,12 +8,11 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @Document
 public class AssetIdTable {
 
-	@Id
-	private String id;
-	private int tableId;
-	private String companyId;
-	
-	public void updateId() {
-		this.tableId+=1;
-	}
+  @Id private String id;
+  private int tableId;
+  private String companyId;
+
+  public void updateId() {
+    this.tableId += 1;
+  }
 }

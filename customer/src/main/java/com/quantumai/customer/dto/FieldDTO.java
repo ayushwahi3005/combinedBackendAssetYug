@@ -5,7 +5,7 @@ import lombok.Data;
 @Data
 public class FieldDTO {
 
-	private String name;
-	private String email;
-	private String companyId;
+  private String name;
+  private String email;
+  private String companyId;
 }
