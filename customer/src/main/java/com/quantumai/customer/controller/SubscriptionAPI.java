@@ -6,6 +6,8 @@ import com.quantumai.customer.service.SubscriptionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @CrossOrigin(origins = "**")
 @RestController
 @RequestMapping("/subscription")
@@ -33,5 +35,32 @@ public class SubscriptionAPI {
     // System.out.println("----------->"+subscriptionService.getCurrentSubscription(companyId).getExpiryDate());
     System.out.println("----------->" + subscriptionService.getCurrentSubscription(companyId));
     return subscriptionService.getCurrentSubscription(companyId);
+  }
+  @GetMapping("/getAllSubscription/{companyId}")
+  public List<Subscription> getAllSubscription(@PathVariable String companyId) {
+    //
+    // System.out.println("----------->"+subscriptionService.getCurrentSubscription(companyId).getSubscriptionDate());
+    //
+    // System.out.println("----------->"+subscriptionService.getCurrentSubscription(companyId).getExpiryDate());
+
+    return subscriptionService.getAllSubscription(companyId);
+  }
+  @DeleteMapping("/deleteUpcomingSubscription/{companyId}/{companyName}/{email}")
+  public void deleteUpcomingSubscription(@PathVariable String companyId,@PathVariable String companyName,@PathVariable String email) throws Exception {
+    //
+    // System.out.println("----------->"+subscriptionService.getCurrentSubscription(companyId).getSubscriptionDate());
+    //
+    // System.out.println("----------->"+subscriptionService.getCurrentSubscription(companyId).getExpiryDate());
+
+    subscriptionService.deleteUpcomingSubscription(companyId,companyName,email);
+  }
+  @GetMapping("/startUpcomingSubscription/{companyId}/{companyName}/{email}")
+  public void startUpcomingSubscription(@PathVariable String companyId,@PathVariable String companyName,@PathVariable String email) throws Exception {
+    //
+    // System.out.println("----------->"+subscriptionService.getCurrentSubscription(companyId).getSubscriptionDate());
+    //
+    // System.out.println("----------->"+subscriptionService.getCurrentSubscription(companyId).getExpiryDate());
+    subscriptionService.startUpcomingSubscription(companyId,companyName,email);
+
   }
 }

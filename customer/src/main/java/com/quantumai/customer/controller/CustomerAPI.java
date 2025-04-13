@@ -178,6 +178,13 @@ public class CustomerAPI {
     customerService.addRoleAndPermission(customRoleDTO);
   }
 
+  @GetMapping(value = "/roleAndPermission/get/{companyId}/{name}")
+  public ResponseEntity<CustomRoleDTO> getRoleAndPermissionByName(@PathVariable String companyId,@PathVariable String name)
+          throws Exception {
+
+    return ResponseEntity.ok(customerService.roleAndPermissionByName(companyId,name));
+  }
+
   @GetMapping(value = "/roleAndPermission/get/{companyId}")
   public ResponseEntity<List<CustomRoleDTO>> getRoleAndPermission(@PathVariable String companyId)
       throws Exception {

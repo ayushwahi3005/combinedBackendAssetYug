@@ -14,8 +14,10 @@ public class AssetCategoryInspection {
     @Id
     private String id;
     private String name;
+    private String categoryName;
     private String categoryId;
     private String companyId;
     private List<InspectionStep> steps;
+    private StatusEnum status;
 
 }

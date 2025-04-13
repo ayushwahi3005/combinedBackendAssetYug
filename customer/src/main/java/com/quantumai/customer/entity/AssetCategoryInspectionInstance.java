@@ -8,7 +8,7 @@ import java.util.List;
 
 @Data
 @Document
-public class AssetCategoryInspectionValues {
+public class AssetCategoryInspectionInstance {
     @Id
     private String id;
     private String assetId;

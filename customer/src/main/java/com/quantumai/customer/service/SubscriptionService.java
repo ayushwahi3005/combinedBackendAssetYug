@@ -30,4 +30,10 @@ public interface SubscriptionService {
   public List<Plans> getAllPlan();
 
   public Subscription getCurrentSubscription(String companyId);
+
+  public List<Subscription> getAllSubscription(String companyId);
+
+  public void deleteUpcomingSubscription(String companyId,String companyName,String email) throws Exception;
+
+  public void startUpcomingSubscription(String companyId,String companyName,String email) throws Exception;
 }

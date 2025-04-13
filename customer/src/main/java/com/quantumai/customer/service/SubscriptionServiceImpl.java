@@ -27,17 +27,19 @@ public class SubscriptionServiceImpl implements SubscriptionService {
 
   @Autowired private PlansRepository plansRepository;
 
+  @Autowired private PaymentService paymentService;
+
   private ModelMapper modelMapper = new ModelMapper();
 
   @Override
   public void addSubscription(SubscriptionDTO subscriptionDTO) {
     Subscription subscription = modelMapper.map(subscriptionDTO, Subscription.class);
     subscription.setSubscriptionDate(LocalDate.now());
-    Optional<Subscription> mySubscription =
-        subscriptionRepository.findByCompanyId(subscriptionDTO.getCompanyId());
-    if (mySubscription.isPresent()) {
-      subscription.setId(mySubscription.get().getId());
-    }
+//    List<Subscription> mySubscription =
+//        subscriptionRepository.findByCompanyId(subscriptionDTO.getCompanyId());
+//    if (mySubscription.isPresent()) {
+//      subscription.setId(mySubscription.get().getId());
+//    }
 
     subscriptionRepository.save(subscription);
   }
@@ -59,7 +61,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
               LocalDate planExpiredDate = planRenewDate.plusMonths(1);
               System.out.println(
                   "Expired-->" + planRenewDate + " planExpiredDate->" + planExpiredDate);
-              if (LocalDate.now().isBefore(planExpiredDate)
+              if (LocalDate.now().isAfter(planExpiredDate)
                   || LocalDateTime.now().equals(planExpiredDate)) {
                 System.out.println("Yesss");
                 subs.setStatus(SubscriptionEnum.EXPIRED);
@@ -121,11 +123,29 @@ public class SubscriptionServiceImpl implements SubscriptionService {
 
   @Override
   public Subscription getCurrentSubscription(String companyId) {
-    Optional<Subscription> subscription = subscriptionRepository.findByCompanyId(companyId);
-    if (subscription.isPresent()) {
-      return subscription.get();
-    } else {
-      return null;
+    Optional<Subscription> subscription = subscriptionRepository.findByCompanyIdAndStatus(companyId,"ACTIVE");
+      return subscription.orElse(null);
+  }
+
+  @Override
+  public List<Subscription> getAllSubscription(String companyId) {
+    List<Subscription> subscription = subscriptionRepository.findByCompanyId(companyId);
+    return subscription;
+  }
+
+  @Override
+  public void deleteUpcomingSubscription(String companyId,String companyName,String email) throws Exception {
+    Optional<Subscription> subscription = subscriptionRepository.findByCompanyIdAndStatus(companyId,"UPCOMING");
+    if(subscription.isPresent()){
+      paymentService.cancelUpcomingSubscriptionStripe(companyId,companyName,email);
+    }
+  }
+
+  @Override
+  public void startUpcomingSubscription(String companyId, String companyName, String email) throws Exception {
+    Optional<Subscription> subscription = subscriptionRepository.findByCompanyIdAndStatus(companyId,"UPCOMING");
+    if(subscription.isPresent()){
+      paymentService.startUpcomingSubscriptionStripe(companyId,companyName,email);
     }
   }
 }

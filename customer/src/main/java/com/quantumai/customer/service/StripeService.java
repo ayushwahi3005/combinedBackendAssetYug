@@ -165,7 +165,7 @@ public class StripeService {
     return null; // ❌ No customer found
   }
   private Subscription createSubscription(String customerId, String companyId) throws StripeException {
-    Optional<com.quantumai.customer.entity.Subscription> subscriptionOptional = subscriptionRepository.findByCompanyId(companyId);
+    Optional<com.quantumai.customer.entity.Subscription> subscriptionOptional = subscriptionRepository.findByCompanyIdAndStatus(companyId,"ACTIVE");
 
     if (subscriptionOptional.isPresent()) {
       ZonedDateTime nextBillingDate;

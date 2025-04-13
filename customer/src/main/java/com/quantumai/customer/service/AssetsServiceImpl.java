@@ -44,7 +44,7 @@ public class AssetsServiceImpl implements AssetsService {
 
   @Autowired private AssetCategoryInspectionRepository assetCategoryInspectionRepository;
 
-    @Autowired private AssetCategoryInspectionValuesRepository assetCategoryInspectionValuesRepository;
+    @Autowired private AssetCategoryInspectionInstanceRepository assetCategoryInspectionInstanceRepository;
 
   LocalDateTime localDateTime;
 
@@ -1098,7 +1098,12 @@ public class AssetsServiceImpl implements AssetsService {
         assetCategoryInspectionRepository.save(assetCategoryInspection);
     }
 
-    @Override
+  @Override
+  public void deleteAssetInspection(String id) {
+    assetCategoryInspectionRepository.deleteById(id);
+  }
+
+  @Override
     public AssetCategoryInspection getAssetInspection(String assetInspectionId) throws Exception {
         return assetCategoryInspectionRepository.findById(assetInspectionId)
                 .orElseThrow(() -> new Exception("No such Inspection Step"));
@@ -1111,12 +1116,12 @@ public class AssetsServiceImpl implements AssetsService {
     }
 
     @Override
-    public void addAssetInspectionValues(AssetCategoryInspectionValues assetCategoryInspectionValues) {
-        assetCategoryInspectionValuesRepository.save(assetCategoryInspectionValues);
+    public void addAssetInspectionInstance(AssetCategoryInspectionInstance assetCategoryInspectionInstance) {
+        assetCategoryInspectionInstanceRepository.save(assetCategoryInspectionInstance);
     }
 
     @Override
-    public List<AssetCategoryInspectionValues> getAllAssetCategoryInspectionValues(String companyId) {
-        return assetCategoryInspectionValuesRepository.findByCompanyId(companyId);
+    public List<AssetCategoryInspectionInstance> getAllAssetCategoryInspectionValues(String companyId) {
+        return assetCategoryInspectionInstanceRepository.findByCompanyId(companyId);
     }
 }

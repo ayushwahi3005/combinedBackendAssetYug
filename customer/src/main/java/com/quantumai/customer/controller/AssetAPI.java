@@ -32,7 +32,6 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
 
 @CrossOrigin(origins = "**")
 @RestController
@@ -1367,12 +1366,12 @@ public class AssetAPI {
     //        Boolean asc=true;
     //        Boolean asc=true;
 
-    System.out.println("CompanyId--------AssetAPI-------->" + filter.toString());
+//    System.out.println("CompanyId--------AssetAPI-------->" + filter.toString());
     if (asc == null) {
       asc = true;
     }
-    System.out.println("Workingggggg");
-    System.out.println("===> " + pageNumber + "-" + category + "-" + searchData + "-" + asc);
+//    System.out.println("Workingggggg");
+//    System.out.println("===> " + pageNumber + "-" + category + "-" + searchData + "-" + asc);
     if (pageNumber == null) {
       pageNumber = 0;
     }
@@ -1448,6 +1447,10 @@ public class AssetAPI {
     public void addAssetInspection(@RequestBody AssetCategoryInspection assetCategoryInspection) {
          assetsService.addAssetInspection(assetCategoryInspection);
     }
+    @DeleteMapping(value = "/deleteAssetInspection/{id}")
+    public void deleteAssetInspection(@PathVariable String id) {
+        assetsService.deleteAssetInspection(id);
+    }
     @GetMapping(value = "/getAssetInspection/{id}")
     public AssetCategoryInspection getAssetInspection(@PathVariable String id) throws Exception {
         return assetsService.getAssetInspection(id);
@@ -1456,12 +1459,12 @@ public class AssetAPI {
     public List<AssetCategoryInspection> getAllAssetInspection(@PathVariable String companyId) throws Exception {
         return assetsService.getAllAssetInspection(companyId);
     }
-    @PostMapping(value = "/addAssetInspectionValues")
-    public void addAssetInspection(@RequestBody AssetCategoryInspectionValues assetCategoryInspection) {
-        assetsService.addAssetInspectionValues(assetCategoryInspection);
+    @PostMapping(value = "/addAssetInspectionInstance")
+    public void addAssetInspection(@RequestBody AssetCategoryInspectionInstance assetCategoryInspection) {
+        assetsService.addAssetInspectionInstance(assetCategoryInspection);
     }
-    @GetMapping(value = "/getAllAssetInspectionValues/{companyId}")
-    public List<AssetCategoryInspectionValues> getAllAssetInspectionValues(@PathVariable String companyId) {
+    @GetMapping(value = "/getAllAssetInspectionInstance/{companyId}")
+    public List<AssetCategoryInspectionInstance> getAllAssetInspectionInstance(@PathVariable String companyId) {
         return assetsService.getAllAssetCategoryInspectionValues(companyId);
     }
   @GetMapping(value = "/getAssetByCategory/{companyId}")

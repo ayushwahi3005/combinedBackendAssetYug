@@ -19,14 +19,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
+import java.time.*;
+import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+
 
 @Service
 @Transactional
@@ -322,8 +321,278 @@ public class PaymentService {
 //
 //    return subscription;
 //}
+//public Subscription createSubscription(String companyId, String paymentMethodId, String name, String email, SubscriptionPlan planSelected, Long quantity, Double amount, String cardHolderName) throws Exception {
+//  Optional<com.quantumai.customer.entity.Subscription> subscriptionOptional = subscriptionRepository.findByCompanyId(companyId);
+//  String priceAmountTag;
+//
+//  if (planSelected == SubscriptionPlan.MONTHLY) {
+//    priceAmountTag = "price_1Qs970DbrtjFAyfvny0ecIQz"; // Monthly plan price ID
+//  } else {
+//    priceAmountTag = "price_1Qs9QyDbrtjFAyfvQpwzPUAI"; // Annual plan price ID
+//  }
+//
+//  boolean isStillValid = false;
+//  Long totalQuantity = quantity;
+//
+//  if (subscriptionOptional.isPresent()) {
+//    com.quantumai.customer.entity.Subscription mySubsc = subscriptionOptional.get();
+//
+////    if (mySubsc.getExpiryDate().isAfter(LocalDate.now())) {
+////      isStillValid = true;
+////      Optional<CustomerStripeDetails> optionalCustomerStripeDetails = customerStripeDetailsRepository.findByCompanyId(companyId);
+////
+////      if (mySubsc.getSubscriptionPlan() == SubscriptionPlan.MONTHLY) {
+////        if (planSelected == SubscriptionPlan.MONTHLY) {
+////          if (quantity <= mySubsc.getPerson()) {
+////            throw new PlanPersonException("Person count cannot be less than or equal to already subscribed persons.");
+////          }
+////
+////          long additionalUsers = quantity - mySubsc.getPerson();
+////          double monthlyCostPerUser = amount / quantity;
+////          double additionalCharge = monthlyCostPerUser * additionalUsers;
+////
+////          if (optionalCustomerStripeDetails.isPresent()) {
+////            List<Subscription> subscriptions = Subscription.list(Map.of("customer", optionalCustomerStripeDetails.get().getCustomerId())).getData();
+////
+//            for (Subscription sub : subscriptions) {
+//              if (!sub.getStatus().equals("canceled")) {
+//                List<SubscriptionItem> subscriptionItems = sub.getItems().getData();
+//                if (!subscriptionItems.isEmpty()) {
+//                  String subscriptionItemId = subscriptionItems.get(0).getId();
+//                  System.out.println("Updating existing subscription item ID: " + subscriptionItemId);
+//
+//                  SubscriptionUpdateParams params = SubscriptionUpdateParams.builder()
+//                          .addItem(SubscriptionUpdateParams.Item.builder()
+//                                  .setId(subscriptionItemId)
+//                                  .setPrice(priceAmountTag)
+//                                  .setQuantity(quantity) // Corrected to set the new total quantity
+//                                  .build()
+//                          )
+//                          .setProrationBehavior(SubscriptionUpdateParams.ProrationBehavior.ALWAYS_INVOICE)
+//                          .build();
+//
+//                  Subscription updatedSubscription = sub.update(params);
+//                  System.out.println("Updated subscription ID: " + updatedSubscription.getId());
+//                }
+//              }
+//            }
+//          }
+////
+////          // ✅ Charge only for additional users
+////          Payment payment = new Payment();
+////          payment.setPaymentStatus(PaymentStatus.COMPLETED);
+////          payment.setPaymentType(PaymentType.CREDIT_CARD);
+////          payment.setDescription("Additional users upgrade");
+////          payment.setCompanyId(companyId);
+////          payment.setAmount(additionalCharge);
+////          payment.setTransactionDate(LocalDateTime.now());
+////          paymentRepository.save(payment);
+////
+////          // ✅ Update Subscription in Database
+////          mySubsc.setPerson(quantity.intValue());
+////          mySubsc.setAmount(mySubsc.getAmount() + additionalCharge);
+////          subscriptionRepository.save(mySubsc);
+////
+////          // ❌ RETURN HERE TO AVOID CREATING A NEW SUBSCRIPTION
+////          return null;
+////        }
+////        else{
+////          if (optionalCustomerStripeDetails.isPresent()) {
+////            List<Subscription> subscriptions = Subscription.list(Map.of("customer", optionalCustomerStripeDetails.get().getCustomerId())).getData();
+////            for (Subscription sub : subscriptions) {
+////              if (!sub.getStatus().equals("canceled")) {
+////                // Cancel the monthly subscription
+////                sub.cancel(Map.of(
+////                        "invoice_now", true, // Charge immediately
+////                        "prorate", false
+////                ));
+////              }
+////            }
+////          }
+////
+////
+////        }
+////      }
+////      else{
+////        System.out.println("MY PLANNNNNNNNN ISSSS ANNNUAAALLLLLLLL");
+////        if (planSelected == SubscriptionPlan.MONTHLY) {
+////          throw new PlanDowngradeException("Cannot downgrade from Annual to Monthly.");
+////        }
+////        if (quantity <= mySubsc.getPerson()) {
+////          throw new PlanPersonException("Person count cannot be less than or equal to the existing subscription.");
+////        }
+////        /////////////////////////////////////////
+////        long additionalUsers = quantity - mySubsc.getPerson();
+////        double yearlyCostPerUser = amount / quantity;
+////        double additionalCharge = yearlyCostPerUser * additionalUsers;
+////
+////        if (optionalCustomerStripeDetails.isPresent()) {
+////          List<Subscription> subscriptions = Subscription.list(Map.of("customer", optionalCustomerStripeDetails.get().getCustomerId())).getData();
+////
+////          for (Subscription sub : subscriptions) {
+////            if (!sub.getStatus().equals("canceled")) {
+////              List<SubscriptionItem> subscriptionItems = sub.getItems().getData();
+////              if (!subscriptionItems.isEmpty()) {
+////                String subscriptionItemId = subscriptionItems.get(0).getId();
+////                System.out.println("Updating existing subscription item ID: " + subscriptionItemId);
+////
+////                SubscriptionUpdateParams params = SubscriptionUpdateParams.builder()
+////                        .addItem(SubscriptionUpdateParams.Item.builder()
+////                                .setId(subscriptionItemId)
+////                                .setPrice(priceAmountTag)
+////                                .setQuantity(quantity) // Corrected to set the new total quantity
+////                                .build()
+////                        )
+////                        .setProrationBehavior(SubscriptionUpdateParams.ProrationBehavior.ALWAYS_INVOICE)
+////                        .build();
+////
+////                Subscription updatedSubscription = sub.update(params);
+////                System.out.println("Updated subscription ID: " + updatedSubscription.getId());
+////              }
+////            }
+////          }
+////        }
+////
+////        // ✅ Charge only for additional users
+////        Payment payment = new Payment();
+////        payment.setPaymentStatus(PaymentStatus.COMPLETED);
+////        payment.setPaymentType(PaymentType.CREDIT_CARD);
+////        payment.setDescription("Additional users upgrade");
+////        payment.setCompanyId(companyId);
+////        payment.setAmount(additionalCharge);
+////        payment.setTransactionDate(LocalDateTime.now());
+////        paymentRepository.save(payment);
+////
+////        // ✅ Update Subscription in Database
+////        com.quantumai.customer.entity.Subscription newSubs = subscriptionOptional.get();
+////        System.out.println("Subsc-----====ID===============>"+newSubs.getId());
+////
+////        newSubs.setPerson(quantity.intValue());
+////        newSubs.setAmount(newSubs.getAmount() + additionalCharge);
+////        subscriptionRepository.save(newSubs);
+////
+////        // ❌ RETURN HERE TO AVOID CREATING A NEW SUBSCRIPTION
+////        return null;
+////
+////      }
+////    }
+//
+////////////////////////////////////////////////////////////////////////
+//    if (mySubsc.getExpiryDate().isAfter(LocalDate.now())) {
+//      LocalDate expiryDate=mySubsc.getExpiryDate();
+//      Optional<CustomerStripeDetails> optionalCustomerStripeDetails = customerStripeDetailsRepository.findByCompanyId(companyId);
+//      if (optionalCustomerStripeDetails.isPresent()) {
+//        List<Subscription> subscriptions = Subscription.list(Map.of("customer", optionalCustomerStripeDetails.get().getCustomerId())).getData();
+//
+////        for (Subscription sub : subscriptions) {
+////          if (!sub.getStatus().equals("canceled")) {
+////            System.out.println("Canceling active subscription: " + sub.getId());
+////            sub.cancel(Map.of("invoice_now", false, "prorate", false));
+////          }
+////        }
+//        for (Subscription sub : subscriptions) {
+//          if (!sub.getStatus().equals("canceled")) {
+//            List<SubscriptionItem> subscriptionItems = sub.getItems().getData();
+//            if (!subscriptionItems.isEmpty()) {
+//              String subscriptionItemId = subscriptionItems.get(0).getId();
+//              System.out.println("Updating existing subscription item ID: " + subscriptionItemId);
+//
+//              SubscriptionUpdateParams params = SubscriptionUpdateParams.builder()
+//                      .addItem(SubscriptionUpdateParams.Item.builder()
+//                              .setId(subscriptionItemId)
+//                              .setPrice(priceAmountTag)
+//                              .setQuantity(quantity) // Corrected to set the new total quantity
+//                              .build()
+//                      )
+//                      .setProrationBehavior(SubscriptionUpdateParams.ProrationBehavior.ALWAYS_INVOICE)
+//                      .build();
+//
+//              Subscription updatedSubscription = sub.update(params);
+//              System.out.println("Updated subscription ID: " + updatedSubscription.getId());
+//            }
+//          }
+//        }
+//
+//        Payment payment = new Payment();
+//        payment.setPaymentStatus(PaymentStatus.COMPLETED);
+//        payment.setPaymentType(PaymentType.CREDIT_CARD);
+//        payment.setDescription("New Subscription Charge");
+//        payment.setCompanyId(companyId);
+//        payment.setAmount(amount);
+//        payment.setTransactionDate(LocalDateTime.now());
+//        paymentRepository.save(payment);
+//
+//        // ✅ Update Subscription in Database
+//        mySubsc.setPerson(quantity.intValue());
+//        mySubsc.setAmount(amount);
+//        subscriptionRepository.save(mySubsc);
+//
+//        // ❌ RETURN HERE TO AVOID CREATING A NEW SUBSCRIPTION
+//        return null;
+//      }
+//    }
+//  }
+//
+//  // ✅ If No Active Subscription Exists, Create a New One
+//  String customerId = createCustomerIfNotExists(email, name);
+//  PaymentMethod paymentMethod = PaymentMethod.retrieve(paymentMethodId);
+//  paymentMethod.attach(Map.of("customer", customerId));
+//
+//  CustomerUpdateParams customerUpdateParams = CustomerUpdateParams.builder()
+//          .setInvoiceSettings(CustomerUpdateParams.InvoiceSettings.builder()
+//                  .setDefaultPaymentMethod(paymentMethodId)
+//                  .build())
+//          .build();
+//  Customer.retrieve(customerId).update(customerUpdateParams);
+//
+//  SubscriptionCreateParams params = SubscriptionCreateParams.builder()
+//          .setCustomer(customerId)
+//          .addItem(SubscriptionCreateParams.Item.builder()
+//                  .setPrice(priceAmountTag)
+//                  .setQuantity(quantity)
+//                  .build()
+//          )
+//          .setPaymentBehavior(SubscriptionCreateParams.PaymentBehavior.DEFAULT_INCOMPLETE)
+//          .addExpand("latest_invoice.payment_intent")
+//          .build();
+//
+//  Subscription subscription = Subscription.create(params);
+//
+//  if (subscription.getLatestInvoiceObject().getPaymentIntentObject() != null) {
+//    String paymentIntentId = subscription.getLatestInvoiceObject().getPaymentIntentObject().getId();
+//    PaymentIntent intent = PaymentIntent.retrieve(paymentIntentId);
+//    intent.confirm();
+//
+//    Payment payment = new Payment();
+//    payment.setPaymentStatus(PaymentStatus.COMPLETED);
+//    payment.setPaymentType(PaymentType.CREDIT_CARD);
+//    payment.setDescription("Subscription Payment");
+//    payment.setCompanyId(companyId);
+//    payment.setAmount(amount);
+//    payment.setTransactionDate(LocalDateTime.now());
+//    paymentRepository.save(payment);
+//    com.quantumai.customer.entity.Subscription newSubscription;
+//      newSubscription = subscriptionOptional.orElseGet(com.quantumai.customer.entity.Subscription::new);
+////    com.quantumai.customer.entity.Subscription newSubs = subscriptionOptional.get();
+//
+//
+//
+//    newSubscription.setSubscriptionPlan(planSelected);
+//    newSubscription.setAmount(amount);
+//    newSubscription.setStatus(SubscriptionEnum.ACTIVE);
+//    newSubscription.setSubscriptionDate(LocalDate.now());
+//    newSubscription.setExpiryDate(planSelected == SubscriptionPlan.MONTHLY ? LocalDate.now().plusMonths(1) : LocalDate.now().plusYears(1));
+//    newSubscription.setCompanyId(companyId);
+//    newSubscription.setPerson(totalQuantity.intValue());
+//    subscriptionRepository.save(newSubscription);
+//
+//    saveCard(paymentMethodId, email, cardHolderName, companyId);
+//  }
+//
+//  return subscription;
+//}
 public Subscription createSubscription(String companyId, String paymentMethodId, String name, String email, SubscriptionPlan planSelected, Long quantity, Double amount, String cardHolderName) throws Exception {
-  Optional<com.quantumai.customer.entity.Subscription> subscriptionOptional = subscriptionRepository.findByCompanyId(companyId);
+  List<com.quantumai.customer.entity.Subscription> subscriptionList = subscriptionRepository.findByCompanyId(companyId);
   String priceAmountTag;
 
   if (planSelected == SubscriptionPlan.MONTHLY) {
@@ -332,154 +601,161 @@ public Subscription createSubscription(String companyId, String paymentMethodId,
     priceAmountTag = "price_1Qs9QyDbrtjFAyfvQpwzPUAI"; // Annual plan price ID
   }
 
-  boolean isStillValid = false;
-  Long totalQuantity = quantity;
+  if (!subscriptionList.isEmpty()) {
+    Optional<com.quantumai.customer.entity.Subscription> existingSubscriptionOptional = subscriptionRepository.findByCompanyIdAndStatus(companyId,"ACTIVE");
+    if(existingSubscriptionOptional.isEmpty()){
+      throw new Exception("No Active Subscription");
+    }
+    LocalDate expiryDate = existingSubscriptionOptional.get().getExpiryDate();
 
-  if (subscriptionOptional.isPresent()) {
-    com.quantumai.customer.entity.Subscription mySubsc = subscriptionOptional.get();
 
-    if (mySubsc.getExpiryDate().isAfter(LocalDate.now())) {
-      isStillValid = true;
-      Optional<CustomerStripeDetails> optionalCustomerStripeDetails = customerStripeDetailsRepository.findByCompanyId(companyId);
+    SubscriptionPlan existingPlan=existingSubscriptionOptional.get().getSubscriptionPlan();
+    Optional<CustomerStripeDetails> optionalCustomerStripeDetails = customerStripeDetailsRepository.findByCompanyId(companyId);
+    if(existingPlan==SubscriptionPlan.MONTHLY){
+      if(planSelected==SubscriptionPlan.MONTHLY){
 
-      if (mySubsc.getSubscriptionPlan() == SubscriptionPlan.MONTHLY) {
-        if (planSelected == SubscriptionPlan.MONTHLY) {
-          if (quantity <= mySubsc.getPerson()) {
-            throw new PlanPersonException("Person count cannot be less than or equal to already subscribed persons.");
-          }
-
-          long additionalUsers = quantity - mySubsc.getPerson();
-          double monthlyCostPerUser = amount / quantity;
-          double additionalCharge = monthlyCostPerUser * additionalUsers;
-
-          if (optionalCustomerStripeDetails.isPresent()) {
-            List<Subscription> subscriptions = Subscription.list(Map.of("customer", optionalCustomerStripeDetails.get().getCustomerId())).getData();
-
-            for (Subscription sub : subscriptions) {
-              if (!sub.getStatus().equals("canceled")) {
-                List<SubscriptionItem> subscriptionItems = sub.getItems().getData();
-                if (!subscriptionItems.isEmpty()) {
-                  String subscriptionItemId = subscriptionItems.get(0).getId();
-                  System.out.println("Updating existing subscription item ID: " + subscriptionItemId);
-
+        if (optionalCustomerStripeDetails.isPresent()) {
+          List<Subscription> subscriptions = Subscription.list(Map.of("customer", optionalCustomerStripeDetails.get().getCustomerId())).getData();
+          for (Subscription sub : subscriptions) {
+            if (!sub.getStatus().equals("canceled")) { // Ensure only active subscriptions are updated
                   SubscriptionUpdateParams params = SubscriptionUpdateParams.builder()
                           .addItem(SubscriptionUpdateParams.Item.builder()
-                                  .setId(subscriptionItemId)
+                                  .setId(sub.getItems().getData().get(0).getId()) // Get current subscription item ID
                                   .setPrice(priceAmountTag)
-                                  .setQuantity(quantity) // Corrected to set the new total quantity
+                                  .setQuantity(quantity)// Replace with your new Stripe price ID
                                   .build()
                           )
-                          .setProrationBehavior(SubscriptionUpdateParams.ProrationBehavior.ALWAYS_INVOICE)
+                          .setProrationBehavior(SubscriptionUpdateParams.ProrationBehavior.NONE) // Optional: Handle proration
                           .build();
 
                   Subscription updatedSubscription = sub.update(params);
                   System.out.println("Updated subscription ID: " + updatedSubscription.getId());
                 }
-              }
-            }
           }
-
-          // ✅ Charge only for additional users
-          Payment payment = new Payment();
-          payment.setPaymentStatus(PaymentStatus.COMPLETED);
-          payment.setPaymentType(PaymentType.CREDIT_CARD);
-          payment.setDescription("Additional users upgrade");
-          payment.setCompanyId(companyId);
-          payment.setAmount(additionalCharge);
-          payment.setTransactionDate(LocalDateTime.now());
-          paymentRepository.save(payment);
-
-          // ✅ Update Subscription in Database
-          mySubsc.setPerson(quantity.intValue());
-          mySubsc.setAmount(mySubsc.getAmount() + additionalCharge);
-          subscriptionRepository.save(mySubsc);
-
-          // ❌ RETURN HERE TO AVOID CREATING A NEW SUBSCRIPTION
-          return null;
-        }
-        else{
-          if (optionalCustomerStripeDetails.isPresent()) {
-            List<Subscription> subscriptions = Subscription.list(Map.of("customer", optionalCustomerStripeDetails.get().getCustomerId())).getData();
-            for (Subscription sub : subscriptions) {
-              if (!sub.getStatus().equals("canceled")) {
-                // Cancel the monthly subscription
-                sub.cancel(Map.of(
-                        "invoice_now", true, // Charge immediately
-                        "prorate", false
-                ));
-              }
-            }
-          }
+          com.quantumai.customer.entity.Subscription newSubscription = new com.quantumai.customer.entity.Subscription();
+          newSubscription.setSubscriptionPlan(planSelected);
+          newSubscription.setAmount(amount);
+          newSubscription.setStatus(SubscriptionEnum.UPCOMING);
+          newSubscription.setSubscriptionDate(expiryDate);
+          newSubscription.setExpiryDate(expiryDate.plusMonths(1));
+          newSubscription.setCompanyId(companyId);
+          newSubscription.setPerson(quantity.intValue());
+          subscriptionRepository.save(newSubscription);
 
 
         }
       }
-      else{
-        System.out.println("MY PLANNNNNNNNN ISSSS ANNNUAAALLLLLLLL");
-        if (planSelected == SubscriptionPlan.MONTHLY) {
-          throw new PlanDowngradeException("Cannot downgrade from Annual to Monthly.");
+      else if(planSelected==SubscriptionPlan.ANNUAL) {
+        if (optionalCustomerStripeDetails.isPresent()) {
+          List<Subscription> subscriptions = Subscription.list(Map.of("customer", optionalCustomerStripeDetails.get().getCustomerId())).getData();
+          for (Subscription sub : subscriptions) {
+            if (!sub.getStatus().equals("canceled")) {
+              System.out.println("Canceling current subscription: " + sub.getId());
+              sub.cancel(Map.of("invoice_now", false, "prorate", false)); // Do not charge immediately
+            }
+          }
+
         }
-        if (quantity <= mySubsc.getPerson()) {
-          throw new PlanPersonException("Person count cannot be less than or equal to the existing subscription.");
-        }
-        /////////////////////////////////////////
-        long additionalUsers = quantity - mySubsc.getPerson();
-        double yearlyCostPerUser = amount / quantity;
-        double additionalCharge = yearlyCostPerUser * additionalUsers;
+        Instant startDate = expiryDate.atStartOfDay(ZoneId.of("UTC")).toInstant();  // Desired start date in UTC
+        long trialEndTimestamp = startDate.getEpochSecond();
+
+        String customerId = createCustomerIfNotExists(email, name);
+        SubscriptionCreateParams params = SubscriptionCreateParams.builder()
+                .setCustomer(customerId)
+                .addItem(SubscriptionCreateParams.Item.builder()
+                        .setPrice(priceAmountTag)
+                        .setQuantity(quantity)
+                        .build()
+                )
+//              .setBillingCycleAnchor(expiryDate.atStartOfDay(ZoneId.systemDefault()).toEpochSecond()) // ✅ Start from expiry date
+                .setPaymentBehavior(SubscriptionCreateParams.PaymentBehavior.DEFAULT_INCOMPLETE)
+                .setProrationBehavior(SubscriptionCreateParams.ProrationBehavior.NONE)
+                .addExpand("latest_invoice.payment_intent")
+                .setTrialEnd(trialEndTimestamp)
+                .build();
+        Subscription subscription = Subscription.create(params);
+
+        com.quantumai.customer.entity.Subscription newSubscription = new com.quantumai.customer.entity.Subscription();
+        newSubscription.setSubscriptionPlan(planSelected);
+        newSubscription.setAmount(amount);
+        newSubscription.setStatus(SubscriptionEnum.UPCOMING);
+        newSubscription.setSubscriptionDate(expiryDate);
+        newSubscription.setExpiryDate(expiryDate.plusYears(1));
+        newSubscription.setCompanyId(companyId);
+        newSubscription.setPerson(quantity.intValue());
+        subscriptionRepository.save(newSubscription);
+      }
+
+    }
+    else{
+      if(planSelected==SubscriptionPlan.ANNUAL){
 
         if (optionalCustomerStripeDetails.isPresent()) {
           List<Subscription> subscriptions = Subscription.list(Map.of("customer", optionalCustomerStripeDetails.get().getCustomerId())).getData();
-
           for (Subscription sub : subscriptions) {
-            if (!sub.getStatus().equals("canceled")) {
-              List<SubscriptionItem> subscriptionItems = sub.getItems().getData();
-              if (!subscriptionItems.isEmpty()) {
-                String subscriptionItemId = subscriptionItems.get(0).getId();
-                System.out.println("Updating existing subscription item ID: " + subscriptionItemId);
+            if (!sub.getStatus().equals("canceled")) { // Ensure only active subscriptions are updated
+              SubscriptionUpdateParams params = SubscriptionUpdateParams.builder()
+                      .addItem(SubscriptionUpdateParams.Item.builder()
+                              .setId(sub.getItems().getData().get(0).getId()) // Get current subscription item ID
+                              .setPrice(priceAmountTag)
+                              .setQuantity(quantity)// Replace with your new Stripe price ID
+                              .build()
+                      )
+                      .setProrationBehavior(SubscriptionUpdateParams.ProrationBehavior.NONE) // Optional: Handle proration
+                      .build();
 
-                SubscriptionUpdateParams params = SubscriptionUpdateParams.builder()
-                        .addItem(SubscriptionUpdateParams.Item.builder()
-                                .setId(subscriptionItemId)
-                                .setPrice(priceAmountTag)
-                                .setQuantity(quantity) // Corrected to set the new total quantity
-                                .build()
-                        )
-                        .setProrationBehavior(SubscriptionUpdateParams.ProrationBehavior.ALWAYS_INVOICE)
-                        .build();
-
-                Subscription updatedSubscription = sub.update(params);
-                System.out.println("Updated subscription ID: " + updatedSubscription.getId());
-              }
+              Subscription updatedSubscription = sub.update(params);
+              System.out.println("Updated subscription ID: " + updatedSubscription.getId());
             }
           }
+          com.quantumai.customer.entity.Subscription newSubscription = new com.quantumai.customer.entity.Subscription();
+          newSubscription.setSubscriptionPlan(planSelected);
+          newSubscription.setAmount(amount);
+          newSubscription.setStatus(SubscriptionEnum.UPCOMING);
+          newSubscription.setSubscriptionDate(expiryDate);
+          newSubscription.setExpiryDate(expiryDate.plusYears(1));
+          newSubscription.setCompanyId(companyId);
+          newSubscription.setPerson(quantity.intValue());
+          subscriptionRepository.save(newSubscription);
+
         }
+      }
+      else if(planSelected==SubscriptionPlan.MONTHLY){
+        Instant startDate = expiryDate.atStartOfDay(ZoneId.of("UTC")).toInstant();  // Desired start date in UTC
+        long trialEndTimestamp = startDate.getEpochSecond();
 
-        // ✅ Charge only for additional users
-        Payment payment = new Payment();
-        payment.setPaymentStatus(PaymentStatus.COMPLETED);
-        payment.setPaymentType(PaymentType.CREDIT_CARD);
-        payment.setDescription("Additional users upgrade");
-        payment.setCompanyId(companyId);
-        payment.setAmount(additionalCharge);
-        payment.setTransactionDate(LocalDateTime.now());
-        paymentRepository.save(payment);
+        String customerId = createCustomerIfNotExists(email, name);
+        SubscriptionCreateParams params = SubscriptionCreateParams.builder()
+                .setCustomer(customerId)
+                .addItem(SubscriptionCreateParams.Item.builder()
+                        .setPrice(priceAmountTag)
+                        .setQuantity(quantity)
+                        .build()
+                )
+//              .setBillingCycleAnchor(expiryDate.atStartOfDay(ZoneId.systemDefault()).toEpochSecond()) // ✅ Start from expiry date
+                .setPaymentBehavior(SubscriptionCreateParams.PaymentBehavior.DEFAULT_INCOMPLETE)
+                .setProrationBehavior(SubscriptionCreateParams.ProrationBehavior.NONE)
+                .addExpand("latest_invoice.payment_intent")
+                .setTrialEnd(trialEndTimestamp)
+                .build();
+        Subscription subscription = Subscription.create(params);
 
-        // ✅ Update Subscription in Database
-        com.quantumai.customer.entity.Subscription newSubs = subscriptionOptional.get();
-        System.out.println("Subsc-----====ID===============>"+newSubs.getId());
-
-        newSubs.setPerson(quantity.intValue());
-        newSubs.setAmount(newSubs.getAmount() + additionalCharge);
-        subscriptionRepository.save(newSubs);
-
-        // ❌ RETURN HERE TO AVOID CREATING A NEW SUBSCRIPTION
-        return null;
-        //////////////////////////////////////////
+        com.quantumai.customer.entity.Subscription newSubscription = new com.quantumai.customer.entity.Subscription();
+        newSubscription.setSubscriptionPlan(planSelected);
+        newSubscription.setAmount(amount);
+        newSubscription.setStatus(SubscriptionEnum.UPCOMING);
+        newSubscription.setSubscriptionDate(expiryDate);
+        newSubscription.setExpiryDate(expiryDate.plusMonths(1));
+        newSubscription.setCompanyId(companyId);
+        newSubscription.setPerson(quantity.intValue());
+        subscriptionRepository.save(newSubscription);
       }
     }
+
+    return null;
   }
 
-  // ✅ If No Active Subscription Exists, Create a New One
+  // If no existing subscription, create a new one immediately
   String customerId = createCustomerIfNotExists(email, name);
   PaymentMethod paymentMethod = PaymentMethod.retrieve(paymentMethodId);
   paymentMethod.attach(Map.of("customer", customerId));
@@ -517,19 +793,15 @@ public Subscription createSubscription(String companyId, String paymentMethodId,
     payment.setAmount(amount);
     payment.setTransactionDate(LocalDateTime.now());
     paymentRepository.save(payment);
-    com.quantumai.customer.entity.Subscription newSubscription;
-      newSubscription = subscriptionOptional.orElseGet(com.quantumai.customer.entity.Subscription::new);
-//    com.quantumai.customer.entity.Subscription newSubs = subscriptionOptional.get();
 
-
-
+    com.quantumai.customer.entity.Subscription newSubscription = new com.quantumai.customer.entity.Subscription();
     newSubscription.setSubscriptionPlan(planSelected);
     newSubscription.setAmount(amount);
     newSubscription.setStatus(SubscriptionEnum.ACTIVE);
     newSubscription.setSubscriptionDate(LocalDate.now());
     newSubscription.setExpiryDate(planSelected == SubscriptionPlan.MONTHLY ? LocalDate.now().plusMonths(1) : LocalDate.now().plusYears(1));
     newSubscription.setCompanyId(companyId);
-    newSubscription.setPerson(totalQuantity.intValue());
+    newSubscription.setPerson(quantity.intValue());
     subscriptionRepository.save(newSubscription);
 
     saveCard(paymentMethodId, email, cardHolderName, companyId);
@@ -645,5 +917,146 @@ public Subscription createSubscription(String companyId, String paymentMethodId,
     Customer customer = Customer.create(customerParams);
 
     return customer.getId();
+  }
+  public void cancelUpcomingSubscriptionStripe(String companyId,String companyName,String email) throws Exception {
+    List<com.quantumai.customer.entity.Subscription> subscriptionList = subscriptionRepository.findByCompanyId(companyId);
+    Optional<com.quantumai.customer.entity.Subscription> upcomingPlan = subscriptionRepository.findByCompanyIdAndStatus(companyId,"UPCOMING");
+
+    String priceAmountTag;
+    if(upcomingPlan.isPresent()){
+
+      Optional<CustomerStripeDetails> optionalCustomerStripeDetails = customerStripeDetailsRepository.findByCompanyId(companyId);
+      if (optionalCustomerStripeDetails.isPresent()) {
+        List<Subscription> subscriptions = Subscription.list(Map.of("customer", optionalCustomerStripeDetails.get().getCustomerId())).getData();
+        for (Subscription sub : subscriptions) {
+          if (!sub.getStatus().equals("canceled")) { // Ensure only active subscriptions are canceled
+              sub.cancel(Map.of(
+                      "invoice_now", false,
+                      "prorate", false
+              ));
+
+            }
+        }
+
+        // Delete Upcoming from database
+        subscriptionRepository.delete(upcomingPlan.get());
+        Optional<com.quantumai.customer.entity.Subscription> currentPlan = subscriptionRepository.findByCompanyIdAndStatus(companyId,"ACTIVE");
+        if(currentPlan.isEmpty()) {
+          throw new Exception("No Active Subscription");
+        }
+        if (currentPlan.get().getSubscriptionPlan() == SubscriptionPlan.MONTHLY) {
+          priceAmountTag = "price_1Qs970DbrtjFAyfvny0ecIQz"; // Monthly plan price ID
+        } else {
+          priceAmountTag = "price_1Qs9QyDbrtjFAyfvQpwzPUAI"; // Annual plan price ID
+        }
+
+        //Re Subscribe current Subscription
+        Instant startDate = currentPlan.get().getExpiryDate().atStartOfDay(ZoneId.of("UTC")).toInstant();  // Desired start date in UTC
+        long trialEndTimestamp = startDate.getEpochSecond();
+        String customerId = createCustomerIfNotExists(email, companyName);
+        SubscriptionCreateParams params = SubscriptionCreateParams.builder()
+                .setCustomer(customerId)
+                .addItem(SubscriptionCreateParams.Item.builder()
+                        .setPrice(priceAmountTag)
+                        .setQuantity(currentPlan.get().getPerson().longValue())
+                        .build()
+                )
+//              .setBillingCycleAnchor(expiryDate.atStartOfDay(ZoneId.systemDefault()).toEpochSecond()) // ✅ Start from expiry date
+                .setPaymentBehavior(SubscriptionCreateParams.PaymentBehavior.DEFAULT_INCOMPLETE)
+                .setProrationBehavior(SubscriptionCreateParams.ProrationBehavior.NONE)
+                .addExpand("latest_invoice.payment_intent")
+                .setTrialEnd(trialEndTimestamp)
+                .build();
+        Subscription subscription = Subscription.create(params);
+
+
+      }
+    }
+
+  }
+
+  public void startUpcomingSubscriptionStripe(String companyId,String companyName,String email) throws PlanDowngradeException,Exception {
+    List<com.quantumai.customer.entity.Subscription> subscriptionList = subscriptionRepository.findByCompanyId(companyId);
+    Optional<com.quantumai.customer.entity.Subscription> optionalUpcomingPlan = subscriptionRepository.findByCompanyIdAndStatus(companyId,"UPCOMING");
+    Optional<com.quantumai.customer.entity.Subscription> optionalCurrentPlan = subscriptionRepository.findByCompanyIdAndStatus(companyId,"ACTIVE");
+
+    String priceAmountTag;
+    if(optionalUpcomingPlan.isPresent()){
+
+      Optional<CustomerStripeDetails> optionalCustomerStripeDetails = customerStripeDetailsRepository.findByCompanyId(companyId);
+      if (optionalCustomerStripeDetails.isPresent()) {
+
+        if(optionalCurrentPlan.isPresent()){
+          com.quantumai.customer.entity.Subscription currentSubscription=optionalCurrentPlan.get();
+          com.quantumai.customer.entity.Subscription upcomingSubscription=optionalUpcomingPlan.get();
+          if(currentSubscription.getSubscriptionPlan()==SubscriptionPlan.MONTHLY){
+
+            String stripeCustomerId = optionalCustomerStripeDetails.get().getCustomerId();
+
+            // Get the saved payment method ID
+            String paymentMethodId = optionalCustomerStripeDetails.get().getPaymentMethodId();
+
+            if (stripeCustomerId != null && paymentMethodId != null) {
+              // Call function to create payment
+              PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
+                      .setCustomer(stripeCustomerId) // Set customer ID
+                      .setAmount(upcomingSubscription.getAmount().longValue() * 100 * upcomingSubscription.getPerson()) // Convert amount to cents
+                      .setCurrency("usd") // Change as per your currency
+                      .setPaymentMethod(paymentMethodId) // Use the saved card
+                      .setConfirm(true) // Confirm payment immediately
+                      .setOffSession(true) // Use for subscriptions to charge without user interaction
+                      .build();
+
+              PaymentIntent paymentIntent = PaymentIntent.create(params);
+              System.out.println("Payment successful. PaymentIntent ID: " + paymentIntent.getId());
+              subscriptionRepository.delete(currentSubscription);
+              upcomingSubscription.setStatus(SubscriptionEnum.ACTIVE);
+              subscriptionRepository.save(upcomingSubscription);
+            } else {
+              throw new Exception("Stripe Customer ID or Payment Method ID is missing");
+            }
+          }
+          else if(currentSubscription.getSubscriptionPlan()==SubscriptionPlan.ANNUAL&&upcomingSubscription.getSubscriptionPlan()==SubscriptionPlan.ANNUAL){
+
+            String stripeCustomerId = optionalCustomerStripeDetails.get().getCustomerId();
+
+            // Get the saved payment method ID
+            String paymentMethodId = optionalCustomerStripeDetails.get().getPaymentMethodId();
+//            int leftMonths=currentSubscription.getExpiryDate().getMonthValue()-LocalDate.now().getMonthValue();
+            long leftMonths= ChronoUnit.MONTHS.between(LocalDate.now().withDayOfMonth(1), currentSubscription.getExpiryDate().withDayOfMonth(1));
+            long amount=(upcomingSubscription.getAmount().longValue()*leftMonths)/(12L *upcomingSubscription.getPerson());
+            int increasedPerson=upcomingSubscription.getPerson()-currentSubscription.getPerson();
+            System.out.println("leftMonths-->"+leftMonths+"Amount---------->"+amount+" increasedPerson--->"+increasedPerson);
+            if (stripeCustomerId != null && paymentMethodId != null) {
+              // Call function to create payment
+              PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
+                      .setCustomer(stripeCustomerId) // Set customer ID
+                      .setAmount(amount * 100 * increasedPerson) // Convert amount to cents
+                      .setCurrency("usd") // Change as per your currency
+                      .setPaymentMethod(paymentMethodId) // Use the saved card
+                      .setConfirm(true) // Confirm payment immediately
+                      .setOffSession(true) // Use for subscriptions to charge without user interaction
+                      .build();
+
+              PaymentIntent paymentIntent = PaymentIntent.create(params);
+              System.out.println("Payment successful. PaymentIntent ID: " + paymentIntent.getId());
+
+              upcomingSubscription.setStatus(SubscriptionEnum.ACTIVE);
+              upcomingSubscription.setExpiryDate(currentSubscription.getExpiryDate());
+              upcomingSubscription.setSubscriptionDate(LocalDate.now());
+              subscriptionRepository.delete(currentSubscription);
+              subscriptionRepository.save(upcomingSubscription);
+            } else {
+              throw new Exception("Stripe Customer ID or Payment Method ID is missing");
+            }
+          }
+          else{
+            throw new PlanDowngradeException("Cannot Process Request");
+          }
+        }
+
+      }
+    }
+
   }
 }

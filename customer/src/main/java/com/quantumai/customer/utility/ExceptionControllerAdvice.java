@@ -91,7 +91,7 @@ public class ExceptionControllerAdvice {
   @ExceptionHandler(PlanDowngradeException.class)
   public ResponseEntity<ErrorInfo> PlanDowngradeException(PlanDowngradeException exception) {
     ErrorInfo errorInfo = new ErrorInfo();
-    errorInfo.setErrorMessage("Cannot downgrade from Annual to Monthly");
+    errorInfo.setErrorMessage("Cannot Start from Annual to Monthly");
     errorInfo.setErrorCode(HttpStatus.BAD_REQUEST.value());
     return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
   }

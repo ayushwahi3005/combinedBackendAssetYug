@@ -8,6 +8,7 @@ import java.util.UUID;
 public class InspectionStep {
 
     private String id;
+    private long stepNumber;
     private String name;
     private InspectionStepType type;
 

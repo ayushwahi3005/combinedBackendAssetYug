@@ -112,11 +112,13 @@ public interface AssetsService {
 
   public void addAssetInspection(AssetCategoryInspection assetCategoryInspection);
 
+  public void deleteAssetInspection(String id);
+
   public AssetCategoryInspection getAssetInspection(String assetInspectionId) throws Exception;
 
   public List<AssetCategoryInspection> getAllAssetInspection(String companyId);
 
-  public void addAssetInspectionValues(AssetCategoryInspectionValues assetCategoryInspectionValues);
+  public void addAssetInspectionInstance(AssetCategoryInspectionInstance assetCategoryInspectionInstance);
 
-  public List<AssetCategoryInspectionValues> getAllAssetCategoryInspectionValues(String companyId);
+  public List<AssetCategoryInspectionInstance> getAllAssetCategoryInspectionValues(String companyId);
 }
