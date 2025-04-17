@@ -91,7 +91,7 @@ public class ExceptionControllerAdvice {
   @ExceptionHandler(PlanDowngradeException.class)
   public ResponseEntity<ErrorInfo> PlanDowngradeException(PlanDowngradeException exception) {
     ErrorInfo errorInfo = new ErrorInfo();
-    errorInfo.setErrorMessage("Cannot Start from Annual to Monthly");
+    errorInfo.setErrorMessage("Cannot Start Upcoming Subscription as Upcoming Subscription Person is less than Current Subscription");
     errorInfo.setErrorCode(HttpStatus.BAD_REQUEST.value());
     return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
   }
@@ -99,7 +99,7 @@ public class ExceptionControllerAdvice {
   @ExceptionHandler(PlanPersonException.class)
   public ResponseEntity<ErrorInfo> PlanPersonException(PlanPersonException exception) {
     ErrorInfo errorInfo = new ErrorInfo();
-    errorInfo.setErrorMessage("Person count cannot be less than or equal to the existing subscription");
+    errorInfo.setErrorMessage("Subscription Combination is Already Active");
     errorInfo.setErrorCode(HttpStatus.BAD_REQUEST.value());
     return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
   }

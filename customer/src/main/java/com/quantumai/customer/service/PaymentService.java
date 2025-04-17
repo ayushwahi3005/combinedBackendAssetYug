@@ -611,6 +611,9 @@ public Subscription createSubscription(String companyId, String paymentMethodId,
 
     SubscriptionPlan existingPlan=existingSubscriptionOptional.get().getSubscriptionPlan();
     Optional<CustomerStripeDetails> optionalCustomerStripeDetails = customerStripeDetailsRepository.findByCompanyId(companyId);
+    if(existingPlan==planSelected&&existingSubscriptionOptional.get().getPerson()==quantity.intValue()){
+      throw new PlanPersonException("Same Plan Cannot be Selected");
+    }
     if(existingPlan==SubscriptionPlan.MONTHLY){
       if(planSelected==SubscriptionPlan.MONTHLY){
 
@@ -989,18 +992,20 @@ public Subscription createSubscription(String companyId, String paymentMethodId,
         if(optionalCurrentPlan.isPresent()){
           com.quantumai.customer.entity.Subscription currentSubscription=optionalCurrentPlan.get();
           com.quantumai.customer.entity.Subscription upcomingSubscription=optionalUpcomingPlan.get();
-          if(currentSubscription.getSubscriptionPlan()==SubscriptionPlan.MONTHLY){
+          System.out.println("=======> Current Person "+currentSubscription.getPerson()+" Upcoming Person "+upcomingSubscription.getPerson());
+          if(currentSubscription.getSubscriptionPlan()==SubscriptionPlan.MONTHLY&&upcomingSubscription.getSubscriptionPlan()==SubscriptionPlan.MONTHLY&&upcomingSubscription.getPerson()>currentSubscription.getPerson()){
 
             String stripeCustomerId = optionalCustomerStripeDetails.get().getCustomerId();
 
             // Get the saved payment method ID
             String paymentMethodId = optionalCustomerStripeDetails.get().getPaymentMethodId();
-
+            Double amountPerPerson=upcomingSubscription.getAmount()/upcomingSubscription.getPerson();
+            Long totalAmount=(upcomingSubscription.getPerson()-currentSubscription.getPerson())*amountPerPerson.longValue();
             if (stripeCustomerId != null && paymentMethodId != null) {
               // Call function to create payment
               PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
                       .setCustomer(stripeCustomerId) // Set customer ID
-                      .setAmount(upcomingSubscription.getAmount().longValue() * 100 * upcomingSubscription.getPerson()) // Convert amount to cents
+                      .setAmount(totalAmount*100) // Convert amount to cents
                       .setCurrency("usd") // Change as per your currency
                       .setPaymentMethod(paymentMethodId) // Use the saved card
                       .setConfirm(true) // Confirm payment immediately
@@ -1009,6 +1014,15 @@ public Subscription createSubscription(String companyId, String paymentMethodId,
 
               PaymentIntent paymentIntent = PaymentIntent.create(params);
               System.out.println("Payment successful. PaymentIntent ID: " + paymentIntent.getId());
+
+              Payment payment = new Payment();
+              payment.setPaymentStatus(PaymentStatus.COMPLETED);
+              payment.setPaymentType(PaymentType.CREDIT_CARD);
+              payment.setDescription("Subscription Payment");
+              payment.setCompanyId(companyId);
+              payment.setAmount(totalAmount.doubleValue());
+              payment.setTransactionDate(LocalDateTime.now());
+              paymentRepository.save(payment);
               subscriptionRepository.delete(currentSubscription);
               upcomingSubscription.setStatus(SubscriptionEnum.ACTIVE);
               subscriptionRepository.save(upcomingSubscription);
@@ -1016,7 +1030,7 @@ public Subscription createSubscription(String companyId, String paymentMethodId,
               throw new Exception("Stripe Customer ID or Payment Method ID is missing");
             }
           }
-          else if(currentSubscription.getSubscriptionPlan()==SubscriptionPlan.ANNUAL&&upcomingSubscription.getSubscriptionPlan()==SubscriptionPlan.ANNUAL){
+          else if(currentSubscription.getSubscriptionPlan()==SubscriptionPlan.ANNUAL&&upcomingSubscription.getSubscriptionPlan()==SubscriptionPlan.ANNUAL&&upcomingSubscription.getPerson()>currentSubscription.getPerson()){
 
             String stripeCustomerId = optionalCustomerStripeDetails.get().getCustomerId();
 
@@ -1041,6 +1055,15 @@ public Subscription createSubscription(String companyId, String paymentMethodId,
               PaymentIntent paymentIntent = PaymentIntent.create(params);
               System.out.println("Payment successful. PaymentIntent ID: " + paymentIntent.getId());
 
+              Payment payment = new Payment();
+              payment.setPaymentStatus(PaymentStatus.COMPLETED);
+              payment.setPaymentType(PaymentType.CREDIT_CARD);
+              payment.setDescription("Subscription Payment");
+              payment.setCompanyId(companyId);
+              payment.setAmount(amount * 1.00 * increasedPerson);
+              payment.setTransactionDate(LocalDateTime.now());
+              paymentRepository.save(payment);
+
               upcomingSubscription.setStatus(SubscriptionEnum.ACTIVE);
               upcomingSubscription.setExpiryDate(currentSubscription.getExpiryDate());
               upcomingSubscription.setSubscriptionDate(LocalDate.now());
@@ -1050,7 +1073,8 @@ public Subscription createSubscription(String companyId, String paymentMethodId,
               throw new Exception("Stripe Customer ID or Payment Method ID is missing");
             }
           }
-          else{
+          else
+         {
             throw new PlanDowngradeException("Cannot Process Request");
           }
         }
