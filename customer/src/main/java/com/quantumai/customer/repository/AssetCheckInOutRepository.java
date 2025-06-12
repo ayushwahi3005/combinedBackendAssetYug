@@ -8,5 +8,5 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 public interface AssetCheckInOutRepository extends MongoRepository<AssetCheckInOut, String> {
   public Optional<AssetCheckInOut> findByAssetId(String assetid);
 
-  public List<AssetCheckInOut> findByCompanyId(String companyId);
+  public List<AssetCheckInOut> findByCompanyId(Long companyId);
 }

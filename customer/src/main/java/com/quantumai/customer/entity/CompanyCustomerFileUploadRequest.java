@@ -4,7 +4,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 public class CompanyCustomerFileUploadRequest {
   private MultipartFile file;
-  private String companyId;
+  private Long companyId;
 
   private String email;
 
@@ -16,11 +16,11 @@ public class CompanyCustomerFileUploadRequest {
     this.file = file;
   }
 
-  public String getCompanyId() {
+  public Long getCompanyId() {
     return companyId;
   }
 
-  public void setCompanyId(String companyId) {
+  public void setCompanyId(Long companyId) {
     this.companyId = companyId;
   }
 

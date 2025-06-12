@@ -7,7 +7,7 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface AssetMandatoryFieldsRepository
     extends MongoRepository<AssetMandatoryFields, String> {
-  public Optional<AssetMandatoryFields> findByNameAndCompanyId(String name, String companyId);
+  public Optional<AssetMandatoryFields> findByNameAndCompanyId(String name, Long companyId);
 
-  public List<AssetMandatoryFields> findByCompanyId(String companyId);
+  public List<AssetMandatoryFields> findByCompanyId(Long companyId);
 }

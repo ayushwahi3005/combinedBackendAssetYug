@@ -12,6 +12,6 @@ public class AssetCheckInOut {
   @Id private String id;
   private String assetId;
   private String status;
-  private String companyId;
+  private Long companyId;
   private List<AssetCheckInOutDetails> detailsList;
 }

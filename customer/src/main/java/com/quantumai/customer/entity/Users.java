@@ -2,6 +2,7 @@ package com.quantumai.customer.entity;
 
 import lombok.Data;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.DBRef;
 
 @Data
 public class Users {
@@ -11,8 +12,9 @@ public class Users {
   private String lastName;
   private String email;
   private String title;
-  private String companyId;
+  private Long companyId;
   private String mobileNumber;
   private String password;
-  private String role;
+  private StatusEnum status;
+  @DBRef private CustomRole role;
 }

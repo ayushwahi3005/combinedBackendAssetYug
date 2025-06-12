@@ -9,7 +9,7 @@ import lombok.Data;
 public class SubscriptionDTO {
 
   private String id;
-  private String companyId;
+  private Long companyId;
   private SubscriptionEnum status;
   private String plan;
   private Integer person;

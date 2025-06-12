@@ -6,9 +6,9 @@ import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface AssetCategoryRepository extends MongoRepository<AssetCategory, String> {
-  public List<AssetCategory> findByCompanyId(String companyId);
+  public List<AssetCategory> findByCompanyId(Long companyId);
 
   public Optional<AssetCategory> findByName(String name);
 
-  public List<AssetCategory> findByCompanyIdAndStatus(String companyId, String status);
+  public List<AssetCategory> findByCompanyIdAndStatus(Long companyId, String status);
 }

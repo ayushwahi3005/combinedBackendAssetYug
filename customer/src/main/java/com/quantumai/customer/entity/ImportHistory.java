@@ -16,5 +16,5 @@ public class ImportHistory {
   private String recordType;
   private String message;
   private String executedBy;
-  private String companyId;
+  private Long companyId;
 }

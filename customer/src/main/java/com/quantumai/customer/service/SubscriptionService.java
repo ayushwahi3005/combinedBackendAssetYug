@@ -17,7 +17,7 @@ public interface SubscriptionService {
 
   public void updatePayment(Payment payment);
 
-  public List<Payment> getAllPayment(String companyId);
+  public List<Payment> getAllPayment(Long companyId);
 
   public void addPlan(Plans plans);
 
@@ -29,11 +29,13 @@ public interface SubscriptionService {
 
   public List<Plans> getAllPlan();
 
-  public Subscription getCurrentSubscription(String companyId);
+  public Subscription getCurrentSubscription(Long companyId);
 
-  public List<Subscription> getAllSubscription(String companyId);
+  public List<Subscription> getAllSubscription(Long companyId);
 
-  public void deleteUpcomingSubscription(String companyId,String companyName,String email) throws Exception;
+  public void deleteUpcomingSubscription(Long companyId, String companyName, String email)
+      throws Exception;
 
-  public void startUpcomingSubscription(String companyId,String companyName,String email) throws Exception;
+  public void startUpcomingSubscription(Long companyId, String companyName, String email)
+      throws Exception;
 }

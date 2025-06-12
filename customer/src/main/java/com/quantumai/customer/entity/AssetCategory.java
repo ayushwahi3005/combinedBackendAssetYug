@@ -11,5 +11,5 @@ public class AssetCategory {
   @Id private String id;
   private String name;
   private String status;
-  private String companyId;
+  private Long companyId;
 }

@@ -13,5 +13,5 @@ public class AssetShowFields {
   private boolean show;
   private String email;
   private String type;
-  private String companyId;
+  private Long companyId;
 }

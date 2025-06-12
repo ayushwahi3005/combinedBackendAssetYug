@@ -20,7 +20,7 @@ public class ExceptionControllerAdvice {
   @ExceptionHandler(NoSubscriptionError.class)
   public ResponseEntity<ErrorInfo> NoSubscriptionErrorException(NoSubscriptionError exception) {
     ErrorInfo errorInfo = new ErrorInfo();
-    errorInfo.setErrorMessage("No Subscription");
+    errorInfo.setErrorMessage("No active subscription. Please subscribe to a Plan");
     errorInfo.setErrorCode(HttpStatus.BAD_REQUEST.value());
     return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
   }
@@ -80,8 +80,10 @@ public class ExceptionControllerAdvice {
     errorInfo.setErrorCode(HttpStatus.BAD_REQUEST.value());
     return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
   }
+
   @ExceptionHandler(ExtraFieldAlreadyPresentException.class)
-  public ResponseEntity<ErrorInfo> ExtraFieldAlreadyPresentException(ExtraFieldAlreadyPresentException exception) {
+  public ResponseEntity<ErrorInfo> ExtraFieldAlreadyPresentException(
+      ExtraFieldAlreadyPresentException exception) {
     ErrorInfo errorInfo = new ErrorInfo();
     errorInfo.setErrorMessage("Extra Field Already Present");
     errorInfo.setErrorCode(HttpStatus.BAD_REQUEST.value());
@@ -91,7 +93,8 @@ public class ExceptionControllerAdvice {
   @ExceptionHandler(PlanDowngradeException.class)
   public ResponseEntity<ErrorInfo> PlanDowngradeException(PlanDowngradeException exception) {
     ErrorInfo errorInfo = new ErrorInfo();
-    errorInfo.setErrorMessage("Cannot Start Upcoming Subscription as Upcoming Subscription Person is less than Current Subscription");
+    errorInfo.setErrorMessage(
+        "Cannot Start Upcoming Subscription as Upcoming Subscription Person is less than Current Subscription");
     errorInfo.setErrorCode(HttpStatus.BAD_REQUEST.value());
     return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
   }
@@ -104,5 +107,11 @@ public class ExceptionControllerAdvice {
     return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
   }
 
-
+  @ExceptionHandler(RoleDeletionException.class)
+  public ResponseEntity<ErrorInfo> RoleDeletionException(RoleDeletionException exception) {
+    ErrorInfo errorInfo = new ErrorInfo();
+    errorInfo.setErrorMessage("Some User is Already Using this Role");
+    errorInfo.setErrorCode(HttpStatus.BAD_REQUEST.value());
+    return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
+  }
 }

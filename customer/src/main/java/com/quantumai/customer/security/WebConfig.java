@@ -30,9 +30,10 @@ public class WebConfig {
     config.addAllowedHeader("Content-Type");
     config.addAllowedHeader("Authorization");
     config.addAllowedHeader("Device-Id"); // Add your custom header
-
+    config.addAllowedHeader("companyId");
     // Expose custom headers
     config.addExposedHeader("Device-Id");
+    config.addExposedHeader("companyId");
 
     // Register configuration
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

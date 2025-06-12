@@ -9,7 +9,9 @@ public interface CustomRoleRepository extends MongoRepository<CustomRole, String
 
   Optional<CustomRole> findById(String id);
 
-  Optional<CustomRole> findByNameAndCompanyId(String name, String id);
+  Optional<CustomRole> findByNameAndCompanyId(String name, Long id);
 
-  List<CustomRole> findByCompanyId(String companyId);
+  List<CustomRole> findByCompanyId(Long companyId);
+
+  List<CustomRole> findByCompanyIdAndStatus(Long companyId, String status);
 }

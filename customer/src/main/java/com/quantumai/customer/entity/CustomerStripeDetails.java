@@ -7,13 +7,11 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @Data
 @Document
 public class CustomerStripeDetails {
-    @Id
-    private String id;
-    private String firstName;
-    private String lastName;
-    private String paymentMethodId;
-    private String customerId;
-    private String companyId;
-    private String email;
-
+  @Id private String id;
+  private String firstName;
+  private String lastName;
+  private String paymentMethodId;
+  private String customerId;
+  private Long companyId;
+  private String email;
 }

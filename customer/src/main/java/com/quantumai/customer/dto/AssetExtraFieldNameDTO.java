@@ -8,5 +8,5 @@ public class AssetExtraFieldNameDTO {
   private String name;
   private String type;
   private String email;
-  private String companyId;
+  private Long companyId;
 }

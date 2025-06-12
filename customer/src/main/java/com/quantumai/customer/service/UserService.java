@@ -18,19 +18,20 @@ public interface UserService {
 
   public Claims decodeDetails(String token);
 
-  public List<UsersDTO> getAllUsers(String companyId);
+  public List<UsersDTO> getAllUsers(Long companyId);
 
   public void registerUser(Users user) throws UserException;
 
-  public UsersDTO getUsers(String companyId, String email);
+  public UsersDTO getUsers(Long companyId, String email);
 
   public void updateUser(UsersDTO usersDTO);
 
-  public List<UsersDTO> getAllUsersByRole(String role, String companyId);
+  public List<UsersDTO> getAllUsersByRole(String role, Long companyId);
 
-  public void deleteUser(String companyId, String email, String authHeader)
+  public void deleteUser(Long companyId, String email, String authHeader)
       throws FirebaseAuthException, UserCannotDeletedException, Exception;
-  //	public UserDTO resendMail(String email,String companyId);
+
+  //	public UserDTO resendMail(String email,Long companyId);
 
   public void addExtraFields(UserExtraFieldsDTO extraFieldsDTO) throws Exception;
 
@@ -38,28 +39,26 @@ public interface UserService {
 
   public void deleteExtraFields(String id) throws Exception;
 
-  public List<UserExtraFieldNameDTO> getUserExtraField(String companyId);
+  public List<UserExtraFieldNameDTO> getUserExtraField(Long companyId);
 
   public void addUserExtraField(UserExtraFieldNameDTO extraFieldNameDTO)
-          throws ExtraFieldAlreadyPresentException;
+      throws ExtraFieldAlreadyPresentException;
 
   public void deleteUserExtraField(String id);
 
-  public Map<String, Map<String, String>> getextraFieldList(String companyId);
+  public Map<String, Map<String, String>> getextraFieldList(Long companyId);
 
   public void updateShowFields(UserShowFields showFields);
 
   public void updateMandatoryFields(UserMandatoryFields mandatoryFields);
 
-  public UserShowFields getShowFields(String name, String companyId);
+  public UserShowFields getShowFields(String name, Long companyId);
 
-  public UserMandatoryFields getMandatoryFields(String name, String companyId);
+  public UserMandatoryFields getMandatoryFields(String name, Long companyId);
 
-  public List<UserShowFields> getAllShowFields(String companyId);
+  public List<UserShowFields> getAllShowFields(Long companyId);
 
-  public List<UserMandatoryFields> getAllMandatoryFields(String companyId);
+  public List<UserMandatoryFields> getAllMandatoryFields(Long companyId);
 
-  public void deleteShowAndMandatoryFields(String companyId, String name);
-
-
+  public void deleteShowAndMandatoryFields(Long companyId, String name);
 }

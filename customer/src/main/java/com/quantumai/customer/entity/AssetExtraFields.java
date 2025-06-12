@@ -11,5 +11,5 @@ public class AssetExtraFields {
   private String value;
   private String assetId;
   private String type;
-  private String companyId;
+  private Long companyId;
 }

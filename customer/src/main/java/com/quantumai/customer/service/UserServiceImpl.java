@@ -13,9 +13,8 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
-
 import java.util.*;
-
+import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 @Service
+@Slf4j
 public class UserServiceImpl implements UserService {
 
   @Autowired private JavaMailSender emailSender;
@@ -97,7 +97,7 @@ public class UserServiceImpl implements UserService {
   }
 
   @Override
-  public List<UsersDTO> getAllUsers(String companyId) {
+  public List<UsersDTO> getAllUsers(Long companyId) {
     // TODO Auto-generated method stub
     List<Users> usersList = usersRepository.findByCompanyId(companyId);
     List<UsersDTO> usersListDTO = new ArrayList<>();
@@ -125,7 +125,7 @@ public class UserServiceImpl implements UserService {
   }
 
   @Override
-  public UsersDTO getUsers(String companyId, String email) {
+  public UsersDTO getUsers(Long companyId, String email) {
     // TODO Auto-generated method stub
     Optional<Users> Optionaluser = usersRepository.findByCompanyIdAndEmail(companyId, email);
     UsersDTO usersDTO = modelMapper.map(Optionaluser.get(), UsersDTO.class);
@@ -146,7 +146,7 @@ public class UserServiceImpl implements UserService {
   }
 
   @Override
-  public List<UsersDTO> getAllUsersByRole(String role, String companyId) {
+  public List<UsersDTO> getAllUsersByRole(String role, Long companyId) {
     // TODO Auto-generated method stub
     List<Users> usersList = usersRepository.findByCompanyId(companyId);
     List<UsersDTO> usersListDTO = new ArrayList<>();
@@ -156,12 +156,12 @@ public class UserServiceImpl implements UserService {
               UsersDTO usersDTO = modelMapper.map(user, UsersDTO.class);
               usersListDTO.add(usersDTO);
             });
-    System.out.println("~~~~~~~~~~~~~~~~>"+usersListDTO);
+    System.out.println("~~~~~~~~~~~~~~~~>" + usersListDTO);
     return usersListDTO;
   }
 
   @Override
-  public void deleteUser(String companyId, String email, String authHeader) throws Exception {
+  public void deleteUser(Long companyId, String email, String authHeader) throws Exception {
     // TODO Auto-generated method stub
     this.headers.set("Authorization", authHeader);
     HttpEntity<String> requestEntity = new HttpEntity<>(headers);
@@ -188,12 +188,15 @@ public class UserServiceImpl implements UserService {
       FirebaseAuth.getInstance();
 
       // Retrieve user record based on email
-      UserRecord userRecord = FirebaseAuth.getInstance().getUserByEmail(email);
-
-      // Get user ID
-      String userId = userRecord.getUid();
-      if (!userId.isEmpty()) {
-        FirebaseAuth.getInstance().deleteUser(userId);
+      try {
+        UserRecord userRecord = FirebaseAuth.getInstance().getUserByEmail(email);
+        // Get user ID
+        String userId = userRecord.getUid();
+        if (!userId.isEmpty()) {
+          FirebaseAuth.getInstance().deleteUser(userId);
+        }
+      } catch (Exception e) {
+        log.info("User Not Found in Firebase...");
       }
 
       usersRepository.delete(OptionalUser.get());
@@ -220,11 +223,11 @@ public class UserServiceImpl implements UserService {
     }
     List<UserExtraFieldsDTO> extraFieldsDTOList = new ArrayList<>();
     extraFieldsList.stream()
-            .forEach(
-                    (x) -> {
-                      UserExtraFieldsDTO extraFieldsDTO = modelMapper.map(x, UserExtraFieldsDTO.class);
-                      extraFieldsDTOList.add(extraFieldsDTO);
-                    });
+        .forEach(
+            (x) -> {
+              UserExtraFieldsDTO extraFieldsDTO = modelMapper.map(x, UserExtraFieldsDTO.class);
+              extraFieldsDTOList.add(extraFieldsDTO);
+            });
     return extraFieldsDTOList;
   }
 
@@ -238,32 +241,33 @@ public class UserServiceImpl implements UserService {
   }
 
   @Override
-  public List<UserExtraFieldNameDTO> getUserExtraField(String companyId) {
+  public List<UserExtraFieldNameDTO> getUserExtraField(Long companyId) {
     List<UserExtraFieldName> extraFieldNameList =
-            extraFieldNameRepository.findByCompanyId(companyId);
+        extraFieldNameRepository.findByCompanyId(companyId);
     List<UserExtraFieldNameDTO> extraFieldNameListDTO = new ArrayList<>();
     extraFieldNameList.stream()
-            .forEach(
-                    (x) -> {
-                      UserExtraFieldNameDTO extraFieldNameDTO =
-                              modelMapper.map(x, UserExtraFieldNameDTO.class);
-                      extraFieldNameListDTO.add(extraFieldNameDTO);
-                    });
+        .forEach(
+            (x) -> {
+              UserExtraFieldNameDTO extraFieldNameDTO =
+                  modelMapper.map(x, UserExtraFieldNameDTO.class);
+              extraFieldNameListDTO.add(extraFieldNameDTO);
+            });
     return extraFieldNameListDTO;
   }
 
   @Override
-  public void addUserExtraField(UserExtraFieldNameDTO extraFieldNameDTO) throws ExtraFieldAlreadyPresentException {
+  public void addUserExtraField(UserExtraFieldNameDTO extraFieldNameDTO)
+      throws ExtraFieldAlreadyPresentException {
     UserExtraFieldName extraFieldNameNew =
-            extraFieldNameRepository.findByNameIgnoreCaseAndCompanyId(
-                    extraFieldNameDTO.getName(), extraFieldNameDTO.getCompanyId());
+        extraFieldNameRepository.findByNameIgnoreCaseAndCompanyId(
+            extraFieldNameDTO.getName(), extraFieldNameDTO.getCompanyId());
     if (extraFieldNameNew != null) {
       throw new ExtraFieldAlreadyPresentException("Extra Field Already Present");
     }
     extraFieldNameDTO.setName(extraFieldNameDTO.getName());
 
     UserExtraFieldName extraFieldName =
-            modelMapper.map(extraFieldNameDTO, UserExtraFieldName.class);
+        modelMapper.map(extraFieldNameDTO, UserExtraFieldName.class);
     extraFieldNameRepository.save(extraFieldName);
   }
 
@@ -273,42 +277,42 @@ public class UserServiceImpl implements UserService {
     extraFieldNameRepository.deleteById(id);
     UserExtraFieldName extraFieldName = extraFieldNameOptional.get();
     List<UserExtraFields> extraFieldsList =
-            extraFieldsRepository.findByNameIgnoreCase(extraFieldName.getName());
+        extraFieldsRepository.findByNameIgnoreCase(extraFieldName.getName());
     extraFieldsList.stream()
-            .forEach(
-                    (x) -> {
-                      // System.out.println("-------------------------------------->"+x.getName());
-                      extraFieldsRepository.delete(x);
-                    });
+        .forEach(
+            (x) -> {
+              // System.out.println("-------------------------------------->"+x.getName());
+              extraFieldsRepository.delete(x);
+            });
   }
 
   @Override
-  public Map<String, Map<String, String>> getextraFieldList(String companyId) {
+  public Map<String, Map<String, String>> getextraFieldList(Long companyId) {
     List<UserExtraFields> extraFieldNameList = extraFieldsRepository.findByCompanyId(companyId);
     List<Users> userList = usersRepository.findByCompanyId(companyId);
     Map<String, Map<String, String>> fieldNameValueMap = new HashMap<>();
 
     userList.stream()
-            .forEach(
-                    (user) -> {
-                      Map<String, String> m = new HashMap<>();
-                      extraFieldNameList.stream()
-                              .forEach(
-                                      (field) -> {
-                                        if (field.getUserId().endsWith(user.getId())) {
-                                          m.put(field.getName(), field.getValue());
-                                        }
-                                      });
-                      fieldNameValueMap.put(user.getId(), m);
-                    });
+        .forEach(
+            (user) -> {
+              Map<String, String> m = new HashMap<>();
+              extraFieldNameList.stream()
+                  .forEach(
+                      (field) -> {
+                        if (field.getUserId().endsWith(user.getId())) {
+                          m.put(field.getName(), field.getValue());
+                        }
+                      });
+              fieldNameValueMap.put(user.getId(), m);
+            });
     return fieldNameValueMap;
   }
 
   @Override
   public void updateShowFields(UserShowFields showFields) {
     Optional<UserShowFields> showFieldsOptional =
-            showFieldsRepository.findByNameIgnoreCaseAndCompanyId(
-                    showFields.getName(), showFields.getCompanyId());
+        showFieldsRepository.findByNameIgnoreCaseAndCompanyId(
+            showFields.getName(), showFields.getCompanyId());
     UserShowFields myShowFields = new UserShowFields();
     if (showFieldsOptional.isPresent()) {
       myShowFields = showFieldsOptional.get();
@@ -320,8 +324,8 @@ public class UserServiceImpl implements UserService {
   @Override
   public void updateMandatoryFields(UserMandatoryFields mandatoryFields) {
     Optional<UserMandatoryFields> mandatoryFieldsOptional =
-            mandatoryFieldsRepository.findByNameIgnoreCaseAndCompanyId(
-                    mandatoryFields.getName(), mandatoryFields.getCompanyId());
+        mandatoryFieldsRepository.findByNameIgnoreCaseAndCompanyId(
+            mandatoryFields.getName(), mandatoryFields.getCompanyId());
     UserMandatoryFields myMandatoryFields = new UserMandatoryFields();
     if (mandatoryFieldsOptional.isPresent()) {
       myMandatoryFields = mandatoryFieldsOptional.get();
@@ -331,9 +335,9 @@ public class UserServiceImpl implements UserService {
   }
 
   @Override
-  public UserShowFields getShowFields(String name, String companyId) {
+  public UserShowFields getShowFields(String name, Long companyId) {
     Optional<UserShowFields> showFieldsOptional =
-            showFieldsRepository.findByNameIgnoreCaseAndCompanyId(name, companyId);
+        showFieldsRepository.findByNameIgnoreCaseAndCompanyId(name, companyId);
     if (showFieldsOptional.isPresent()) {
       return showFieldsOptional.get();
     } else {
@@ -342,9 +346,9 @@ public class UserServiceImpl implements UserService {
   }
 
   @Override
-  public UserMandatoryFields getMandatoryFields(String name, String companyId) {
+  public UserMandatoryFields getMandatoryFields(String name, Long companyId) {
     Optional<UserMandatoryFields> mandatoryFieldsOptional =
-            mandatoryFieldsRepository.findByNameIgnoreCaseAndCompanyId(name, companyId);
+        mandatoryFieldsRepository.findByNameIgnoreCaseAndCompanyId(name, companyId);
     if (mandatoryFieldsOptional.isPresent()) {
       return mandatoryFieldsOptional.get();
     } else {
@@ -353,25 +357,25 @@ public class UserServiceImpl implements UserService {
   }
 
   @Override
-  public List<UserShowFields> getAllShowFields(String companyId) {
+  public List<UserShowFields> getAllShowFields(Long companyId) {
     List<UserShowFields> showFieldsList = showFieldsRepository.findByCompanyId(companyId);
     return showFieldsList;
   }
 
   @Override
-  public List<UserMandatoryFields> getAllMandatoryFields(String companyId) {
+  public List<UserMandatoryFields> getAllMandatoryFields(Long companyId) {
     List<UserMandatoryFields> mandatoryFieldsList =
-            mandatoryFieldsRepository.findByCompanyId(companyId);
+        mandatoryFieldsRepository.findByCompanyId(companyId);
     return mandatoryFieldsList;
   }
 
   @Override
-  public void deleteShowAndMandatoryFields(String companyId, String name) {
+  public void deleteShowAndMandatoryFields(Long companyId, String name) {
     Optional<UserShowFields> showFieldsOptional =
-            showFieldsRepository.findByNameIgnoreCaseAndCompanyId(name, companyId);
+        showFieldsRepository.findByNameIgnoreCaseAndCompanyId(name, companyId);
     showFieldsRepository.delete(showFieldsOptional.get());
     Optional<UserMandatoryFields> mandatoryFieldsOptional =
-            mandatoryFieldsRepository.findByNameIgnoreCaseAndCompanyId(name, companyId);
+        mandatoryFieldsRepository.findByNameIgnoreCaseAndCompanyId(name, companyId);
     if (mandatoryFieldsOptional.isPresent()) {
       mandatoryFieldsRepository.delete(mandatoryFieldsOptional.get());
     }

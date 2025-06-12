@@ -10,13 +10,13 @@ import com.quantumai.customer.repository.PlansRepository;
 import com.quantumai.customer.repository.SubscriptionRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import java.util.Collections;
-import java.util.Comparator;
 
 @Service
 public class SubscriptionServiceImpl implements SubscriptionService {
@@ -35,11 +35,11 @@ public class SubscriptionServiceImpl implements SubscriptionService {
   public void addSubscription(SubscriptionDTO subscriptionDTO) {
     Subscription subscription = modelMapper.map(subscriptionDTO, Subscription.class);
     subscription.setSubscriptionDate(LocalDate.now());
-//    List<Subscription> mySubscription =
-//        subscriptionRepository.findByCompanyId(subscriptionDTO.getCompanyId());
-//    if (mySubscription.isPresent()) {
-//      subscription.setId(mySubscription.get().getId());
-//    }
+    //    List<Subscription> mySubscription =
+    //        subscriptionRepository.findByCompanyId(subscriptionDTO.getCompanyId());
+    //    if (mySubscription.isPresent()) {
+    //      subscription.setId(mySubscription.get().getId());
+    //    }
 
     subscriptionRepository.save(subscription);
   }
@@ -81,11 +81,10 @@ public class SubscriptionServiceImpl implements SubscriptionService {
   }
 
   @Override
-  public List<Payment> getAllPayment(String companyId) {
-    List<Payment> allInvoice= paymentRepository.findByCompanyId(companyId);
+  public List<Payment> getAllPayment(Long companyId) {
+    List<Payment> allInvoice = paymentRepository.findByCompanyId(companyId);
     Collections.sort(allInvoice, Comparator.comparing(Payment::getTransactionDate).reversed());
     return allInvoice;
-
   }
 
   @Override
@@ -122,30 +121,35 @@ public class SubscriptionServiceImpl implements SubscriptionService {
   }
 
   @Override
-  public Subscription getCurrentSubscription(String companyId) {
-    Optional<Subscription> subscription = subscriptionRepository.findByCompanyIdAndStatus(companyId,"ACTIVE");
-      return subscription.orElse(null);
+  public Subscription getCurrentSubscription(Long companyId) {
+    Optional<Subscription> subscription =
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");
+    return subscription.orElse(null);
   }
 
   @Override
-  public List<Subscription> getAllSubscription(String companyId) {
+  public List<Subscription> getAllSubscription(Long companyId) {
     List<Subscription> subscription = subscriptionRepository.findByCompanyId(companyId);
     return subscription;
   }
 
   @Override
-  public void deleteUpcomingSubscription(String companyId,String companyName,String email) throws Exception {
-    Optional<Subscription> subscription = subscriptionRepository.findByCompanyIdAndStatus(companyId,"UPCOMING");
-    if(subscription.isPresent()){
-      paymentService.cancelUpcomingSubscriptionStripe(companyId,companyName,email);
+  public void deleteUpcomingSubscription(Long companyId, String companyName, String email)
+      throws Exception {
+    Optional<Subscription> subscription =
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, "UPCOMING");
+    if (subscription.isPresent()) {
+      paymentService.cancelUpcomingSubscriptionStripe(companyId, companyName, email);
     }
   }
 
   @Override
-  public void startUpcomingSubscription(String companyId, String companyName, String email) throws Exception {
-    Optional<Subscription> subscription = subscriptionRepository.findByCompanyIdAndStatus(companyId,"UPCOMING");
-    if(subscription.isPresent()){
-      paymentService.startUpcomingSubscriptionStripe(companyId,companyName,email);
+  public void startUpcomingSubscription(Long companyId, String companyName, String email)
+      throws Exception {
+    Optional<Subscription> subscription =
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, "UPCOMING");
+    if (subscription.isPresent()) {
+      paymentService.startUpcomingSubscriptionStripe(companyId, companyName, email);
     }
   }
 }

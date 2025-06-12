@@ -7,10 +7,9 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface CompanyCustomerCategoryRepository
     extends MongoRepository<CompanyCustomerCategory, String> {
-  public List<CompanyCustomerCategory> findByCompanyId(String companyId);
+  public List<CompanyCustomerCategory> findByCompanyId(Long companyId);
 
-  public List<CompanyCustomerCategory> findByCompanyIdAndStatus(String companyId, String status);
+  public List<CompanyCustomerCategory> findByCompanyIdAndStatus(Long companyId, String status);
 
   public Optional<CompanyCustomerCategory> findByName(String name);
-
 }

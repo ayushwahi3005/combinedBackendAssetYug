@@ -52,21 +52,21 @@ public class CustomerAPI {
     return ResponseEntity.ok(customerService.authenticate(authenticationRequestDTO, deviceId));
   }
 
-//  @GetMapping(value = "/getLoginToken/{email}/{deviceId}")
-//  public ResponseEntity<AuthenticationResponseDTO> getLoginToken(
-//      @PathVariable String email, @PathVariable String deviceId) throws Exception {
-//
-//    return ResponseEntity.ok(customerService.getLoginToken(email, deviceId));
-//  }
+  //  @GetMapping(value = "/getLoginToken/{email}/{deviceId}")
+  //  public ResponseEntity<AuthenticationResponseDTO> getLoginToken(
+  //      @PathVariable String email, @PathVariable String deviceId) throws Exception {
+  //
+  //    return ResponseEntity.ok(customerService.getLoginToken(email, deviceId));
+  //  }
   @PostMapping(value = "/getLoginToken")
-  public ResponseEntity<AuthenticationResponseDTO> getLoginToken(@RequestBody JsonNode jsonNode) throws Exception {
+  public ResponseEntity<AuthenticationResponseDTO> getLoginToken(@RequestBody JsonNode jsonNode)
+      throws Exception {
 
-    String email=jsonNode.get("email").asText();
-    String password=jsonNode.get("password").asText();
-    String deviceId=jsonNode.get("deviceId").asText();
+    String email = jsonNode.get("email").asText();
+    String password = jsonNode.get("password").asText();
+    String deviceId = jsonNode.get("deviceId").asText();
 
-
-    return ResponseEntity.ok(customerService.getLoginToken(email, password,deviceId));
+    return ResponseEntity.ok(customerService.getLoginToken(email, password, deviceId));
   }
 
   @GetMapping(value = "/get/{email}")
@@ -81,13 +81,20 @@ public class CustomerAPI {
   }
 
   @PostMapping(value = "/isSameBrowserAndDevice")
-  public ResponseEntity<Boolean> isSameBrowserAndDevice(@RequestBody JsonNode jsonNode)
-      throws Exception {
+  public ResponseEntity<Boolean> isSameBrowser(@RequestBody JsonNode jsonNode) throws Exception {
     String userId = jsonNode.get("userId").asText();
     String deviceId = jsonNode.get("deviceId").asText();
     String userAgent = jsonNode.get("userAgent").asText();
     return ResponseEntity.ok(
         activeSessionService.isSameBrowserAndDevice(userId, deviceId, userAgent));
+  }
+
+  @PostMapping(value = "/isSameDevice")
+  public ResponseEntity<Boolean> isSameDevice(@RequestBody JsonNode jsonNode) throws Exception {
+    String userId = jsonNode.get("userId").asText();
+    String mobileId = jsonNode.get("mobileId").asText();
+    String userAgent = jsonNode.get("userAgent").asText();
+    return ResponseEntity.ok(activeSessionService.isSameMobile(userId, mobileId, userAgent));
   }
 
   @PostMapping(value = "/addLoggedIn")
@@ -98,6 +105,17 @@ public class CustomerAPI {
       String userAgent = jsonNode.get("userAgent").asText();
 
       activeSessionService.createOrUpdateSession(userId, null, userAgent, deviceId);
+    }
+  }
+
+  @PostMapping(value = "/addLoggedInMobile")
+  public void addLoggedInMobile(@RequestBody JsonNode jsonNode) throws Exception {
+    if (jsonNode != null) {
+      String userId = jsonNode.get("userId").asText();
+      String mobileId = jsonNode.get("mobileId").asText();
+      String userAgent = jsonNode.get("userAgent").asText();
+
+      activeSessionService.createOrUpdateSessionMobile(userId, null, userAgent, mobileId);
     }
   }
 
@@ -124,7 +142,7 @@ public class CustomerAPI {
   }
 
   @GetMapping(value = "/getCompanyInformation/{companyId}")
-  public ResponseEntity<CompanyInformation> getCompanyInformation(@PathVariable String companyId)
+  public ResponseEntity<CompanyInformation> getCompanyInformation(@PathVariable Long companyId)
       throws Exception {
     return ResponseEntity.ok(customerService.getcompanyInformation(companyId));
   }
@@ -142,7 +160,7 @@ public class CustomerAPI {
   }
 
   @GetMapping(value = "/getRegisteredUsers/{companyId}")
-  public ResponseEntity<List<String>> getRegisteredUsers(@PathVariable String companyId)
+  public ResponseEntity<List<String>> getRegisteredUsers(@PathVariable Long companyId)
       throws Exception {
     return ResponseEntity.ok(customerService.activeUsers(companyId));
   }
@@ -160,7 +178,7 @@ public class CustomerAPI {
   }
 
   @DeleteMapping(value = "/deleteAccount/{companyId}/{email}")
-  public void deleteUser(@PathVariable String companyId, @PathVariable String email)
+  public void deleteUser(@PathVariable Long companyId, @PathVariable String email)
       throws Exception {
 
     customerService.deleteUser(companyId, email);
@@ -179,20 +197,20 @@ public class CustomerAPI {
   }
 
   @GetMapping(value = "/roleAndPermission/get/{companyId}/{name}")
-  public ResponseEntity<CustomRoleDTO> getRoleAndPermissionByName(@PathVariable String companyId,@PathVariable String name)
-          throws Exception {
+  public ResponseEntity<CustomRoleDTO> getRoleAndPermissionByName(
+      @PathVariable Long companyId, @PathVariable String name) throws Exception {
 
-    return ResponseEntity.ok(customerService.roleAndPermissionByName(companyId,name));
+    return ResponseEntity.ok(customerService.roleAndPermissionByName(companyId, name));
   }
 
   @GetMapping(value = "/roleAndPermission/get/{companyId}")
-  public ResponseEntity<List<CustomRoleDTO>> getRoleAndPermission(@PathVariable String companyId)
+  public ResponseEntity<List<CustomRoleDTO>> getRoleAndPermission(@PathVariable Long companyId)
       throws Exception {
 
     return ResponseEntity.ok(customerService.getRoleAndPermission(companyId));
   }
 
-  @DeleteMapping(value = "/roleAndPermission/delete/{id}")
+  @DeleteMapping(value = "/roleAndPermission/{id}")
   public void deleteRoleAndPermission(@PathVariable String id) throws Exception {
 
     customerService.deleteRoleAndPermission(id);
@@ -200,7 +218,7 @@ public class CustomerAPI {
 
   @GetMapping(value = "/countByRole/{companyId}/{roleName}")
   public ResponseEntity<Long> countByRole(
-      @PathVariable String companyId, @PathVariable String roleName) throws Exception {
+      @PathVariable Long companyId, @PathVariable String roleName) throws Exception {
     Long count = customerService.countByRoleName(roleName, companyId);
     System.out.println("count->" + count + " " + roleName);
     return ResponseEntity.ok(count);
@@ -208,7 +226,7 @@ public class CustomerAPI {
 
   @GetMapping(value = "/roleAndPermissionByName/get/{companyId}/{name}")
   public ResponseEntity<CustomRoleDTO> roleAndPermissionByName(
-      @PathVariable String companyId, @PathVariable String name) throws Exception {
+      @PathVariable Long companyId, @PathVariable String name) throws Exception {
 
     return ResponseEntity.ok(customerService.roleAndPermissionByName(companyId, name));
   }
@@ -219,7 +237,7 @@ public class CustomerAPI {
   }
 
   @GetMapping(value = "/getAllLocation/{companyId}")
-  public ResponseEntity<List<Location>> getAllLocation(@PathVariable String companyId) {
+  public ResponseEntity<List<Location>> getAllLocation(@PathVariable Long companyId) {
     return ResponseEntity.ok(customerService.getAllLocation(companyId));
   }
 
@@ -235,8 +253,15 @@ public class CustomerAPI {
   }
 
   @GetMapping(value = "/getAllBin/{companyId}")
-  public ResponseEntity<List<Bin>> getAllBin(@PathVariable String companyId) {
+  public ResponseEntity<List<BinDTO>> getAllBin(@PathVariable Long companyId) {
     return ResponseEntity.ok(customerService.getAllBin(companyId));
+  }
+
+  @GetMapping("/locations-with-bins/{companyId}")
+  public ResponseEntity<List<LocationWithBinsDTO>> getLocationsWithBins(
+      @PathVariable Long companyId) {
+    // Fetch all locations, and for each, fetch bins, map into DTO
+    return ResponseEntity.ok(customerService.getLocationsWithBins(companyId));
   }
 
   @DeleteMapping(value = "/deleteBin/{id}")
@@ -251,7 +276,7 @@ public class CustomerAPI {
 
   @GetMapping(value = "/getAllImportHistory/{companyId}")
   public Page<ImportHistoryDTO> getImportHistory(
-      @PathVariable String companyId,
+      @PathVariable Long companyId,
       @RequestParam(defaultValue = "0", required = false) int pageNumber,
       @RequestParam(defaultValue = "10", required = false) int pageSize) {
 
@@ -282,20 +307,22 @@ public class CustomerAPI {
     String password = obj.get("password").asText();
     customerService.updatePassword(email, otp, password);
   }
+
   @PostMapping(value = "/addCardDetails")
   public void addCardDetails(@RequestBody CustomerStripeDetails customerStripeDetails) {
 
     customerService.addCardDetails(customerStripeDetails);
   }
+
   @GetMapping(value = "/getCardDetails/{companyId}")
-  public CustomerStripeDetails getCardDetails(@PathVariable String  companyId) {
+  public CustomerStripeDetails getCardDetails(@PathVariable Long companyId) {
 
     return customerService.getCardDetails(companyId);
   }
+
   @DeleteMapping(value = "/deleteCardDetails/{id}")
   public void deleteCardDetails(@PathVariable String id) {
 
     customerService.deleteCardDetails(id);
   }
-
 }

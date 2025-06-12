@@ -8,7 +8,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @Document
 public class CompanyInformation {
 
-  @Id private String id;
+  @Id private Long id;
   private String customerEmail;
   private String companyName;
   private String comapanyLogo;

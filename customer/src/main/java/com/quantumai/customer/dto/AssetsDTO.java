@@ -14,8 +14,9 @@ public class AssetsDTO {
   private String customer;
   private String customerId;
   private String location;
+  private String locationName;
   private String status;
   private String image;
-  private String companyId;
+  private Long companyId;
   private String updatedAt;
 }

@@ -44,16 +44,20 @@ public class AssetsServiceImpl implements AssetsService {
 
   @Autowired private AssetCategoryInspectionRepository assetCategoryInspectionRepository;
 
-    @Autowired private AssetCategoryInspectionInstanceRepository assetCategoryInspectionInstanceRepository;
+  @Autowired
+  private AssetCategoryInspectionInstanceRepository assetCategoryInspectionInstanceRepository;
 
+  @Autowired private LocationRepository locationRepository;
+  @Autowired private BinRepository binRepository;
   LocalDateTime localDateTime;
 
   private ModelMapper modelMapper = new ModelMapper();
 
   @Override
-  public List<AssetsDTO> getAssetsDetails(String companyId) {
+  public List<AssetsDTO> getAssetsDetails(Long companyId) {
     // TODO Auto-generated method stub
     List<Assets> assetsList = assetsRepository.findByCompanyId(companyId);
+    //    locationRepository.findByCompanyId(companyId).stream().;
     List<AssetsDTO> assetsDTOList = new ArrayList<AssetsDTO>();
     assetsList.stream()
         .forEach(
@@ -158,15 +162,26 @@ public class AssetsServiceImpl implements AssetsService {
   public AssetsDTO getAsset(String assetId) throws Exception {
     // TODO Auto-generated method stub
     Optional<Assets> optionalasset = assetsRepository.findById(assetId);
+
     Assets asset = optionalasset.orElseThrow(() -> new Exception("No Such Asset"));
     AssetsDTO assetDTO = modelMapper.map(asset, AssetsDTO.class);
+    if (asset.getLocation().startsWith("bin")) {
+      Optional<Bin> binOptional = binRepository.findById(asset.getLocation().substring(4));
+      binOptional.ifPresent(bin -> assetDTO.setLocation(bin.getBinNumber()));
+
+    } else if (asset.getLocation().startsWith("location")) {
+      Optional<Location> locationOptional =
+          locationRepository.findById(asset.getLocation().substring(9));
+      locationOptional.ifPresent(loc -> assetDTO.setLocation(loc.getName()));
+    }
+
     return assetDTO;
   }
 
   @Override
   public void addExtraFields(AssetExtraFieldsDTO extraFieldsDTO) throws Exception {
     // TODO Auto-generated method stub
-    extraFieldsDTO.setName(extraFieldsDTO.getName().toLowerCase());
+    extraFieldsDTO.setName(extraFieldsDTO.getName());
 
     //		List<AssetExtraFields>
     // extraFieldsList=extraFieldsRepository.findByName(extraFieldsDTO.getName().toLowerCase());
@@ -205,7 +220,7 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
-  public List<AssetExtraFieldNameDTO> getAssetExtraField(String companyId) {
+  public List<AssetExtraFieldNameDTO> getAssetExtraField(Long companyId) {
     // TODO Auto-generated method stub
     List<AssetExtraFieldName> extraFieldNameList =
         extraFieldNameRepository.findByCompanyId(companyId);
@@ -225,8 +240,8 @@ public class AssetsServiceImpl implements AssetsService {
       throws ExtraFieldAlreadyPresentException {
     // TODO Auto-generated method stub
     AssetExtraFieldName extraFieldNameNew =
-        extraFieldNameRepository.findByNameAndCompanyId(
-            extraFieldNameDTO.getName().toLowerCase(), extraFieldNameDTO.getCompanyId());
+        extraFieldNameRepository.findByNameIgnoreCaseAndCompanyId(
+            extraFieldNameDTO.getName(), extraFieldNameDTO.getCompanyId());
     if (extraFieldNameNew != null) {
       throw new ExtraFieldAlreadyPresentException("Extra Field Already Present");
     }
@@ -245,7 +260,7 @@ public class AssetsServiceImpl implements AssetsService {
     extraFieldNameRepository.deleteById(id);
     AssetExtraFieldName extraFieldName = extraFieldNameOptional.get();
     List<AssetExtraFields> extraFieldsList =
-        extraFieldsRepository.findByName(extraFieldName.getName().toLowerCase());
+        extraFieldsRepository.findByName(extraFieldName.getName());
     extraFieldsList.stream()
         .forEach(
             (x) -> {
@@ -255,7 +270,7 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
-  public Map<String, Map<String, String>> getextraFieldList(String companyId) {
+  public Map<String, Map<String, String>> getextraFieldList(Long companyId) {
     // TODO Auto-generated method stub
     List<AssetExtraFields> extraFieldNameList = extraFieldsRepository.findByCompanyId(companyId);
     List<Assets> assetList = assetsRepository.findByCompanyId(companyId);
@@ -334,15 +349,15 @@ public class AssetsServiceImpl implements AssetsService {
     // TODO Auto-generated method stub
     Optional<AssetCheckInOut> checkInOutList = checkInOutRepository.findByAssetId(assetId);
     List<AssetCheckInOutDTO> checkInOutDTOList = new ArrayList<>();
-    if (!checkInOutList.isEmpty()) {
+    if (checkInOutList.isPresent()) {
 
-      checkInOutList.stream()
-          .forEach(
-              (x) -> {
-                AssetCheckInOutDTO checkInOutDTO = modelMapper.map(x, AssetCheckInOutDTO.class);
-                checkInOutDTOList.add(checkInOutDTO);
-              });
+      checkInOutList.ifPresent(
+          (x) -> {
+            AssetCheckInOutDTO checkInOutDTO = modelMapper.map(x, AssetCheckInOutDTO.class);
+            checkInOutDTOList.add(checkInOutDTO);
+          });
     }
+    if (checkInOutDTOList.isEmpty()) return List.of();
     List<AssetCheckInOutDetailsDTO> myList = checkInOutDTOList.get(0).getDetailsList();
 
     //		Collections.reverse(myList);
@@ -432,7 +447,7 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
-  public AssetShowFields getShowFields(String name, String companyId) {
+  public AssetShowFields getShowFields(String name, Long companyId) {
     // TODO Auto-generated method stub
     Optional<AssetShowFields> showFieldsOptional =
         showFieldsRepository.findByNameAndCompanyId(name, companyId);
@@ -444,7 +459,7 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
-  public AssetMandatoryFields getMandatoryFields(String name, String companyId) {
+  public AssetMandatoryFields getMandatoryFields(String name, Long companyId) {
     // TODO Auto-generated method stub
     Optional<AssetMandatoryFields> mandatoryFieldsOptional =
         mandatoryFieldsRepository.findByNameAndCompanyId(name, companyId);
@@ -456,14 +471,14 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
-  public List<AssetShowFields> getAllShowFields(String companyId) {
+  public List<AssetShowFields> getAllShowFields(Long companyId) {
     // TODO Auto-generated method stub
     List<AssetShowFields> showFieldsList = showFieldsRepository.findByCompanyId(companyId);
     return showFieldsList;
   }
 
   @Override
-  public List<AssetMandatoryFields> getAllMandatoryFields(String companyId) {
+  public List<AssetMandatoryFields> getAllMandatoryFields(Long companyId) {
     // TODO Auto-generated method stub
     List<AssetMandatoryFields> mandatoryFieldsList =
         mandatoryFieldsRepository.findByCompanyId(companyId);
@@ -471,7 +486,7 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
-  public void deleteShowAndMandatoryFields(String companyId, String name) {
+  public void deleteShowAndMandatoryFields(Long companyId, String name) {
     // TODO Auto-generated method stub
     Optional<AssetShowFields> showFieldsOptional =
         showFieldsRepository.findByNameAndCompanyId(name, companyId);
@@ -484,7 +499,7 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
-  public void updateAssetWithFile(List<AssetsDTO> assetsDTOList, String companyId) {
+  public void updateAssetWithFile(List<AssetsDTO> assetsDTOList, Long companyId) {
     // TODO Auto-generated method stub
 
     assetsDTOList.stream()
@@ -513,7 +528,7 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
-  public AssetQR getQRData(String companyId) {
+  public AssetQR getQRData(Long companyId) {
     // TODO Auto-generated method stub
     Optional<AssetQR> optionalQr = qrRepository.findByCompanyId(companyId);
     if (optionalQr.isPresent()) {
@@ -523,17 +538,28 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
-  public PaginatedResultDTO<String> getAllAssetDetails(String companyId) {
+  public PaginatedResultDTO<String> getAllAssetDetails(Long companyId) {
     // TODO Auto-generated method stub
     List<AssetExtraFieldName> extraFieldNameList =
         extraFieldNameRepository.findByCompanyId(companyId);
 
     List<Assets> assetList = assetsRepository.findByCompanyId(companyId);
+    Map<String, String> binIdToNameMap =
+        binRepository.findByCompanyId(companyId).stream()
+            .collect(Collectors.toMap(Bin::getId, Bin::getBinNumber));
+    Map<String, String> locationIdToNameMap =
+        locationRepository.findByCompanyId(companyId).stream()
+            .collect(Collectors.toMap(Location::getId, Location::getName));
 
     List<String> mapList = new ArrayList<>();
     assetList.stream()
         .forEach(
             (order) -> {
+              if (order.getLocation()!=null&&order.getLocation().startsWith("bin")) {
+                order.setLocation(binIdToNameMap.get(order.getLocation().substring(4)));
+              } else if (order.getLocation()!=null&&order.getLocation().startsWith("location")) {
+                order.setLocation(locationIdToNameMap.get(order.getLocation().substring(9)));
+              }
               List<AssetExtraFields> extraFieldsList =
                   extraFieldsRepository.findByAssetId(order.getId());
               Map<String, String> m = new HashMap<>();
@@ -552,7 +578,7 @@ public class AssetsServiceImpl implements AssetsService {
               m.put("email", order.getEmail());
               m.put("name", order.getName());
               m.put("assetId", order.getAssetId().toString());
-              m.put("companyId", order.getCompanyId());
+              m.put("companyId", order.getCompanyId().toString());
               m.put("serialNumber", order.getSerialNumber());
               m.put("category", order.getCategory());
               m.put("customer", order.getCustomer());
@@ -585,10 +611,10 @@ public class AssetsServiceImpl implements AssetsService {
 
   @Override
   public PaginatedResultDTO<String> sortAssets(
-      String companyId, String field, Integer pageNumber, Integer pageSize) {
+      Long companyId, String field, Integer pageNumber, Integer pageSize) {
     System.out.println("--->" + field);
     AssetExtraFieldName extraFieldName =
-        extraFieldNameRepository.findByNameAndCompanyId(field, companyId);
+        extraFieldNameRepository.findByNameIgnoreCaseAndCompanyId(field, companyId);
     //		//System.out.println(extraFieldName);
 
     List<Map<String, String>> mapList = new ArrayList<>();
@@ -667,7 +693,7 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
-  public List<String> searchedAssets(String companyId, String data, String field) {
+  public List<String> searchedAssets(Long companyId, String data, String field) {
     // TODO Auto-generated method stub
     List<Map<String, String>> mapList = new ArrayList<>();
     PaginatedResultDTO<String> myList = getAllAssetDetails(companyId);
@@ -737,7 +763,7 @@ public class AssetsServiceImpl implements AssetsService {
       m.put("email", assetsDTO.getEmail());
       m.put("name", assetsDTO.getName());
       m.put("assetId", assetsDTO.getAssetId().toString());
-      m.put("companyId", assetsDTO.getCompanyId());
+      m.put("companyId", assetsDTO.getCompanyId().toString());
       m.put("serialNumber", assetsDTO.getSerialNumber());
       m.put("category", assetsDTO.getCategory());
       m.put("customer", assetsDTO.getCustomer());
@@ -813,7 +839,8 @@ public class AssetsServiceImpl implements AssetsService {
           mapping.put(key.toString(), value.toString());
         }
       }
-      PaginatedResultDTO<String> assetsWithAllFields = getAllAssetDetails(mapping.get("companyId"));
+      PaginatedResultDTO<String> assetsWithAllFields =
+          getAllAssetDetails(Long.parseLong(mapping.get("companyId")));
 
       filteredAssetsWithAllFields =
           assetsWithAllFields.getData().stream()
@@ -931,7 +958,7 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
-  public CheckInCheckOutCountDTO checkInCheckOut(String companyId) {
+  public CheckInCheckOutCountDTO checkInCheckOut(Long companyId) {
     List<Assets> assetsList = assetsRepository.findByCompanyId(companyId);
     AtomicReference<Integer> checkIn = new AtomicReference<>(0);
     AtomicReference<Integer> checkOut = new AtomicReference<>(0);
@@ -969,14 +996,14 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
-  public List<AssetsDTO> assetListFromSerialNumber(String companyId, String serialNumber) {
+  public List<AssetsDTO> assetListFromSerialNumber(Long companyId, String serialNumber) {
     List<AssetsDTO> assetList =
         assetsRepository.findByCompanyIdAndSerialNumber(companyId, serialNumber);
     return assetList;
   }
 
   @Override
-  public List<AssetCheckInOut> filterByCheckedInOut(String companyId, Boolean checkedIn) {
+  public List<AssetCheckInOut> filterByCheckedInOut(Long companyId, Boolean checkedIn) {
 
     List<AssetCheckInOut> assetCheckInOutDTOmyList =
         checkInOutRepository.findByCompanyId(companyId);
@@ -1017,7 +1044,7 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
-  public List<AssetCategory> getCategoryList(String companyId) {
+  public List<AssetCategory> getCategoryList(Long companyId) {
 
     List<AssetCategory> categoryList = assetCategoryRepository.findByCompanyId(companyId);
 
@@ -1033,24 +1060,24 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
-  public AssetCategory getCategoryListById(String companyId, String id) {
+  public AssetCategory getCategoryListById(Long companyId, String id) {
     Optional<AssetCategory> categoryOptional = assetCategoryRepository.findById(id);
     return categoryOptional.orElse(null);
   }
 
-    @Override
-    public int countAssetByCategory(String category) {
-        return assetsRepository.countByCategory(category);
-    }
+  @Override
+  public int countAssetByCategory(String category) {
+    return assetsRepository.countByCategory(category);
+  }
 
-    public List<AssetCategory> getActiveCategoryList(String companyId) {
+  public List<AssetCategory> getActiveCategoryList(Long companyId) {
     List<AssetCategory> categoryList =
         assetCategoryRepository.findByCompanyIdAndStatus(companyId, "active");
     return categoryList;
   }
 
   @Override
-  public List<AssetsDTO> getActiveAssets(String companyId) {
+  public List<AssetsDTO> getActiveAssets(Long companyId) {
     List<Assets> assetList = assetsRepository.findByCompanyId(companyId);
     List<AssetsDTO> filteredList = new ArrayList<>();
     assetList.stream()
@@ -1066,7 +1093,7 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
-  public Map<String, List<AssetsDTO>> getAssetByCategory(String companyId) {
+  public Map<String, List<AssetsDTO>> getAssetByCategory(Long companyId) {
     List<Assets> assetList = assetsRepository.findByCompanyId(companyId);
     List<AssetCategory> assetCategoryList = assetCategoryRepository.findByCompanyId(companyId);
     Map<String, List<AssetsDTO>> categoryAssetMap = new HashMap<>();
@@ -1093,10 +1120,10 @@ public class AssetsServiceImpl implements AssetsService {
     return categoryAssetMap;
   }
 
-    @Override
-    public void addAssetInspection(AssetCategoryInspection assetCategoryInspection) {
-        assetCategoryInspectionRepository.save(assetCategoryInspection);
-    }
+  @Override
+  public void addAssetInspection(AssetCategoryInspection assetCategoryInspection) {
+    assetCategoryInspectionRepository.save(assetCategoryInspection);
+  }
 
   @Override
   public void deleteAssetInspection(String id) {
@@ -1104,24 +1131,25 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
-    public AssetCategoryInspection getAssetInspection(String assetInspectionId) throws Exception {
-        return assetCategoryInspectionRepository.findById(assetInspectionId)
-                .orElseThrow(() -> new Exception("No such Inspection Step"));
+  public AssetCategoryInspection getAssetInspection(String assetInspectionId) throws Exception {
+    return assetCategoryInspectionRepository
+        .findById(assetInspectionId)
+        .orElseThrow(() -> new Exception("No such Inspection Step"));
+  }
 
-    }
+  @Override
+  public List<AssetCategoryInspection> getAllAssetInspection(Long companyId) {
+    return assetCategoryInspectionRepository.findByCompanyId(companyId);
+  }
 
-    @Override
-    public List<AssetCategoryInspection> getAllAssetInspection(String companyId) {
-        return assetCategoryInspectionRepository.findByCompanyId(companyId);
-    }
+  @Override
+  public void addAssetInspectionInstance(
+      AssetCategoryInspectionInstance assetCategoryInspectionInstance) {
+    assetCategoryInspectionInstanceRepository.save(assetCategoryInspectionInstance);
+  }
 
-    @Override
-    public void addAssetInspectionInstance(AssetCategoryInspectionInstance assetCategoryInspectionInstance) {
-        assetCategoryInspectionInstanceRepository.save(assetCategoryInspectionInstance);
-    }
-
-    @Override
-    public List<AssetCategoryInspectionInstance> getAllAssetCategoryInspectionValues(String companyId) {
-        return assetCategoryInspectionInstanceRepository.findByCompanyId(companyId);
-    }
+  @Override
+  public List<AssetCategoryInspectionInstance> getAllAssetCategoryInspectionValues(Long companyId) {
+    return assetCategoryInspectionInstanceRepository.findByCompanyId(companyId);
+  }
 }

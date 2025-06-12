@@ -1,6 +1,5 @@
 package com.quantumai.customer.entity;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
@@ -26,5 +25,13 @@ public class Payment {
 
   private String description;
 
-  private String companyId;
+  private SubscriptionPlan planSelected;
+
+  private Long companyId;
+
+  private Integer person;
+
+  private LocalDateTime startDate;
+
+  private LocalDateTime endDate;
 }

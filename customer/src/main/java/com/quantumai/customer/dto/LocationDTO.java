@@ -5,7 +5,7 @@ import lombok.Data;
 @Data
 public class LocationDTO {
   private String id;
-  private String companyId;
+  private Long companyId;
   private String name;
   private String parentLocation;
   private String address;

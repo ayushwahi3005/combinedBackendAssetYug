@@ -1,10 +1,10 @@
 package com.quantumai.customer.exception;
 
-public class PlanPersonException extends Exception{
+public class PlanPersonException extends Exception {
 
-    private static final long serialVersionUID = 1135898947336259291L;
+  private static final long serialVersionUID = 1135898947336259291L;
 
-    public PlanPersonException(String msg) {
-        super(msg);
-    }
+  public PlanPersonException(String msg) {
+    super(msg);
+  }
 }

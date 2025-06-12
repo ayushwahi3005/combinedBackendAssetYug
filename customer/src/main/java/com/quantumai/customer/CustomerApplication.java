@@ -15,6 +15,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 
 @EnableScheduling
 @SpringBootApplication
+// @EnableTransactionManagement
 // @EnableWebMvc // Ensure Web MVC is enabled for global CORS configuration
 public class CustomerApplication {
 
@@ -87,4 +88,9 @@ public class CustomerApplication {
     System.out.println("updateAllSubscriptionExpiryTriggered->" + LocalDateTime.now());
     subscriptionService.isExpired();
   }
+  //  @Bean
+  //  public PlatformTransactionManager transactionManager(MongoDatabaseFactory
+  // mongoDatabaseFactory){
+  //    return  new MongoTransactionManager(mongoDatabaseFactory);
+  //  }
 }

@@ -18,22 +18,22 @@ public interface CompanyCustomerService {
 
   public CompanyCustomerDTO getCustomer(String id);
 
-  public List<CompanyCustomerDTO> getAllCustomer(String companyId);
+  public List<CompanyCustomerDTO> getAllCustomer(Long companyId);
 
   public void updateCustomer(CompanyCustomerDTO companyCustomerDTO);
 
   public void deleteCustomer(String id);
 
-  public List<String> getAllCustomerWithExtraColumns(String companyId);
+  public List<String> getAllCustomerWithExtraColumns(Long companyId);
 
-  public List<String> searchedCompanyCustomer(String companyId, String search, String category);
+  public List<String> searchedCompanyCustomer(Long companyId, String search, String category);
 
-  public List<String> sortCompanyCustomer(String companyId, String category);
+  public List<String> sortCompanyCustomer(Long companyId, String category);
 
   public void addCompanyCustomerExtraField(CompanyCustomerExtraFieldNameDTO extraFieldNameDTO)
       throws ExtraFieldAlreadyPresentException;
 
-  public List<CompanyCustomerExtraFieldNameDTO> getCompanyCustomerExtraField(String companyId);
+  public List<CompanyCustomerExtraFieldNameDTO> getCompanyCustomerExtraField(Long companyId);
 
   public void deleteCompanyCustomerExtraField(String id);
 
@@ -41,17 +41,17 @@ public interface CompanyCustomerService {
 
   public void updateShowFields(CompanyCustomerShowFields showFields);
 
-  public CompanyCustomerMandatoryFields getMandatoryFields(String name, String companyId);
+  public CompanyCustomerMandatoryFields getMandatoryFields(String name, Long companyId);
 
-  public CompanyCustomerShowFields getShowFields(String name, String companyId);
+  public CompanyCustomerShowFields getShowFields(String name, Long companyId);
 
-  public List<CompanyCustomerMandatoryFields> getAllMandatoryFields(String companyId);
+  public List<CompanyCustomerMandatoryFields> getAllMandatoryFields(Long companyId);
 
-  public List<CompanyCustomerShowFields> getAllShowFields(String companyId);
+  public List<CompanyCustomerShowFields> getAllShowFields(Long companyId);
 
-  public void deleteShowAndMandatoryFields(String companyId, String name);
+  public void deleteShowAndMandatoryFields(Long companyId, String name);
 
-  public Map<String, Map<String, String>> getextraFieldList(String companyId);
+  public Map<String, Map<String, String>> getextraFieldList(Long companyId);
 
   public void addExtraFields(CompanyCustomerExtraFieldsDTO extraFieldsDTO);
 
@@ -70,12 +70,12 @@ public interface CompanyCustomerService {
 
   public void deleteFile(String id);
 
-  public CompanyCustomerDTO getCompanyCustomerByLocalId(Integer id, String companyId);
+  public CompanyCustomerDTO getCompanyCustomerByLocalId(Integer id, Long companyId);
 
-  public PaginatedResultDTO<String> getAllCustomerDetails(String companyId);
+  public PaginatedResultDTO<String> getAllCustomerDetails(Long companyId);
 
   public PaginatedResultDTO<String> sortCustomers(
-      String companyId, String field, Integer pageNumber, Integer pageSize);
+      Long companyId, String field, Integer pageNumber, Integer pageSize);
 
   //	public void updateCustomersWithInActive(String customerId);
   public PaginatedResultDTO<String> advanceFilter(
@@ -85,9 +85,9 @@ public interface CompanyCustomerService {
 
   public void addCategory(CategoryDTO categoryDTO) throws CategoryException;
 
-  public List<CompanyCustomerCategory> getCategoryList(String companyId);
+  public List<CompanyCustomerCategory> getCategoryList(Long companyId);
 
-  public List<CompanyCustomerCategory> getActiveCategoryList(String companyId);
+  public List<CompanyCustomerCategory> getActiveCategoryList(Long companyId);
 
   public void deleteCategory(String id);
 
@@ -95,5 +95,5 @@ public interface CompanyCustomerService {
 
   public int countCompanyCustomerByCategory(String category);
 
-  public CompanyCustomerCategory getCategoryListById(String companyId, String id);
+  public CompanyCustomerCategory getCategoryListById(Long companyId, String id);
 }

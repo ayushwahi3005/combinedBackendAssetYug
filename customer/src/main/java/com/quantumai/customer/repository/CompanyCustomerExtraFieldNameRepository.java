@@ -8,7 +8,7 @@ public interface CompanyCustomerExtraFieldNameRepository
     extends MongoRepository<CompanyCustomerExtraFieldName, String> {
   public CompanyCustomerExtraFieldName findByName(String name);
 
-  public List<CompanyCustomerExtraFieldName> findByCompanyId(String companyId);
+  public List<CompanyCustomerExtraFieldName> findByCompanyId(Long companyId);
 
-  public CompanyCustomerExtraFieldName findByNameAndCompanyId(String name, String companyId);
+  public CompanyCustomerExtraFieldName findByNameIgnoreCaseAndCompanyId(String name, Long companyId);
 }

@@ -10,7 +10,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 public class Subscription {
 
   @Id private String id;
-  private String companyId;
+  private Long companyId;
   private SubscriptionEnum status;
   private String plan;
   private Integer person;

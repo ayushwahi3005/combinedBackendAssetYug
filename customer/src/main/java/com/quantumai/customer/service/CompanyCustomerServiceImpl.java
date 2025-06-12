@@ -77,7 +77,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   }
 
   @Override
-  public List<CompanyCustomerDTO> getAllCustomer(String companyId) {
+  public List<CompanyCustomerDTO> getAllCustomer(Long companyId) {
     // TODO Auto-generated method stub
     List<CompanyCustomer> companyCustomerList =
         companyCustomerRepository.findByCompanyId(companyId);
@@ -113,7 +113,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   }
 
   @Override
-  public List<String> getAllCustomerWithExtraColumns(String companyId) {
+  public List<String> getAllCustomerWithExtraColumns(Long companyId) {
     // TODO Auto-generated method stub
     List<CompanyCustomerExtraFieldName> extraFieldNameList =
         extraFieldNameRepository.findByCompanyId(companyId);
@@ -142,7 +142,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
                       });
               m.put("id", order.getId());
               m.put("name", order.getName());
-              m.put("companyId", order.getCompanyId());
+              m.put("companyId", order.getCompanyId().toString());
               m.put("category", order.getCategory());
               m.put("status", order.getStatus());
               m.put("address", order.getAddress());
@@ -173,13 +173,13 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   }
 
   @Override
-  public List<String> searchedCompanyCustomer(String companyId, String search, String category) {
+  public List<String> searchedCompanyCustomer(Long companyId, String search, String category) {
     // TODO Auto-generated method stub
     return null;
   }
 
   @Override
-  public List<String> sortCompanyCustomer(String companyId, String category) {
+  public List<String> sortCompanyCustomer(Long companyId, String category) {
     // TODO Auto-generated method stub
     return null;
   }
@@ -189,12 +189,12 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
       throws ExtraFieldAlreadyPresentException {
     // TODO Auto-generated method stub
     CompanyCustomerExtraFieldName extraFieldNameNew =
-        extraFieldNameRepository.findByNameAndCompanyId(
-            extraFieldNameDTO.getName().toLowerCase(), extraFieldNameDTO.getCompanyId());
+        extraFieldNameRepository.findByNameIgnoreCaseAndCompanyId(
+            extraFieldNameDTO.getName(), extraFieldNameDTO.getCompanyId());
     if (extraFieldNameNew != null) {
       throw new ExtraFieldAlreadyPresentException("Extra Field Already Present");
     }
-    extraFieldNameDTO.setName(extraFieldNameDTO.getName().toLowerCase());
+    extraFieldNameDTO.setName(extraFieldNameDTO.getName());
 
     CompanyCustomerExtraFieldName extraFieldName =
         modelMapper.map(extraFieldNameDTO, CompanyCustomerExtraFieldName.class);
@@ -202,7 +202,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   }
 
   @Override
-  public List<CompanyCustomerExtraFieldNameDTO> getCompanyCustomerExtraField(String companyId) {
+  public List<CompanyCustomerExtraFieldNameDTO> getCompanyCustomerExtraField(Long companyId) {
     // TODO Auto-generated method stub
     List<CompanyCustomerExtraFieldName> extraFieldNameList =
         extraFieldNameRepository.findByCompanyId(companyId);
@@ -263,7 +263,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   }
 
   @Override
-  public CompanyCustomerMandatoryFields getMandatoryFields(String name, String companyId) {
+  public CompanyCustomerMandatoryFields getMandatoryFields(String name, Long companyId) {
     // TODO Auto-generated method stub
     Optional<CompanyCustomerMandatoryFields> mandatoryFieldsOptional =
         mandatoryFieldsRepository.findByNameAndCompanyId(name, companyId);
@@ -275,7 +275,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   }
 
   @Override
-  public CompanyCustomerShowFields getShowFields(String name, String companyId) {
+  public CompanyCustomerShowFields getShowFields(String name, Long companyId) {
     // TODO Auto-generated method stub
     // TODO Auto-generated method stub
     System.out.println("Servie====>" + name + " " + companyId);
@@ -290,7 +290,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   }
 
   @Override
-  public List<CompanyCustomerMandatoryFields> getAllMandatoryFields(String companyId) {
+  public List<CompanyCustomerMandatoryFields> getAllMandatoryFields(Long companyId) {
     // TODO Auto-generated method stub
     List<CompanyCustomerMandatoryFields> mandatoryFieldsList =
         mandatoryFieldsRepository.findByCompanyId(companyId);
@@ -298,7 +298,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   }
 
   @Override
-  public List<CompanyCustomerShowFields> getAllShowFields(String companyId) {
+  public List<CompanyCustomerShowFields> getAllShowFields(Long companyId) {
     // TODO Auto-generated method stub
     System.out.println("getAllShowFields service" + companyId);
     List<CompanyCustomerShowFields> showFieldsList =
@@ -308,7 +308,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   }
 
   @Override
-  public void deleteShowAndMandatoryFields(String companyId, String name) {
+  public void deleteShowAndMandatoryFields(Long companyId, String name) {
     // TODO Auto-generated method stub
     Optional<CompanyCustomerShowFields> showFieldsOptional =
         showFieldsRepository.findByNameAndCompanyId(name, companyId);
@@ -323,7 +323,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   }
 
   @Override
-  public Map<String, Map<String, String>> getextraFieldList(String companyId) {
+  public Map<String, Map<String, String>> getextraFieldList(Long companyId) {
     // TODO Auto-generated method stub
     List<CompanyCustomerExtraFields> extraFieldNameList =
         extraFieldsRepository.findByCompanyId(companyId);
@@ -349,7 +349,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   @Override
   public void addExtraFields(CompanyCustomerExtraFieldsDTO extraFieldsDTO) {
     // TODO Auto-generated method stub
-    extraFieldsDTO.setName(extraFieldsDTO.getName().toLowerCase());
+    extraFieldsDTO.setName(extraFieldsDTO.getName());
 
     //		List<CompanyCustomerExtraFields>
     // extraFieldsList=extraFieldsRepository.findByName(extraFieldsDTO.getName().toLowerCase());
@@ -465,7 +465,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   }
 
   @Override
-  public CompanyCustomerDTO getCompanyCustomerByLocalId(Integer id, String companyId) {
+  public CompanyCustomerDTO getCompanyCustomerByLocalId(Integer id, Long companyId) {
     // TODO Auto-generated method stub
     CompanyCustomer companyCustomerOptional =
         companyCustomerRepository.findByCompanyCustomerIdAndCompanyId(id, companyId);
@@ -479,7 +479,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   }
 
   @Override
-  public PaginatedResultDTO<String> getAllCustomerDetails(String companyId) {
+  public PaginatedResultDTO<String> getAllCustomerDetails(Long companyId) {
     // TODO Auto-generated method stub
     List<CompanyCustomerExtraFieldName> extraFieldNameList =
         extraFieldNameRepository.findByCompanyId(companyId);
@@ -508,7 +508,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
               m.put("email", order.getEmail());
               m.put("phone", order.getPhone() == null ? "" : order.getPhone().toString());
               m.put("companyCustomerId", order.getCompanyCustomerId().toString());
-              m.put("companyId", order.getCompanyId());
+              m.put("companyId", order.getCompanyId().toString());
               m.put("address", order.getAddress());
               m.put("category", order.getCategory());
               m.put("apartment", order.getApartment());
@@ -537,10 +537,10 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
 
   @Override
   public PaginatedResultDTO<String> sortCustomers(
-      String companyId, String field, Integer pageNumber, Integer pageSize) {
+      Long companyId, String field, Integer pageNumber, Integer pageSize) {
     System.out.println("--->" + field);
     CompanyCustomerExtraFieldName extraFieldName =
-        extraFieldNameRepository.findByNameAndCompanyId(field, companyId);
+        extraFieldNameRepository.findByNameIgnoreCaseAndCompanyId(field, companyId);
     //		//System.out.println(extraFieldName);
 
     List<Map<String, String>> mapList = new ArrayList<>();
@@ -650,7 +650,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
         }
       }
       PaginatedResultDTO<String> assetsWithAllFields =
-          getAllCustomerDetails(mapping.get("companyId"));
+          getAllCustomerDetails(Long.parseLong(mapping.get("companyId")));
       System.out.println(
           "total1->"
               + assetsWithAllFields.getData().size()
@@ -784,7 +784,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   }
 
   @Override
-  public List<CompanyCustomerCategory> getCategoryList(String companyId) {
+  public List<CompanyCustomerCategory> getCategoryList(Long companyId) {
 
     List<CompanyCustomerCategory> categoryList =
         companyCustomerCategoryRepository.findByCompanyId(companyId);
@@ -792,7 +792,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   }
 
   @Override
-  public List<CompanyCustomerCategory> getActiveCategoryList(String companyId) {
+  public List<CompanyCustomerCategory> getActiveCategoryList(Long companyId) {
     List<CompanyCustomerCategory> categoryList =
         companyCustomerCategoryRepository.findByCompanyIdAndStatus(companyId, "active");
     return categoryList;
@@ -813,14 +813,13 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
     companyCustomerCategoryRepository.save(category);
   }
 
-    @Override
-    public int countCompanyCustomerByCategory(String category) {
-        return companyCustomerRepository.countByCategory(category);
+  @Override
+  public int countCompanyCustomerByCategory(String category) {
+    return companyCustomerRepository.countByCategory(category);
+  }
 
-    }
-
-    @Override
-  public CompanyCustomerCategory getCategoryListById(String companyId, String id) {
+  @Override
+  public CompanyCustomerCategory getCategoryListById(Long companyId, String id) {
     Optional<CompanyCustomerCategory> categoryOptional =
         companyCustomerCategoryRepository.findById(id);
     return categoryOptional.orElse(null);

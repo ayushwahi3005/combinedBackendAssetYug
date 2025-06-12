@@ -27,55 +27,58 @@ public interface CustomerService {
   public AuthenticationResponseDTO authenticate(
       AuthenticationRequestDTO authenticationRequestDTO, String deviceId) throws Exception;
 
-  public AuthenticationResponseDTO getLoginToken(String email,String password,String deviceId) throws WrongCredentialException, UserNotFound;
+  public AuthenticationResponseDTO getLoginToken(String email, String password, String deviceId)
+      throws WrongCredentialException, UserNotFound;
 
-  public void addCompanyInformation(CompanyInformation companyInformation);
+  public void addCompanyInformation(CompanyInformation companyInformation) throws Exception;
 
-  public CompanyInformation getcompanyInformation(String companyId);
+  public CompanyInformation getcompanyInformation(Long companyId);
 
   public CompanyIdDTO getCompanyId(String email);
 
   public BaseResponseDTO addUsers(CustomerDTO customerDTO);
 
-  public List<String> activeUsers(String companyId);
+  public List<String> activeUsers(Long companyId);
 
   public AccountLockInfoDTO getAccountInfo(String email);
 
   public void updateAccountInfo(AccountLockInfoDTO accountLockInfo);
 
-  public void deleteUser(String companyId, String email) throws CustomerException;
+  public void deleteUser(Long companyId, String email) throws CustomerException;
 
   public void addRoleAndPermission(CustomRoleDTO customRoleDTO);
 
   public void deleteRoleAndPermission(String customRoleId) throws Exception;
 
-  public List<CustomRoleDTO> getRoleAndPermission(String companyId);
+  public List<CustomRoleDTO> getRoleAndPermission(Long companyId);
 
-  public Long countByRoleName(String name, String companyId);
+  public Long countByRoleName(String name, Long companyId);
 
-  public CustomRoleDTO roleAndPermissionByName(String companyId, String name);
+  public CustomRoleDTO roleAndPermissionByName(Long companyId, String name);
 
   public Location addLocation(Location location);
 
-  public List<Location> getAllLocation(String companyId);
+  public List<Location> getAllLocation(Long companyId);
 
   public void deleteLocation(String id);
 
   public Bin addBin(Bin bin);
 
-  public List<Bin> getAllBin(String companyId);
+  public List<BinDTO> getAllBin(Long companyId);
+
+  public List<LocationWithBinsDTO> getLocationsWithBins(Long companyId);
 
   public void deleteBin(String id);
 
   public ImportHistory addImportHistory(ImportHistory importHistory);
 
-  public Page<ImportHistoryDTO> getImportHistoryList(String companyId, int page, int size);
+  public Page<ImportHistoryDTO> getImportHistoryList(Long companyId, int page, int size);
 
   public void updateImportHistory(ImportHistory importHistory);
 
   public void addCardDetails(CustomerStripeDetails customerStripeDetails);
 
-  public CustomerStripeDetails getCardDetails(String companyId);
+  public CustomerStripeDetails getCardDetails(Long companyId);
 
   public void deleteCardDetails(String id);
 }

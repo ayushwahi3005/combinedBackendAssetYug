@@ -8,5 +8,5 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface ImportHistoryRepository extends MongoRepository<ImportHistory, String> {
 
-  Page<ImportHistoryDTO> findByCompanyId(String companyId, Pageable pageable);
+  Page<ImportHistoryDTO> findByCompanyId(Long companyId, Pageable pageable);
 }

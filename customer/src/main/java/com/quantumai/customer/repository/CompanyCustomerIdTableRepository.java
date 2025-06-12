@@ -6,5 +6,5 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface CompanyCustomerIdTableRepository
     extends MongoRepository<CompanyCustomerIdTable, String> {
-  public Optional<CompanyCustomerIdTable> findByCompanyId(String id);
+  public Optional<CompanyCustomerIdTable> findByCompanyId(Long id);
 }

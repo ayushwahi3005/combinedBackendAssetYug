@@ -11,6 +11,6 @@ public class AssetCheckInOutDetails {
   private String employee;
   private String notes;
   private String location;
-  private String companyId;
+  private Long companyId;
   private LocalDateTime updateTime;
 }

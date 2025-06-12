@@ -7,12 +7,11 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @Data
 @Document
 public class UserExtraFields {
-    @Id
-    private String id;
-    private String email;
-    private String name;
-    private String value;
-    private String userId;
-    private String type;
-    private String companyId;
+  @Id private String id;
+  private String email;
+  private String name;
+  private String value;
+  private String userId;
+  private String type;
+  private Long companyId;
 }

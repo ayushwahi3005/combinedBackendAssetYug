@@ -2,7 +2,6 @@ package com.quantumai.customer.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.quantumai.customer.entity.Payment;
-import com.quantumai.customer.entity.Subscription;
 import com.quantumai.customer.entity.SubscriptionPlan;
 import com.quantumai.customer.service.PaymentService;
 import com.quantumai.customer.service.StripeService;
@@ -12,8 +11,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import com.stripe.model.PaymentMethod;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,12 +24,11 @@ public class PaymentAPI {
   @Autowired private SubscriptionService subscriptionService;
   private final PaymentService paymentService;
 
-  @Autowired
-  private  StripeService stripeService;
+  @Autowired private StripeService stripeService;
 
   public PaymentAPI(PaymentService paymentService, StripeService stripeService) {
     this.paymentService = paymentService;
-      this.stripeService = stripeService;
+    this.stripeService = stripeService;
   }
 
   @PostMapping("/create-intent")
@@ -45,7 +41,10 @@ public class PaymentAPI {
     try {
       String clientSecret =
           paymentService.createPaymentIntent(
-              obj.get("amount").asLong(), obj.get("currency").asText(),obj.get("name").asText(),obj.get("email").asText());
+              obj.get("amount").asLong(),
+              obj.get("currency").asText(),
+              obj.get("name").asText(),
+              obj.get("email").asText());
       Map<String, String> response = new HashMap<>();
       response.put("clientSecret", clientSecret);
       return ResponseEntity.ok(response);
@@ -54,33 +53,44 @@ public class PaymentAPI {
           .body(Collections.singletonMap("error", e.getMessage()));
     }
   }
+
   @PostMapping("/create-subscription")
-  public ResponseEntity<Map<String, String>> createSubscription(@RequestBody JsonNode obj) throws Exception {
-//    System.out.println("===>Create subscription"+obj.get("subscriptionPlan").toString());
+  public ResponseEntity<Map<String, String>> createSubscription(@RequestBody JsonNode obj)
+      throws Exception {
+    //    System.out.println("===>Create subscription"+obj.get("subscriptionPlan").toString());
     try {
       SubscriptionPlan plan;
-      String planString=obj.get("subscriptionPlan").asText().trim();
-      if(planString.equalsIgnoreCase("MONTHLY")){
+      String planString = obj.get("subscriptionPlan").asText().trim();
+      if (planString.equalsIgnoreCase("MONTHLY")) {
 
-        plan=SubscriptionPlan.MONTHLY;
-        System.out.println("===>Create subscription"+planString.equalsIgnoreCase("MONTHLY")+" "+plan);
+        plan = SubscriptionPlan.MONTHLY;
+        System.out.println(
+            "===>Create subscription" + planString.equalsIgnoreCase("MONTHLY") + " " + plan);
+      } else {
+        //        System.out.println("===>Create subscription"+planString);
+        plan = SubscriptionPlan.ANNUAL;
+        System.out.println(
+            "===>Create subscription" + planString.equalsIgnoreCase("ANNUAL") + " " + plan);
       }
-      else{
-//        System.out.println("===>Create subscription"+planString);
-        plan=SubscriptionPlan.ANNUAL;
-        System.out.println("===>Create subscription"+planString.equalsIgnoreCase("ANNUAL")+" "+plan);
-      }
-//       = SubscriptionPlan.valueOf(obj.get("subscriptionPlan").toString().toUpperCase());
+      //       = SubscriptionPlan.valueOf(obj.get("subscriptionPlan").toString().toUpperCase());
 
-
-      com.stripe.model.Subscription stripeSubscription=paymentService.createSubscription(obj.get("companyId").asText(),obj.get("paymentMethodId").asText(),obj.get("name").asText(),obj.get("email").asText(),plan,obj.get("quantity").asLong(),obj.get("amount").asDouble(),obj.get("cardHolderName").asText());
+      com.stripe.model.Subscription stripeSubscription =
+          paymentService.createSubscription(
+              Long.parseLong(obj.get("companyId").asText()),
+              obj.get("paymentMethodId").asText(),
+              obj.get("name").asText(),
+              obj.get("email").asText(),
+              plan,
+              obj.get("quantity").asLong(),
+              obj.get("amount").asDouble(),
+              obj.get("cardHolderName").asText());
       Map<String, String> response = new HashMap<>();
-//      response.put("clientSecret", clientSecret);
-//      System.out.println("---Subscription-->>>>>>>>"+stripeSubscription.getCustomer());
+      //      response.put("clientSecret", clientSecret);
+      //      System.out.println("---Subscription-->>>>>>>>"+stripeSubscription.getCustomer());
       return ResponseEntity.ok(response);
     } catch (StripeException e) {
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-              .body(Collections.singletonMap("error", e.getMessage()));
+          .body(Collections.singletonMap("error", e.getMessage()));
     }
   }
 
@@ -101,9 +111,9 @@ public class PaymentAPI {
   }
 
   @GetMapping("/get-invoices/{companyId}")
-  public List<Payment> getAllInvoice(@PathVariable String companyId) {
+  public List<Payment> getAllInvoice(@PathVariable Long companyId) {
 
-    return  subscriptionService.getAllPayment(companyId);
+    return subscriptionService.getAllPayment(companyId);
   }
 
   @GetMapping("/checkCred")
@@ -111,25 +121,29 @@ public class PaymentAPI {
 
     return ResponseEntity.ok(true);
   }
+
   @PostMapping("/stripe-save-card")
   public void saveCard(@RequestBody Map<String, String> request) throws StripeException {
     String paymentMethodId = request.get("paymentMethodId");
     String customerEmail = request.get("email");
     String cardholderName = request.get("cardholderName");
-    String companyId = request.get("companyId");
-    System.out.println(paymentMethodId+" "+customerEmail+" "+cardholderName+" "+companyId);
-     stripeService.saveCard(paymentMethodId, customerEmail, cardholderName,companyId);
-
+    Long companyId = Long.parseLong(request.get("companyId"));
+    System.out.println(
+        paymentMethodId + " " + customerEmail + " " + cardholderName + " " + companyId);
+    stripeService.saveCard(paymentMethodId, customerEmail, cardholderName, companyId);
   }
+
   @GetMapping("/stripe-get-cards/{customerId}")
-  public List<Map<String, Object>> getCustomerCards(@PathVariable String customerId) throws StripeException {
+  public List<Map<String, Object>> getCustomerCards(@PathVariable Long customerId)
+      throws StripeException {
     return stripeService.getCustomerCards(customerId);
   }
+
   @DeleteMapping("/stripe-delete-cards/{paymentMethodId}")
   public void removeCard(@PathVariable String paymentMethodId) throws StripeException {
-      System.out.println(paymentMethodId);
-//    String paymentMethodId = request.get("paymentMethodId");
+    System.out.println(paymentMethodId);
+    //    String paymentMethodId = request.get("paymentMethodId");
 
-     stripeService.removeCard(paymentMethodId);
+    stripeService.removeCard(paymentMethodId);
   }
 }

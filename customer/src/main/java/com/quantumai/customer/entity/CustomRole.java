@@ -20,5 +20,5 @@ public class CustomRole {
   private CustomRoleType imports;
   private CustomRoleType category;
   private CustomRoleType inventory;
-  private String companyId;
+  private Long companyId;
 }

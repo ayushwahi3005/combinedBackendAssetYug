@@ -8,7 +8,7 @@ public class CompanyCustomerDTO {
   private String id;
   private Integer companyCustomerId;
   private String name;
-  private String companyId;
+  private Long companyId;
   private String category;
   private String status;
   private String phone;

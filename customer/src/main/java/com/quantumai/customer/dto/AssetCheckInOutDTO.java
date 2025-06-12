@@ -10,5 +10,5 @@ public class AssetCheckInOutDTO {
   private String assetId;
   private String status;
   private List<AssetCheckInOutDetailsDTO> detailsList;
-  private String companyId;
+  private Long companyId;
 }

@@ -5,5 +5,5 @@ import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface AssetIdTableRepository extends MongoRepository<AssetIdTable, String> {
-  public Optional<AssetIdTable> findByCompanyId(String id);
+  public Optional<AssetIdTable> findByCompanyId(Long id);
 }

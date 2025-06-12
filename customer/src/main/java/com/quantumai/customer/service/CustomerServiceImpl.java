@@ -12,12 +12,18 @@ import com.quantumai.customer.security.JwtService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
+import org.springframework.data.mongodb.core.aggregation.ConvertOperators;
+import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -26,6 +32,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
+@Slf4j
 public class CustomerServiceImpl implements CustomerService {
 
   @Autowired private CustomerRepository customerRepository;
@@ -48,6 +55,12 @@ public class CustomerServiceImpl implements CustomerService {
 
   @Autowired private CustomerStripeDetailsRepository customerStripeDetailsRepository;
 
+  @Autowired private AdminRepository adminRepository;
+
+  @Autowired private UsersRepository usersRepository;
+
+  @Autowired private MongoTemplate mongoTemplate;
+
   private final Map<String, OTPEntry> customerOtpStorage = new HashMap<>();
 
   @Autowired
@@ -57,6 +70,22 @@ public class CustomerServiceImpl implements CustomerService {
   private ModelMapper modelMapper = new ModelMapper();
 
   @Autowired private PasswordEncoder passwordEncoder;
+
+  @Autowired private UserService userService;
+
+  @Autowired CompanyPrimaryKeyTableRepository companyPrimaryKeyTableRepository;
+
+  @Autowired CompanyCustomerRepository companyCustomerRepository;
+
+  @Autowired CompanyCustomerIdTableRepository companyCustomerIdTableRepository;
+
+  @Autowired AssetsRepository assetsRepository;
+
+  @Autowired AssetIdTableRepository assetIdTableRepository;
+
+  @Autowired AssetQRRepository assetQRRepository;
+
+  private static final String SEQ_ID = "company_sequence";
 
   @Override
   public BaseResponseDTO addCustomer(CustomerDTO customerDTO) throws Exception {
@@ -75,6 +104,14 @@ public class CustomerServiceImpl implements CustomerService {
     BaseResponseDTO baseResponseDTO = new BaseResponseDTO();
     baseResponseDTO.setSucess(true);
     baseResponseDTO.setMessage("User Successfully Created");
+
+    Admin admin = new Admin();
+    admin.setEmail(customer.getEmail());
+    admin.setRole("ADMIN");
+    admin.setPassword(passwordEncoder.encode("admin"));
+    adminRepository.save(admin);
+
+    // Add User In Customer as ADMIN
 
     return baseResponseDTO;
   }
@@ -121,7 +158,10 @@ public class CustomerServiceImpl implements CustomerService {
       Optional<Customer> customer = customerRepository.findByEmail(email);
       if (customer.isPresent()) {
         Customer myCustomer = customer.get();
+
         myCustomer.setPassword(passwordEncoder.encode(password));
+        customerRepository.save(myCustomer);
+        //        log.info("Updated Password: {}",password);
         FirebaseAuth.getInstance();
 
         // Retrieve user record based on email
@@ -211,41 +251,125 @@ public class CustomerServiceImpl implements CustomerService {
   }
 
   @Override
-  public AuthenticationResponseDTO getLoginToken(String email,String password, String deviceId)
-          throws WrongCredentialException, UserNotFound {
+  public AuthenticationResponseDTO getLoginToken(String email, String password, String deviceId)
+      throws WrongCredentialException, UserNotFound {
     // TODO Auto-generated method stub
     Optional<Customer> customer = customerRepository.findByEmail(email);
     System.out.println("////" + customer);
+    //    log.info("Pswd {} {}",passwordEncoder.encode(password),customer.get().getPassword()
+    //    );
     if (customer.isEmpty()) {
       throw new UserNotFound("User Not Associated to any company");
-    }
-    else if(passwordEncoder.matches(password,customer.get().getPassword())){
+    } else if (passwordEncoder.matches(password, customer.get().getPassword())) {
+
       var jwtToken = jwtService.generateToken(customer.get(), deviceId);
 
       return AuthenticationResponseDTO.builder()
-              .token(jwtToken)
-              .role(customer.get().getRole())
-              .build();
+          .token(jwtToken)
+          .role(customer.get().getRole())
+          .build();
 
-    }
-    else{
+    } else {
       throw new WrongCredentialException("Wrong Credential");
     }
     //		System.out.print(customer);
 
+  }
 
+  private void addDummyData(Long companyId) {
+
+    // Create Dummy CompanyCustomer
+    Optional<CompanyCustomerIdTable> companyCustomerIdTableOptional =
+        companyCustomerIdTableRepository.findByCompanyId(companyId);
+    CompanyCustomer companyCustomer = new CompanyCustomer();
+    companyCustomer.setCompanyId(companyId);
+    companyCustomer.setName("Alex");
+    //    companyCustomer.setCategory("Retail");
+    companyCustomer.setStatus("active");
+    companyCustomer.setPhone("+1-555-123-4567");
+    companyCustomer.setEmail("johndoe@example.com");
+    companyCustomer.setAddress("123 Main Street");
+    companyCustomer.setApartment("Apt 4B");
+    companyCustomer.setCity("Buffalo");
+    companyCustomer.setState("New York");
+    companyCustomer.setZipCode(14201);
+    companyCustomer.setUpdatedAt(LocalDateTime.now().toString());
+
+    if (companyCustomerIdTableOptional.isEmpty()) {
+      companyCustomer.setCompanyCustomerId(1);
+      CompanyCustomerIdTable myidTable = new CompanyCustomerIdTable();
+      myidTable.setTableId(2);
+      myidTable.setCompanyId(companyId);
+      companyCustomerIdTableRepository.save(myidTable);
+
+    } else {
+
+      CompanyCustomerIdTable idTable = companyCustomerIdTableOptional.get();
+      companyCustomer.setCompanyCustomerId(idTable.getTableId());
+      idTable.updateId();
+      companyCustomerIdTableRepository.save(idTable);
+    }
+
+    CompanyCustomer savedCustomer = companyCustomerRepository.save(companyCustomer);
+
+    // Create Dummy Asset
+    Assets assets = new Assets();
+    Optional<AssetIdTable> optionalIdTable = assetIdTableRepository.findByCompanyId(companyId);
+    if (optionalIdTable.isEmpty()) {
+      assets.setAssetId(1);
+      AssetIdTable myidTable = new AssetIdTable();
+      myidTable.setTableId(2);
+      myidTable.setCompanyId(companyId);
+      assetIdTableRepository.save(myidTable);
+    } else {
+
+      AssetIdTable idTable = optionalIdTable.get();
+      assets.setAssetId(idTable.getTableId());
+      idTable.updateId();
+      assetIdTableRepository.save(idTable);
+    }
+    assets.setCustomerId(savedCustomer.getId());
+    assets.setCustomer(savedCustomer.getName());
+    assets.setStatus("active");
+    assets.setName("Asset1");
+    assets.setSerialNumber("10000");
+    assets.setLocation("Buffalo");
+    assets.setUpdatedAt(LocalDateTime.now().toString());
+    assets.setCompanyId(companyId);
+    assetsRepository.save(assets);
+
+    // AssetQr
+    AssetQR assetQR = new AssetQR();
+    assetQR.setType("1");
+    assetQR.setCustom("Custom Text");
+    assetQR.setOptional("Optional Text");
+    assetQR.setCompanyId(companyId);
+
+    assetQRRepository.save(assetQR);
   }
 
   @Override
-  public void addCompanyInformation(CompanyInformation companyInformation) {
+  public void addCompanyInformation(CompanyInformation companyInformation) throws Exception {
     // TODO Auto-generated method stub
     String email = companyInformation.getCustomerEmail();
     Optional<CompanyInformation> myCompanyInformation =
         companyInformationRepository.findByCustomerEmail(email);
     if (myCompanyInformation.isEmpty()) {
       //			customRoleRepository
+      Optional<CompanyPrimaryKeyTable> companyPrimaryKeyTableOptional =
+          companyPrimaryKeyTableRepository.findById(SEQ_ID);
+      if (companyPrimaryKeyTableOptional.isEmpty()) {
+        throw new Exception("Sequence Database Not Found");
+      }
+      CompanyPrimaryKeyTable companyPrimaryKeyTable = companyPrimaryKeyTableOptional.get();
+      Long id = companyPrimaryKeyTable.getSeq();
+      companyInformation.setId(id);
+      companyPrimaryKeyTable.setSeq(id + 1);
+      companyPrimaryKeyTableRepository.save(companyPrimaryKeyTable);
 
       CompanyInformation ci = companyInformationRepository.save(companyInformation);
+      addDummyData(ci.getId());
+
       CustomRole customRole = new CustomRole();
       customRole.setCompanyId(ci.getId());
       customRole.setName("ADMIN");
@@ -269,7 +393,7 @@ public class CustomerServiceImpl implements CustomerService {
   }
 
   @Override
-  public CompanyInformation getcompanyInformation(String companyId) {
+  public CompanyInformation getcompanyInformation(Long companyId) {
     // TODO Auto-generated method stub
 
     Optional<CompanyInformation> myCompanyInformation =
@@ -307,12 +431,17 @@ public class CustomerServiceImpl implements CustomerService {
     BaseResponseDTO baseResponseDTO = new BaseResponseDTO();
     baseResponseDTO.setSucess(true);
     baseResponseDTO.setMessage("User Successfully Created");
+    Optional<Users> optionalUser = usersRepository.findByEmail(customerDTO.getEmail());
+    if (optionalUser.isPresent()) {
+      optionalUser.get().setStatus(StatusEnum.active);
+      usersRepository.save(optionalUser.get());
+    }
 
     return baseResponseDTO;
   }
 
   @Override
-  public List<String> activeUsers(String companyId) {
+  public List<String> activeUsers(Long companyId) {
     // TODO Auto-generated method stub
     List<Customer> customerList = customerRepository.findByCompanyId(companyId);
     List<String> myCustomerList = new ArrayList<>();
@@ -345,7 +474,7 @@ public class CustomerServiceImpl implements CustomerService {
   }
 
   @Override
-  public void deleteUser(String companyId, String email) throws CustomerException {
+  public void deleteUser(Long companyId, String email) throws CustomerException {
     // TODO Auto-generated method stub
 
     Optional<Customer> customerOptional =
@@ -368,18 +497,23 @@ public class CustomerServiceImpl implements CustomerService {
   }
 
   @Override
-  public void deleteRoleAndPermission(String customRoleId) throws Exception {
+  public void deleteRoleAndPermission(String customRoleId) throws RoleDeletionException {
     // TODO Auto-generated method stub
-    Optional<CustomRole> customRoleOptinal = customRoleRepository.findById(customRoleId);
-    if (customRoleOptinal.isPresent()) {
-      customRoleRepository.delete(customRoleOptinal.get());
-    } else {
-      throw new Exception("Error in deleteing role");
+    Optional<CustomRole> customRoleOptional = customRoleRepository.findById(customRoleId);
+    if (customRoleOptional.isPresent()) {
+      Long count =
+          countByRoleName(
+              customRoleOptional.get().getName(), customRoleOptional.get().getCompanyId());
+      if (count == 0) {
+        customRoleRepository.delete(customRoleOptional.get());
+      } else {
+        throw new RoleDeletionException("Error in deleting role");
+      }
     }
   }
 
   @Override
-  public List<CustomRoleDTO> getRoleAndPermission(String companyId) {
+  public List<CustomRoleDTO> getRoleAndPermission(Long companyId) {
     // TODO Auto-generated method stub
     List<CustomRole> customRoleList = customRoleRepository.findByCompanyId(companyId);
     List<CustomRoleDTO> customRoleDTOList = new ArrayList<>();
@@ -393,14 +527,14 @@ public class CustomerServiceImpl implements CustomerService {
   }
 
   @Override
-  public Long countByRoleName(String name, String companyId) {
+  public Long countByRoleName(String name, Long companyId) {
     // TODO Auto-generated method stub
     Long count = customerRepository.countByRoleAndCompanyId(name, companyId);
     return count;
   }
 
   @Override
-  public CustomRoleDTO roleAndPermissionByName(String companyId, String name) {
+  public CustomRoleDTO roleAndPermissionByName(Long companyId, String name) {
     // TODO Auto-generated method stub
     Optional<CustomRole> customRoleOptional =
         customRoleRepository.findByNameAndCompanyId(name, companyId);
@@ -420,7 +554,7 @@ public class CustomerServiceImpl implements CustomerService {
   }
 
   @Override
-  public List<Location> getAllLocation(String companyId) {
+  public List<Location> getAllLocation(Long companyId) {
     List<Location> myLocations = new ArrayList<>();
 
     myLocations = locationRepository.findByCompanyId(companyId);
@@ -439,11 +573,41 @@ public class CustomerServiceImpl implements CustomerService {
   }
 
   @Override
-  public List<Bin> getAllBin(String companyId) {
-    List<Bin> myBins = new ArrayList<>();
+  public List<BinDTO> getAllBin(Long companyId) {
+    //    List<Bin> myBins = new ArrayList<>();
+    //
+    //    myBins = binRepository.findByCompanyId(companyId);
+    //    return myBins;
+    Aggregation agg =
+        Aggregation.newAggregation(
+            Aggregation.match(Criteria.where("companyId").is(companyId)),
+            Aggregation.lookup("location", "locationId", "_id", "locationDetails"),
+            Aggregation.unwind("locationDetails", true),
+            Aggregation.project("id", "locationId", "binNumber", "status", "companyId")
+                .and("locationDetails.name")
+                .as("locationName"));
 
-    myBins = binRepository.findByCompanyId(companyId);
-    return myBins;
+    AggregationResults<BinDTO> results = mongoTemplate.aggregate(agg, "bin", BinDTO.class);
+    return results.getMappedResults();
+  }
+
+  @Override
+  public List<LocationWithBinsDTO> getLocationsWithBins(Long companyId) {
+    Aggregation agg =
+        Aggregation.newAggregation(
+            Aggregation.match(Criteria.where("companyId").is(companyId)),
+            Aggregation.lookup(
+                "bin", "_id", "locationId", "bins"), // join from location._id to bin.locationId
+            Aggregation.project("name")
+                .and(ConvertOperators.ToString.toString("_id"))
+                .as("id")
+                .and("bins")
+                .as("bins"));
+
+    AggregationResults<LocationWithBinsDTO> results =
+        mongoTemplate.aggregate(agg, "location", LocationWithBinsDTO.class);
+
+    return results.getMappedResults();
   }
 
   @Override
@@ -457,7 +621,7 @@ public class CustomerServiceImpl implements CustomerService {
   }
 
   @Override
-  public Page<ImportHistoryDTO> getImportHistoryList(String companyId, int page, int size) {
+  public Page<ImportHistoryDTO> getImportHistoryList(Long companyId, int page, int size) {
     //		Pageable pageable = PageRequest.of(page, size);
     Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "date"));
     return importHistoryRepository.findByCompanyId(companyId, pageable);
@@ -470,15 +634,18 @@ public class CustomerServiceImpl implements CustomerService {
 
   @Override
   public void addCardDetails(CustomerStripeDetails customerStripeDetails) {
-    Optional<CustomerStripeDetails> optionalCustomerCardDetails= customerStripeDetailsRepository.findByCompanyId(customerStripeDetails.getCompanyId());
-      optionalCustomerCardDetails.ifPresent(cardDetails -> customerStripeDetails.setId(cardDetails.getId()));
+    Optional<CustomerStripeDetails> optionalCustomerCardDetails =
+        customerStripeDetailsRepository.findByCompanyId(customerStripeDetails.getCompanyId());
+    optionalCustomerCardDetails.ifPresent(
+        cardDetails -> customerStripeDetails.setId(cardDetails.getId()));
     customerStripeDetailsRepository.save(customerStripeDetails);
   }
 
   @Override
-  public CustomerStripeDetails getCardDetails(String companyId) {
-    Optional<CustomerStripeDetails> optionalCustomerCardDetails= customerStripeDetailsRepository.findByCompanyId(companyId);
-      return optionalCustomerCardDetails.orElse(null);
+  public CustomerStripeDetails getCardDetails(Long companyId) {
+    Optional<CustomerStripeDetails> optionalCustomerCardDetails =
+        customerStripeDetailsRepository.findByCompanyId(companyId);
+    return optionalCustomerCardDetails.orElse(null);
   }
 
   @Override

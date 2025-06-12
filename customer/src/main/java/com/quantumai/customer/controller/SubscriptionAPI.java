@@ -3,10 +3,9 @@ package com.quantumai.customer.controller;
 import com.quantumai.customer.dto.SubscriptionDTO;
 import com.quantumai.customer.entity.Subscription;
 import com.quantumai.customer.service.SubscriptionService;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @CrossOrigin(origins = "**")
 @RestController
@@ -28,7 +27,7 @@ public class SubscriptionAPI {
   }
 
   @GetMapping("/currentSubscription/{companyId}")
-  public Subscription currentSubscription(@PathVariable String companyId) {
+  public Subscription currentSubscription(@PathVariable Long companyId) {
     //
     // System.out.println("----------->"+subscriptionService.getCurrentSubscription(companyId).getSubscriptionDate());
     //
@@ -36,8 +35,9 @@ public class SubscriptionAPI {
     System.out.println("----------->" + subscriptionService.getCurrentSubscription(companyId));
     return subscriptionService.getCurrentSubscription(companyId);
   }
+
   @GetMapping("/getAllSubscription/{companyId}")
-  public List<Subscription> getAllSubscription(@PathVariable String companyId) {
+  public List<Subscription> getAllSubscription(@PathVariable Long companyId) {
     //
     // System.out.println("----------->"+subscriptionService.getCurrentSubscription(companyId).getSubscriptionDate());
     //
@@ -45,22 +45,27 @@ public class SubscriptionAPI {
 
     return subscriptionService.getAllSubscription(companyId);
   }
+
   @DeleteMapping("/deleteUpcomingSubscription/{companyId}/{companyName}/{email}")
-  public void deleteUpcomingSubscription(@PathVariable String companyId,@PathVariable String companyName,@PathVariable String email) throws Exception {
+  public void deleteUpcomingSubscription(
+      @PathVariable Long companyId, @PathVariable String companyName, @PathVariable String email)
+      throws Exception {
     //
     // System.out.println("----------->"+subscriptionService.getCurrentSubscription(companyId).getSubscriptionDate());
     //
     // System.out.println("----------->"+subscriptionService.getCurrentSubscription(companyId).getExpiryDate());
 
-    subscriptionService.deleteUpcomingSubscription(companyId,companyName,email);
+    subscriptionService.deleteUpcomingSubscription(companyId, companyName, email);
   }
+
   @GetMapping("/startUpcomingSubscription/{companyId}/{companyName}/{email}")
-  public void startUpcomingSubscription(@PathVariable String companyId,@PathVariable String companyName,@PathVariable String email) throws Exception {
+  public void startUpcomingSubscription(
+      @PathVariable Long companyId, @PathVariable String companyName, @PathVariable String email)
+      throws Exception {
     //
     // System.out.println("----------->"+subscriptionService.getCurrentSubscription(companyId).getSubscriptionDate());
     //
     // System.out.println("----------->"+subscriptionService.getCurrentSubscription(companyId).getExpiryDate());
-    subscriptionService.startUpcomingSubscription(companyId,companyName,email);
-
+    subscriptionService.startUpcomingSubscription(companyId, companyName, email);
   }
 }

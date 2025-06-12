@@ -10,6 +10,7 @@ import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
 import com.quantumai.customer.exception.CategoryException;
 import com.quantumai.customer.exception.ImportFileRowException;
+import com.quantumai.customer.exception.NoSubscriptionError;
 import com.quantumai.customer.repository.*;
 import com.quantumai.customer.service.CompanyCustomerService;
 import com.quantumai.customer.service.CustomerService;
@@ -54,7 +55,63 @@ public class CompanyCustomerAPI {
 
   @Autowired private CustomerService customerService;
 
+  @Autowired SubscriptionRepository subscriptionRepository;
+
+  @Autowired CompanyCustomerCategoryRepository companyCustomerCategoryRepository;
+
   private ModelMapper modelMapper = new ModelMapper();
+
+  List<String> stateList =
+          List.of(
+                  "Alaska",
+                  "Arizona",
+                  "Arkansas",
+                  "California",
+                  "Colorado",
+                  "Connecticut",
+                  "Delaware",
+                  "Florida",
+                  "Georgia",
+                  "Hawaii",
+                  "Idaho",
+                  "Illinois",
+                  "Indiana",
+                  "Iowa",
+                  "Kansas",
+                  "Kentucky",
+                  "Louisiana",
+                  "Maine",
+                  "Maryland",
+                  "Massachusetts",
+                  "Michigan",
+                  "Minnesota",
+                  "Mississippi",
+                  "Missouri",
+                  "Montana",
+                  "Nebraska",
+                  "Nevada",
+                  "New Hampshire",
+                  "New Jersey",
+                  "New Mexico",
+                  "New York",
+                  "North Carolina",
+                  "North Dakota",
+                  "Ohio",
+                  "Oklahoma",
+                  "Oregon",
+                  "Pennsylvania",
+                  "Rhode Island",
+                  "South Carolina",
+                  "South Dakota",
+                  "Tennessee",
+                  "Texas",
+                  "Utah",
+                  "Vermont",
+                  "Virginia",
+                  "Washington",
+                  "West Virginia",
+                  "Wisconsin",
+                  "Wyoming");
 
   @GetMapping("/working")
   public String working() {
@@ -63,12 +120,19 @@ public class CompanyCustomerAPI {
   }
 
   @DeleteMapping("/deleteCompanyCustomer/{id}")
-  public void deleteCompanyCustomer(@PathVariable String id) {
+  public void deleteCompanyCustomer(@PathVariable String id, @RequestHeader Long companyId)
+      throws NoSubscriptionError {
+
+    Optional<Subscription> subscriptionOptional =
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");
+    if (subscriptionOptional.isEmpty()) {
+      throw new NoSubscriptionError("No Active Subscription");
+    }
     companyCustomerService.deleteCustomer(id);
   }
 
   @GetMapping("/allCompanyCustomer/{companyId}")
-  public List<CompanyCustomerDTO> getCompanyCustomerList(@PathVariable String companyId) {
+  public List<CompanyCustomerDTO> getCompanyCustomerList(@PathVariable Long companyId) {
     return companyCustomerService.getAllCustomer(companyId);
   }
 
@@ -80,7 +144,7 @@ public class CompanyCustomerAPI {
 
   @GetMapping("/getCompanyCustomerByLocalId/{id}/{companyId}")
   public CompanyCustomerDTO getCompanyCustomerByLocalId(
-      @PathVariable String id, @PathVariable String companyId) {
+      @PathVariable String id, @PathVariable Long companyId) {
     System.out.println(id);
     return companyCustomerService.getCompanyCustomerByLocalId(Integer.valueOf(id), companyId);
   }
@@ -91,18 +155,34 @@ public class CompanyCustomerAPI {
   //		return companyCustomerService.getAllCustomer(companyId);
   //	}
   @PostMapping("/addCompanyCustomer")
-  public CompanyCustomerDTO addNewFields(@RequestBody CompanyCustomerDTO companyCustomerDTO) {
+  public CompanyCustomerDTO addNewFields(
+      @RequestBody CompanyCustomerDTO companyCustomerDTO, @RequestHeader Long companyId)
+      throws NoSubscriptionError {
+    System.out.println("CompanyId-->" + companyId);
+    Optional<Subscription> subscriptionOptional =
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");
+    if (subscriptionOptional.isEmpty()) {
+      throw new NoSubscriptionError("No Active Subscription");
+    }
     return companyCustomerService.addCustomer(companyCustomerDTO);
   }
 
   @PutMapping("/updateCompanyCustomer")
-  public void updateCompanyCustomer(@RequestBody CompanyCustomerDTO companyCustomerDTO) {
+  public void updateCompanyCustomer(
+      @RequestBody CompanyCustomerDTO companyCustomerDTO, @RequestHeader Long companyId)
+      throws NoSubscriptionError {
+
+    Optional<Subscription> subscriptionOptional =
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");
+    if (subscriptionOptional.isEmpty()) {
+      throw new NoSubscriptionError("No Active Subscription");
+    }
     companyCustomerService.updateCustomer(companyCustomerDTO);
   }
 
   @GetMapping(value = "/searchCompanyCustomerlist/{companyId}")
   public List<String> getCompanyCustomerFromAsset(
-      @PathVariable String companyId,
+      @PathVariable Long companyId,
       @RequestParam(name = "data", required = true) String search,
       @RequestParam(name = "category", required = true) String category) {
     System.out.println("----------my CompanyCustomer search------------->" + search);
@@ -111,42 +191,71 @@ public class CompanyCustomerAPI {
 
   @GetMapping(value = "/sortCompanyCustomerlist/{companyId}")
   public List<String> getCompanyCustomerFromAsset(
-      @PathVariable String companyId,
+      @PathVariable Long companyId,
       @RequestParam(name = "category", required = true) String category) {
     return companyCustomerService.sortCompanyCustomer(companyId, category);
   }
 
   @PostMapping("/addExtraFieldName")
-  public void addExtraFieldName(@RequestBody CompanyCustomerExtraFieldNameDTO extraFieldNameDTO)
+  public void addExtraFieldName(
+      @RequestBody CompanyCustomerExtraFieldNameDTO extraFieldNameDTO,
+      @RequestHeader Long companyId)
       throws Exception {
+
+    Optional<Subscription> subscriptionOptional =
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");
+    if (subscriptionOptional.isEmpty()) {
+      throw new NoSubscriptionError("No Active Subscription");
+    }
     companyCustomerService.addCompanyCustomerExtraField(extraFieldNameDTO);
   }
 
   @GetMapping("/getExtraFieldName/{companyId}")
-  public List<CompanyCustomerExtraFieldNameDTO> getExtraFieldName(@PathVariable String companyId) {
+  public List<CompanyCustomerExtraFieldNameDTO> getExtraFieldName(@PathVariable Long companyId) {
     //		System.out.println("----------my company------------->"+companyId);
     return companyCustomerService.getCompanyCustomerExtraField(companyId);
   }
 
   @DeleteMapping("/deleteExtraFieldName/{id}")
-  public void deleteExtraFieldName(@PathVariable String id) {
-    System.out.println("-----------------------api------------------------>" + id);
+  public void deleteExtraFieldName(@PathVariable String id, @RequestHeader Long companyId)
+      throws NoSubscriptionError {
+    Optional<Subscription> subscriptionOptional =
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");
+    if (subscriptionOptional.isEmpty()) {
+      throw new NoSubscriptionError("No Active Subscription");
+    }
     companyCustomerService.deleteCompanyCustomerExtraField(id);
   }
 
   @PostMapping("/mandatoryFields")
-  public void mandatoryFields(@RequestBody CompanyCustomerMandatoryFields mandatoryFields) {
+  public void mandatoryFields(
+      @RequestBody CompanyCustomerMandatoryFields mandatoryFields, @RequestHeader Long companyId)
+      throws NoSubscriptionError {
+
+    Optional<Subscription> subscriptionOptional =
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");
+    if (subscriptionOptional.isEmpty()) {
+      throw new NoSubscriptionError("No Active Subscription");
+    }
     companyCustomerService.updateMandatoryFields(mandatoryFields);
   }
 
   @PostMapping("/showFields")
-  public void showFields(@RequestBody CompanyCustomerShowFields showFields) {
+  public void showFields(
+      @RequestBody CompanyCustomerShowFields showFields, @RequestHeader Long companyId)
+      throws NoSubscriptionError {
+
+    Optional<Subscription> subscriptionOptional =
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");
+    if (subscriptionOptional.isEmpty()) {
+      throw new NoSubscriptionError("No Active Subscription");
+    }
     companyCustomerService.updateShowFields(showFields);
   }
 
   @GetMapping("/getMandatoryFields/{name}/{companyId}")
   public ResponseEntity<CompanyCustomerMandatoryFields> getMandatoryFields(
-      @PathVariable String name, @PathVariable String companyId) {
+      @PathVariable String name, @PathVariable Long companyId) {
     System.out.println("============================>" + name + companyId);
     CompanyCustomerMandatoryFields mandatoryFields =
         companyCustomerService.getMandatoryFields(name, companyId);
@@ -155,14 +264,14 @@ public class CompanyCustomerAPI {
 
   @GetMapping("/getShowFields/{name}/{companyId}")
   public ResponseEntity<CompanyCustomerShowFields> getShowFields(
-      @PathVariable String name, @PathVariable String companyId) {
+      @PathVariable String name, @PathVariable Long companyId) {
     CompanyCustomerShowFields showFields = companyCustomerService.getShowFields(name, companyId);
     return ResponseEntity.ok(showFields);
   }
 
   @GetMapping("/getAllMandatoryFields/{companyId}")
   public ResponseEntity<List<CompanyCustomerMandatoryFields>> getAllMandatoryFields(
-      @PathVariable String companyId) {
+      @PathVariable Long companyId) {
     List<CompanyCustomerMandatoryFields> mandatoryFieldsList =
         companyCustomerService.getAllMandatoryFields(companyId);
     return ResponseEntity.ok(mandatoryFieldsList);
@@ -170,25 +279,39 @@ public class CompanyCustomerAPI {
 
   @GetMapping("/getAllShowFields/{companyId}")
   public ResponseEntity<List<CompanyCustomerShowFields>> getAllShowFields(
-      @PathVariable String companyId) {
+      @PathVariable Long companyId) {
     List<CompanyCustomerShowFields> showFieldsList =
         companyCustomerService.getAllShowFields(companyId);
     return ResponseEntity.ok(showFieldsList);
   }
 
   @DeleteMapping("/deleteShowAndMandatoryField/{name}/{companyId}")
-  public void showFields(@PathVariable String name, @PathVariable String companyId) {
+  public void showFields(@PathVariable String name, @PathVariable Long companyId)
+      throws NoSubscriptionError {
+
+    Optional<Subscription> subscriptionOptional =
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");
+    if (subscriptionOptional.isEmpty()) {
+      throw new NoSubscriptionError("No Active Subscription");
+    }
     companyCustomerService.deleteShowAndMandatoryFields(companyId, name);
   }
 
   @GetMapping("/getExtraFieldNameValue/{companyId}")
-  public Map<String, Map<String, String>> getExtraFieldNameValue(@PathVariable String companyId) {
+  public Map<String, Map<String, String>> getExtraFieldNameValue(@PathVariable Long companyId) {
+
     return companyCustomerService.getextraFieldList(companyId);
   }
 
   @PostMapping("/addfields")
-  public void addNewFields(@RequestBody CompanyCustomerExtraFieldsDTO extraFieldsDTO)
+  public void addNewFields(
+      @RequestBody CompanyCustomerExtraFieldsDTO extraFieldsDTO, @RequestHeader Long companyId)
       throws Exception {
+    Optional<Subscription> subscriptionOptional =
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");
+    if (subscriptionOptional.isEmpty()) {
+      throw new NoSubscriptionError("No Active Subscription");
+    }
     companyCustomerService.addExtraFields(extraFieldsDTO);
   }
 
@@ -198,24 +321,44 @@ public class CompanyCustomerAPI {
   }
 
   @DeleteMapping("/deleteExtraFields/{id}")
-  public void deleteExtraField(@PathVariable String id) throws Exception {
+  public void deleteExtraField(@PathVariable String id, Long companyId) throws Exception {
+
+    Optional<Subscription> subscriptionOptional =
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");
+    if (subscriptionOptional.isEmpty()) {
+      throw new NoSubscriptionError("No Active Subscription");
+    }
     companyCustomerService.deleteExtraFields(id);
   }
 
   @DeleteMapping("/deleteCompanyCustomerExtraFields/{id}")
-  public void deleteCompanyCustomerExtraFields(@PathVariable String id) throws Exception {
+  public void deleteCompanyCustomerExtraFields(
+      @PathVariable String id, @RequestHeader Long companyId) throws Exception {
+
+    Optional<Subscription> subscriptionOptional =
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");
+    if (subscriptionOptional.isEmpty()) {
+      throw new NoSubscriptionError("No Active Subscription");
+    }
     companyCustomerService.deleteExtraFieldByCompanyCustomer(id);
   }
 
   @GetMapping("/allCompanyCustomerWithExtraFields/{id}")
-  public List<String> allCompanyCustomerWithExtraFields(@PathVariable String id) {
+  public List<String> allCompanyCustomerWithExtraFields(@PathVariable Long id) {
     return companyCustomerService.getAllCustomerWithExtraColumns(id);
   }
 
   @PostMapping("/addFile/{companyCustomerId}")
   public ResponseEntity<ResponseMessageDTO> addCompanyCustomerFile(
-      @RequestParam("file") MultipartFile file, @PathVariable String companyCustomerId) {
-    System.out.println("------------------------inside Multifile------------->");
+      @RequestParam("file") MultipartFile file,
+      @PathVariable String companyCustomerId,
+      @RequestHeader Long companyId)
+      throws NoSubscriptionError {
+    Optional<Subscription> subscriptionOptional =
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");
+    if (subscriptionOptional.isEmpty()) {
+      throw new NoSubscriptionError("No Active Subscription");
+    }
     String message = "";
     try {
       companyCustomerService.addCompanyCustomerFile(file, companyCustomerId);
@@ -248,10 +391,14 @@ public class CompanyCustomerAPI {
   }
 
   @DeleteMapping("deleteFile/{id}")
-  public void deleteFile(@PathVariable String id) {
+  public void deleteFile(@PathVariable String id, @RequestHeader Long companyId)
+      throws NoSubscriptionError {
+    Optional<Subscription> subscriptionOptional =
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");
+    if (subscriptionOptional.isEmpty()) {
+      throw new NoSubscriptionError("No Active Subscription");
+    }
     companyCustomerService.deleteFile(id);
-    //		return new ResponseEntity<>(assetFileDTO.getFile(),HttpStatus.OK);
-    //		return new ResponseEntity<>("Successfully Deleted File",HttpStatus.EXPECTATION_FAILED);
   }
 
   @PostMapping("/advanceFilter/{pageNumber}/{pageSize}")
@@ -261,10 +408,15 @@ public class CompanyCustomerAPI {
       @PathVariable(required = false) Integer pageSize,
       @RequestParam(name = "category", required = false) String category,
       @RequestParam(name = "search", required = false) String searchData,
-      @RequestParam(name = "asc", required = false) Boolean asc) {
+      @RequestParam(name = "asc", required = false) Boolean asc,
+      @RequestHeader Long companyId)
+      throws NoSubscriptionError {
 
-    // Use a logger instead of System.out.print
-    //		Logger logger = LoggerFactory.getLogger(CompanyCustomerAPI.class);
+    //    Optional<Subscription> subscriptionOptional=
+    // subscriptionRepository.findByCompanyIdAndStatus(companyId,"ACTIVE");
+    //    if(subscriptionOptional.isEmpty()){
+    //      throw new NoSubscriptionError("No Active Subscription");
+    //    }
 
     if (asc == null) {
       asc = true;
@@ -296,12 +448,19 @@ public class CompanyCustomerAPI {
   public void importFile(
       @RequestParam("file") MultipartFile file,
       @RequestParam("columnMappings") String columnMappings,
-      @PathVariable String companyId,
+      @PathVariable Long companyId,
       @PathVariable String email)
-      throws CsvValidationException, MessagingException, ImportFileRowException {
+      throws CsvValidationException,
+          MessagingException,
+          ImportFileRowException,
+          NoSubscriptionError {
     //
     //	//System.out.println("------||---------------------------------------/////////////////////////////////////------->"+columnMappings);
-
+    Optional<Subscription> subscriptionOptional =
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");
+    if (subscriptionOptional.isEmpty()) {
+      throw new NoSubscriptionError("No Active Subscription");
+    }
     Map<String, String> columnMap = new HashMap<>();
     try {
       // Create a JsonFactory and a JsonParser
@@ -392,19 +551,36 @@ public class CompanyCustomerAPI {
       System.out.println("===========>");
       System.out.println(importHistoryDTO);
       while ((row = csvReader.readNext()) != null) {
+
+        boolean isEmpty = Arrays.stream(row)
+                .allMatch(cell -> cell == null || cell.trim().isEmpty());
+        if (isEmpty) {
+          continue; // Don't create the Excel row or process this CSV line
+        }
+
+        System.out.println("CSV Row Raw: " + Arrays.toString(row));
+
+        // Print the trimmed row values
+        String[] trimmedRow = Arrays.stream(row)
+                .map(cell -> cell == null ? "" : cell.trim())
+                .toArray(String[]::new);
+        System.out.println("CSV Row Trimmed: " + Arrays.toString(trimmedRow));
+
         Row myrow = sheet.createRow(excelIndex);
         Cell cell1 = myrow.createCell(0);
         cell1.setCellValue("Line " + (int) (ind + 1));
         CompanyCustomerDTO companyCustomerDTO = new CompanyCustomerDTO();
         companyCustomerDTO.setCompanyId(companyId);
         int errorFlag = 0;
-        String errorDesc = "";
+        StringBuilder errorDesc = new StringBuilder();
         //	            //System.out.println("-------|||||---errorFlag----> "+errorFlag);
         for (int j = 0; j < row.length; j++) {
           String field = headerMap.get(j);
           //	                //System.out.println("--------------> "+j+" " + row[j]);
           //	                //System.out.println("-------|||||------->
           // "+columnMap.get(field).toLowerCase());
+
+
 
           if (errorFlag == 1) {
             break;
@@ -422,7 +598,18 @@ public class CompanyCustomerAPI {
                 break;
               case "category":
                 System.out.println("category//->" + row[j]);
-                companyCustomerDTO.setCategory(row[j]);
+                List<CompanyCustomerCategory> categoryList=companyCustomerCategoryRepository.findByCompanyId(companyId);
+                String rowValue=row[j];
+                if(!rowValue.trim().isBlank()){
+                  List<CompanyCustomerCategory> list=categoryList.stream().filter(x-> x.getName().equalsIgnoreCase(rowValue)).toList();
+                  if(list.isEmpty()){
+                    errorDesc.append("ERROR IN CATEGORY WHILE ADDING IN CUSTOMER");
+                  }
+                  else{
+                    companyCustomerDTO.setCategory(list.get(0).getName());
+                  }
+                }
+
                 break;
               case "email":
                 companyCustomerDTO.setEmail(row[j]);
@@ -438,7 +625,18 @@ public class CompanyCustomerAPI {
                 companyCustomerDTO.setCity(row[j]);
                 break;
               case "state":
-                companyCustomerDTO.setState(row[j]);
+
+                String myState=row[j];
+                List<String> selectedStateList=stateList.stream().filter(myState::equalsIgnoreCase).toList();
+
+                if(!selectedStateList.isEmpty()){
+                  companyCustomerDTO.setState(selectedStateList.get(0));
+                }
+                else{
+                  errorDesc.append("ERROR WHILE ADDING IN STATE");
+                  errorFlag = 1;
+                }
+
                 break;
               case "zipcode":
                 System.out.println("zipCode//->" + row[j]);
@@ -460,9 +658,9 @@ public class CompanyCustomerAPI {
                 } else {
                   // System.out.println("ERROR WHILE ADDING IN Status for line->"+ind);
                   if (errorDesc.length() > 0) {
-                    errorDesc += ", ";
+                    errorDesc.append(", ");
                   }
-                  errorDesc += "ERROR WHILE ADDING IN STATUS";
+                  errorDesc.append("ERROR WHILE ADDING IN STATUS");
                   errorFlag = 1;
                   break;
                 }
@@ -510,11 +708,9 @@ public class CompanyCustomerAPI {
                       // listExtraFieldName.get(i).getName()+" for row->"+ind+1);
                       errorFlag = 1;
                       if (errorDesc.length() > 0) {
-                        errorDesc += ", ";
+                        errorDesc.append(", ");
                       }
-                      errorDesc +=
-                          "ERROR WHILE ADDING IN "
-                              + listExtraFieldName.get(i).getName().toUpperCase();
+                      errorDesc.append("ERROR WHILE ADDING IN ").append(listExtraFieldName.get(i).getName().toUpperCase());
                     }
                   }
                   if (listExtraFieldName.get(i).getType().equals("date")) {
@@ -533,11 +729,9 @@ public class CompanyCustomerAPI {
                       // listExtraFieldName.get(i).getName()+" for row->"+ind+1);
                       errorFlag = 1;
                       if (errorDesc.length() > 0) {
-                        errorDesc += ", ";
+                        errorDesc.append(", ");
                       }
-                      errorDesc +=
-                          "ERROR WHILE ADDING IN "
-                              + listExtraFieldName.get(i).getName().toUpperCase();
+                      errorDesc.append("ERROR WHILE ADDING IN ").append(listExtraFieldName.get(i).getName().toUpperCase());
                     }
                   } else {
                     extraFieldsDTO.setValue(value);
@@ -562,7 +756,7 @@ public class CompanyCustomerAPI {
         }
 
         Cell cell2 = myrow.createCell(1);
-        cell2.setCellValue(errorDesc);
+        cell2.setCellValue(errorDesc.toString());
         if (errorFlag == 1) {
           // System.out.println("Inside errorFLag");
 
@@ -572,7 +766,7 @@ public class CompanyCustomerAPI {
         ind++;
         currCount++;
         importHistoryDTO.setDate(LocalDateTime.now().toString());
-        long complete = (currCount * 100) / totalCount;
+        long complete = (currCount * 100L) / (totalCount);
         importHistoryDTO.setComplete(complete);
         importHistoryDTO = customerService.addImportHistory(importHistoryDTO);
         //				System.out.println(importHistoryDTO);
@@ -580,7 +774,19 @@ public class CompanyCustomerAPI {
       }
       if (excelIndex > 0) {
         importHistoryDTO.setMessage("We have sent import result via email");
-        try (FileOutputStream fileOut = new FileOutputStream("Report.xlsx")) {
+        Sheet mySheet = workbook.getSheetAt(0);
+
+        // Get last row index (0-based)
+        int lastRowNum = mySheet.getLastRowNum();
+
+        if (lastRowNum >= 0) {
+          Row lastRow = mySheet.getRow(lastRowNum);
+          if (lastRow != null) {
+            mySheet.removeRow(lastRow);
+          }
+        }
+
+          try (FileOutputStream fileOut = new FileOutputStream("CustomerReport.xlsx")) {
           workbook.write(fileOut);
         }
         workbook.close();
@@ -601,7 +807,7 @@ public class CompanyCustomerAPI {
       }
       if (excelIndex == 0) {
         importHistoryDTO.setMessage("Import was Successfully Done");
-        try (FileOutputStream fileOut = new FileOutputStream("Report.xlsx")) {
+        try (FileOutputStream fileOut = new FileOutputStream("CustomerReport.xlsx")) {
           workbook.write(fileOut);
         }
         workbook.close();
@@ -638,14 +844,19 @@ public class CompanyCustomerAPI {
   public void importUpdation(
       @RequestParam("file") MultipartFile file,
       @RequestParam("columnMappings") String columnMappings,
-      @PathVariable String companyId,
+      @PathVariable Long companyId,
       @PathVariable String email)
       throws CsvValidationException,
           JsonParseException,
           IOException,
           MessagingException,
-          ImportFileRowException {
-
+          ImportFileRowException,
+          NoSubscriptionError {
+    Optional<Subscription> subscriptionOptional =
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");
+    if (subscriptionOptional.isEmpty()) {
+      throw new NoSubscriptionError("No Active Subscription");
+    }
     System.out.println("------||-------->" + columnMappings);
     Map<String, String> columnMap = new HashMap<>();
     try {
@@ -732,15 +943,31 @@ public class CompanyCustomerAPI {
       Sheet sheet = workbook.createSheet("Sheet1");
       int excelIndex = 0;
       while ((row = csvReader.readNext()) != null) {
+        boolean isEmpty = Arrays.stream(row)
+                .allMatch(cell -> cell == null || cell.trim().isEmpty());
+        if (isEmpty) {
+          continue; // Don't create the Excel row or process this CSV line
+        }
+
+        System.out.println("CSV Row Raw: " + Arrays.toString(row));
+
+        // Print the trimmed row values
+        String[] trimmedRow = Arrays.stream(row)
+                .map(cell -> cell == null ? "" : cell.trim())
+                .toArray(String[]::new);
+        System.out.println("CSV Row Trimmed: " + Arrays.toString(trimmedRow));
+
         Row myrow = sheet.createRow(excelIndex);
         Cell cell1 = myrow.createCell(0);
         cell1.setCellValue("Row " + (int) (ind + 1));
         int errorFlag = 0;
-        String errorDesc = "";
+        StringBuilder errorDesc = new StringBuilder();
         //	            AssetsDTO assetsDTO = new AssetsDTO();
         //	            assetsDTO.setCompanyId(companyId);
         CompanyCustomer companyCustomer = new CompanyCustomer();
         for (int j = 0; j < row.length; j++) {
+
+
           if (j > 0 && companyCustomer == null) {
             break;
           }
@@ -777,7 +1004,7 @@ public class CompanyCustomerAPI {
                 // System.out.println("------------------/////////----"+assetsDTO.getId());
                 if (companyCustomer == null) {
                   errorFlag = 1;
-                  errorDesc += "ERROR WHILE UPDATING IN INVENTORYID";
+                  errorDesc.append("ERROR WHILE UPDATING IN INVENTORYID");
                 }
                 break;
 
@@ -790,7 +1017,18 @@ public class CompanyCustomerAPI {
                 break;
               case "category":
                 System.out.println("category//->" + row[j]);
-                companyCustomer.setCategory(row[j]);
+                List<CompanyCustomerCategory> categoryList=companyCustomerCategoryRepository.findByCompanyId(companyId);
+                String rowValue=row[j];
+                if(!rowValue.trim().isBlank()){
+                  List<CompanyCustomerCategory> list=categoryList.stream().filter(x-> x.getName().equalsIgnoreCase(rowValue)).toList();
+                  if(list.isEmpty()){
+                    errorDesc.append("ERROR IN CATEGORY WHILE ADDING IN CUSTOMER");
+                  }
+                  else{
+                    companyCustomer.setCategory(list.get(0).getName());
+                  }
+                }
+
                 break;
               case "email":
                 companyCustomer.setEmail(row[j]);
@@ -806,17 +1044,27 @@ public class CompanyCustomerAPI {
                 companyCustomer.setCity(row[j]);
                 break;
               case "state":
-                companyCustomer.setState(row[j]);
+
+                String myState=row[j];
+                List<String> selectedStateList=stateList.stream().filter(myState::equalsIgnoreCase).toList();
+                if(!selectedStateList.isEmpty()){
+                  companyCustomer.setState(selectedStateList.get(0));
+                }
+                else{
+                  errorDesc.append("ERROR WHILE ADDING IN STATE");
+                  errorFlag = 1;
+                }
+
                 break;
               case "zipcode":
                 System.out.println("zipCode//->" + row[j]);
                 companyCustomer.setZipCode(Integer.parseInt(row[j]));
                 break;
               case "status":
-                if ((row[j].toLowerCase().equals("active"))
-                    || (row[j].toLowerCase().equals("inactive"))) {
+                if ((row[j].equalsIgnoreCase("active"))
+                    || (row[j].equalsIgnoreCase("inactive"))) {
 
-                  if (row[j].toLowerCase().equals("active")) {
+                  if (row[j].equalsIgnoreCase("active")) {
                     companyCustomer.setStatus("active");
                   } else {
                     companyCustomer.setStatus("inActive");
@@ -827,10 +1075,10 @@ public class CompanyCustomerAPI {
 
                 } else {
                   // System.out.println("ERROR WHILE ADDING IN Status for line->"+ind);
-                  if (errorDesc.length() > 0) {
-                    errorDesc += ", ";
+                  if (!errorDesc.isEmpty()) {
+                    errorDesc.append(", ");
                   }
-                  errorDesc += "ERROR WHILE ADDING IN STATUS";
+                  errorDesc.append("ERROR WHILE ADDING IN STATUS");
                   errorFlag = 1;
                   break;
                 }
@@ -846,11 +1094,10 @@ public class CompanyCustomerAPI {
               for (int i = 0; i < listExtraFieldName.size(); i++) {
                 if (columnMap
                     .get(field)
-                    .toLowerCase()
-                    .equals(listExtraFieldName.get(i).getName().toLowerCase())) {
+                    .equalsIgnoreCase(listExtraFieldName.get(i).getName())) {
                   CompanyCustomerExtraFields extraFieldsDTO = new CompanyCustomerExtraFields();
                   CompanyCustomerExtraFields extraFieldsOptional =
-                      extraFieldsRepository.findByNameAndCompanyCustomerId(
+                      extraFieldsRepository.findByNameIgnoreCaseAndCompanyCustomerId(
                           listExtraFieldName.get(i).getName(), id);
                   System.out.println(
                       "-----------------working ---->" + listExtraFieldName.get(i).getType());
@@ -861,9 +1108,9 @@ public class CompanyCustomerAPI {
                     extraFieldsDTO.setType(listExtraFieldName.get(i).getType());
                     if (listExtraFieldName.get(i).getType().equals("number")) {
                       try {
-                        Integer val = Integer.parseInt(value);
+                        int val = Integer.parseInt(value);
                         System.out.println("-----------------extra---->" + val + "->" + value);
-                        extraFieldsDTO.setValue(val.toString());
+                        extraFieldsDTO.setValue(Integer.toString(val));
                       } catch (Exception e) {
                         System.out.println(
                             "ERROR WHILE ADDING EXTRA IN"
@@ -871,12 +1118,10 @@ public class CompanyCustomerAPI {
                                 + " for row->"
                                 + ind);
                         errorFlag = 1;
-                        if (errorDesc.length() > 0) {
-                          errorDesc += ", ";
+                        if (!errorDesc.isEmpty()) {
+                          errorDesc.append(", ");
                         }
-                        errorDesc +=
-                            "ERROR WHILE ADDING IN "
-                                + listExtraFieldName.get(i).getName().toUpperCase();
+                        errorDesc.append("ERROR WHILE ADDING IN ").append(listExtraFieldName.get(i).getName().toUpperCase());
                       }
                     } else if (listExtraFieldName.get(i).getType().equals("date")) {
                       try {
@@ -899,12 +1144,10 @@ public class CompanyCustomerAPI {
                                 + " for row->"
                                 + ind);
                         errorFlag = 1;
-                        if (errorDesc.length() > 0) {
-                          errorDesc += ", ";
+                        if (!errorDesc.isEmpty()) {
+                          errorDesc.append(", ");
                         }
-                        errorDesc +=
-                            "ERROR WHILE ADDING IN "
-                                + listExtraFieldName.get(i).getName().toUpperCase();
+                        errorDesc.append("ERROR WHILE ADDING IN ").append(listExtraFieldName.get(i).getName().toUpperCase());
                       }
                     } else {
                       extraFieldsDTO.setValue(value);
@@ -917,9 +1160,9 @@ public class CompanyCustomerAPI {
                     extraFieldsDTO.setType(listExtraFieldName.get(i).getType());
                     if (listExtraFieldName.get(i).getType().equals("number")) {
                       try {
-                        Integer val = Integer.parseInt(value);
+                        int val = Integer.parseInt(value);
                         System.out.println("-----------------extra---->" + val + "->" + value);
-                        extraFieldsDTO.setValue(val.toString());
+                        extraFieldsDTO.setValue(Integer.toString(val));
                       } catch (Exception e) {
                         System.out.println(
                             "ERROR WHILE ADDING EXTRA IN"
@@ -927,12 +1170,10 @@ public class CompanyCustomerAPI {
                                 + " for row->"
                                 + ind);
                         errorFlag = 1;
-                        if (errorDesc.length() > 0) {
-                          errorDesc += ", ";
+                        if (!errorDesc.isEmpty()) {
+                          errorDesc.append(", ");
                         }
-                        errorDesc +=
-                            "ERROR WHILE ADDING IN "
-                                + listExtraFieldName.get(i).getName().toUpperCase();
+                        errorDesc.append("ERROR WHILE ADDING IN ").append(listExtraFieldName.get(i).getName().toUpperCase());
                       }
                     } else if (listExtraFieldName.get(i).getType().equals("date")) {
                       try {
@@ -955,12 +1196,10 @@ public class CompanyCustomerAPI {
                                 + " for row->"
                                 + ind);
                         errorFlag = 1;
-                        if (errorDesc.length() > 0) {
-                          errorDesc += ", ";
+                        if (!errorDesc.isEmpty()) {
+                          errorDesc.append(", ");
                         }
-                        errorDesc +=
-                            "ERROR WHILE ADDING IN "
-                                + listExtraFieldName.get(i).getName().toUpperCase();
+                        errorDesc.append("ERROR WHILE ADDING IN ").append(listExtraFieldName.get(i).getName().toUpperCase());
                       }
                     } else {
                       extraFieldsDTO.setValue(value);
@@ -980,14 +1219,14 @@ public class CompanyCustomerAPI {
 
         if (errorFlag == 0) {
           System.out.println("saving inventory" + companyCustomer.getId());
-          //	            InventoryDTO inventoryDTO = modelMapper.map(inventory, InventoryDTO.class);
+          //	            CustomerDTO inventoryDTO = modelMapper.map(inventory, CustomerDTO.class);
           companyCustomerRepository.save(companyCustomer);
           // -------------------------------------------
         }
 
         //	            System.out.println();
         Cell cell2 = myrow.createCell(1);
-        cell2.setCellValue(errorDesc);
+        cell2.setCellValue(errorDesc.toString());
         if (errorFlag == 1) {
           System.out.println("Inside errorFLag");
 
@@ -997,13 +1236,24 @@ public class CompanyCustomerAPI {
         ind++;
         currCount++;
         importHistoryDTO.setDate(LocalDateTime.now().toString());
-        long complete = (currCount * 100) / totalCount;
+        long complete = (currCount * 100L) / (totalCount);
         importHistoryDTO.setComplete(complete);
         importHistoryDTO = customerService.addImportHistory(importHistoryDTO);
       }
       if (excelIndex > 0) {
         importHistoryDTO.setMessage("We have sent import result via email");
-        try (FileOutputStream fileOut = new FileOutputStream("InventoryReport.xlsx")) {
+        Sheet mySheet = workbook.getSheetAt(0);
+
+        // Get last row index (0-based)
+        int lastRowNum = mySheet.getLastRowNum();
+
+        if (lastRowNum >= 0) {
+          Row lastRow = mySheet.getRow(lastRowNum);
+          if (lastRow != null) {
+            mySheet.removeRow(lastRow);
+          }
+        }
+        try (FileOutputStream fileOut = new FileOutputStream("CustomerReport.xlsx")) {
           workbook.write(fileOut);
         }
         workbook.close();
@@ -1013,13 +1263,13 @@ public class CompanyCustomerAPI {
         helper.setTo(email);
         helper.setSubject("Import Report from AssetYug");
         helper.setText("Hey, We have attached import result below");
-        helper.addAttachment("InventoryAttachment.xlsx", new File("InventoryReport.xlsx"));
+        helper.addAttachment("CustomerAttachment.xlsx", new File("CustomerReport.xlsx"));
 
         emailSender.send(message);
       }
       if (excelIndex == 0) {
         importHistoryDTO.setMessage("Import was Successfully Done");
-        try (FileOutputStream fileOut = new FileOutputStream("InventoryReport.xlsx")) {
+        try (FileOutputStream fileOut = new FileOutputStream("CustomerReport.xlsx")) {
           workbook.write(fileOut);
         }
         workbook.close();
@@ -1041,7 +1291,7 @@ public class CompanyCustomerAPI {
     } catch (IOException e) {
       importHistoryDTO.setStatus("Failed");
       importHistoryDTO.setMessage(e.getMessage());
-      e.printStackTrace();
+
     }
     customerService.addImportHistory(importHistoryDTO);
     //		System.out.println(importHistoryDTO);
@@ -1106,39 +1356,61 @@ public class CompanyCustomerAPI {
   }
 
   @PostMapping(value = "/addCategory")
-  public void addCategory(@RequestBody CategoryDTO categoryDTO) throws CategoryException {
+  public void addCategory(@RequestBody CategoryDTO categoryDTO, @RequestHeader Long companyId)
+      throws CategoryException, NoSubscriptionError {
     System.out.println("Category===>" + categoryDTO);
+    Optional<Subscription> subscriptionOptional =
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");
+    if (subscriptionOptional.isEmpty()) {
+      throw new NoSubscriptionError("No Active Subscription");
+    }
     companyCustomerService.addCategory(categoryDTO);
   }
+
   @GetMapping(value = "/countCompanyCustomerByCategory/{category}")
-  public int countCompanyCustomerByCategory(@PathVariable String category) throws CategoryException {
+  public int countCompanyCustomerByCategory(@PathVariable String category)
+      throws CategoryException {
     System.out.println("Category===>" + category);
     return companyCustomerService.countCompanyCustomerByCategory(category);
   }
 
   @GetMapping(value = "/getCategoryList/{companyId}")
-  public List<CompanyCustomerCategory> getCategoryList(@PathVariable String companyId) {
+  public List<CompanyCustomerCategory> getCategoryList(@PathVariable Long companyId) {
     return companyCustomerService.getCategoryList(companyId);
   }
 
   @GetMapping(value = "/getCategoryActiveList/{companyId}")
-  public List<CompanyCustomerCategory> getCategoryActiveList(@PathVariable String companyId) {
+  public List<CompanyCustomerCategory> getCategoryActiveList(@PathVariable Long companyId) {
     return companyCustomerService.getActiveCategoryList(companyId);
   }
 
   @DeleteMapping(value = "/deleteCategory/{id}")
-  public void deleteCategory(@PathVariable String id) {
+  public void deleteCategory(@PathVariable String id, @RequestHeader Long companyId)
+      throws NoSubscriptionError {
+
+    Optional<Subscription> subscriptionOptional =
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");
+    if (subscriptionOptional.isEmpty()) {
+      throw new NoSubscriptionError("No Active Subscription");
+    }
     companyCustomerService.deleteCategory(id);
   }
 
   @GetMapping(value = "/getCategoryListById/{companyId}/{id}")
   public CompanyCustomerCategory getCategoryById(
-      @PathVariable String companyId, @PathVariable String id) {
+      @PathVariable Long companyId, @PathVariable String id) {
     return companyCustomerService.getCategoryListById(companyId, id);
   }
 
   @PutMapping(value = "/updateCategory")
-  public void updateCategory(@RequestBody CategoryDTO categoryDTO) {
+  public void updateCategory(@RequestBody CategoryDTO categoryDTO, @RequestHeader Long companyId)
+      throws NoSubscriptionError {
+
+    Optional<Subscription> subscriptionOptional =
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");
+    if (subscriptionOptional.isEmpty()) {
+      throw new NoSubscriptionError("No Active Subscription");
+    }
     companyCustomerService.updateCategory(categoryDTO);
   }
 }

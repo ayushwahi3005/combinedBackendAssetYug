@@ -10,5 +10,5 @@ public class CompanyCustomerExtraFieldsDTO {
   private String value;
   private String companyCustomerId;
   private String type;
-  private String companyId;
+  private Long companyId;
 }

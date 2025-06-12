@@ -48,6 +48,8 @@ public class SecurityConfiguration {
             "/users/invite/getUser/**",
             "/customer/authenticate/**",
             "/customer/addLoggedIn/**",
+            "/customer/isSameDevice/**",
+            "/customer/addLoggedInMobile/**",
             "/customer/isSameBrowserAndDevice/**",
             "/customer/removeSession/*",
             "/customer/checkUserName/*",
@@ -99,6 +101,4 @@ public class SecurityConfiguration {
   public SessionRegistry sessionRegistry() {
     return new SessionRegistryImpl();
   }
-
-
 }

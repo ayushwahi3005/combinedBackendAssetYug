@@ -5,5 +5,5 @@ import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface AssetQRRepository extends MongoRepository<AssetQR, String> {
-  public Optional<AssetQR> findByCompanyId(String companyId);
+  public Optional<AssetQR> findByCompanyId(Long companyId);
 }

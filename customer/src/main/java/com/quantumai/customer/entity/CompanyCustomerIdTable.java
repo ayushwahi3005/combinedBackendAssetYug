@@ -10,7 +10,7 @@ public class CompanyCustomerIdTable {
 
   @Id private String id;
   private int tableId;
-  private String companyId;
+  private Long companyId;
 
   public void updateId() {
     this.tableId += 1;

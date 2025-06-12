@@ -1,5 +1,6 @@
 package com.quantumai.customer.dto;
 
+import com.quantumai.customer.entity.StatusEnum;
 import lombok.Data;
 
 @Data
@@ -8,9 +9,10 @@ public class UsersDTO {
   private String firstName;
   private String lastName;
   private String email;
-  private String companyId;
+  private Long companyId;
   private String mobileNumber;
   private String password;
+  private StatusEnum status;
   private String title;
-  private String role;
+  private CustomRoleDTO role;
 }

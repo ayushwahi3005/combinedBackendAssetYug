@@ -2,7 +2,6 @@ package com.quantumai.customer.service;
 
 import com.quantumai.customer.entity.CustomerStripeDetails;
 import com.quantumai.customer.entity.SubscriptionPlan;
-
 import com.quantumai.customer.repository.CustomerStripeDetailsRepository;
 import com.quantumai.customer.repository.SubscriptionRepository;
 import com.stripe.Stripe;
@@ -14,11 +13,6 @@ import com.stripe.param.CustomerListParams;
 import com.stripe.param.PaymentMethodListParams;
 import com.stripe.param.SubscriptionCreateParams;
 import jakarta.annotation.PostConstruct;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -27,6 +21,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional
@@ -35,11 +33,9 @@ public class StripeService {
   @Value("${stripe.secret.key}")
   private String secretKey;
 
-  @Autowired
-  private CustomerStripeDetailsRepository customerStripeDetailsRepository;
+  @Autowired private CustomerStripeDetailsRepository customerStripeDetailsRepository;
 
-  @Autowired
-  private SubscriptionRepository subscriptionRepository;
+  @Autowired private SubscriptionRepository subscriptionRepository;
 
   @PostConstruct
   public void init() {
@@ -48,11 +44,14 @@ public class StripeService {
     }
     Stripe.apiKey = secretKey;
   }
-  public void saveCard(String paymentMethodId, String customerEmail, String cardholderName, String companyId) throws StripeException {
+
+  public void saveCard(
+      String paymentMethodId, String customerEmail, String cardholderName, Long companyId)
+      throws StripeException {
     Stripe.apiKey = secretKey;
 
     Customer customer = findCustomerByEmail(customerEmail); // ✅ Check for existing customer
-    String myCustomerId=null;
+    String myCustomerId = null;
     if (customer == null) {
       // ✅ If no customer exists, create a new one
       Map<String, Object> customerParams = new HashMap<>();
@@ -61,11 +60,12 @@ public class StripeService {
       customer = Customer.create(customerParams);
     } else {
       // ✅ If customer exists, update name (optional)
-//      myCustomerId
-//       customerStripeDetailsRepository.save(customerStripeDetails);
-      Optional<CustomerStripeDetails> optionalcustomerStripeDetails=customerStripeDetailsRepository.findByCompanyId(companyId);
-      if(optionalcustomerStripeDetails.isPresent()){
-        myCustomerId=optionalcustomerStripeDetails.get().getId();
+      //      myCustomerId
+      //       customerStripeDetailsRepository.save(customerStripeDetails);
+      Optional<CustomerStripeDetails> optionalcustomerStripeDetails =
+          customerStripeDetailsRepository.findByCompanyId(companyId);
+      if (optionalcustomerStripeDetails.isPresent()) {
+        myCustomerId = optionalcustomerStripeDetails.get().getId();
       }
       Map<String, Object> updateParams = new HashMap<>();
       updateParams.put("name", cardholderName); // Update name if changed
@@ -83,7 +83,7 @@ public class StripeService {
     updatePaymentParams.put("billing_details", billingDetails);
     paymentMethod.update(updatePaymentParams);
 
-    Subscription subscription = createSubscription(customer.getId(),companyId);
+    Subscription subscription = createSubscription(customer.getId(), companyId);
 
     // ✅ Store in MongoDB
     CustomerStripeDetails customerStripeDetails = new CustomerStripeDetails();
@@ -98,12 +98,14 @@ public class StripeService {
     System.out.println("Card saved successfully for customer ID: " + customer.getId());
   }
 
-  public List<Map<String, Object>> getCustomerCards(String customerId) throws StripeException {
+  public List<Map<String, Object>> getCustomerCards(Long customerId) throws StripeException {
     Stripe.apiKey = secretKey;
-    Optional<CustomerStripeDetails> customerStripeDetails=customerStripeDetailsRepository.findByCompanyId(customerId);
-    if(customerStripeDetails.isEmpty()) return null;
+    Optional<CustomerStripeDetails> customerStripeDetails =
+        customerStripeDetailsRepository.findByCompanyId(customerId);
+    if (customerStripeDetails.isEmpty()) return null;
     // ✅ 1️⃣ Fetch saved cards for the customer
-    PaymentMethodListParams params = PaymentMethodListParams.builder()
+    PaymentMethodListParams params =
+        PaymentMethodListParams.builder()
             .setCustomer(customerStripeDetails.get().getCustomerId())
             .setType(PaymentMethodListParams.Type.CARD)
             .build();
@@ -111,16 +113,20 @@ public class StripeService {
     List<PaymentMethod> paymentMethods = PaymentMethod.list(params).getData();
 
     // ✅ 2️⃣ Explicitly define the map to avoid type inference issues
-    return paymentMethods.stream().map(pm -> {
-      Map<String, Object> cardDetails = new HashMap<>();
-      cardDetails.put("id", pm.getId());
-      cardDetails.put("brand", pm.getCard().getBrand());
-      cardDetails.put("last4", pm.getCard().getLast4());
-      cardDetails.put("expMonth", pm.getCard().getExpMonth());
-      cardDetails.put("expYear", pm.getCard().getExpYear());
-      return cardDetails;
-    }).collect(Collectors.toList());
+    return paymentMethods.stream()
+        .map(
+            pm -> {
+              Map<String, Object> cardDetails = new HashMap<>();
+              cardDetails.put("id", pm.getId());
+              cardDetails.put("brand", pm.getCard().getBrand());
+              cardDetails.put("last4", pm.getCard().getLast4());
+              cardDetails.put("expMonth", pm.getCard().getExpMonth());
+              cardDetails.put("expYear", pm.getCard().getExpYear());
+              return cardDetails;
+            })
+        .collect(Collectors.toList());
   }
+
   public void removeCard(String paymentMethodId) throws StripeException {
     Stripe.apiKey = secretKey;
 
@@ -129,15 +135,17 @@ public class StripeService {
 
     // ✅ Detach from Customer
     paymentMethod.detach();
-    Optional<CustomerStripeDetails> customerStripeDetails= customerStripeDetailsRepository.findByPaymentMethodId(paymentMethodId);
-    if(customerStripeDetails.isPresent()){
-      CustomerStripeDetails myCustomerStripeDetails =customerStripeDetails.get();
+    Optional<CustomerStripeDetails> customerStripeDetails =
+        customerStripeDetailsRepository.findByPaymentMethodId(paymentMethodId);
+    if (customerStripeDetails.isPresent()) {
+      CustomerStripeDetails myCustomerStripeDetails = customerStripeDetails.get();
       myCustomerStripeDetails.setPaymentMethodId(null);
       customerStripeDetailsRepository.save(myCustomerStripeDetails);
     }
 
     System.out.println("Card removed successfully from customer ID: " + paymentMethodId);
   }
+
   public Customer findCustomerByEmail(String email) throws StripeException {
     String startingAfter = null;
 
@@ -164,8 +172,11 @@ public class StripeService {
 
     return null; // ❌ No customer found
   }
-  private Subscription createSubscription(String customerId, String companyId) throws StripeException {
-    Optional<com.quantumai.customer.entity.Subscription> subscriptionOptional = subscriptionRepository.findByCompanyIdAndStatus(companyId,"ACTIVE");
+
+  private Subscription createSubscription(String customerId, Long companyId)
+      throws StripeException {
+    Optional<com.quantumai.customer.entity.Subscription> subscriptionOptional =
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");
 
     if (subscriptionOptional.isPresent()) {
       ZonedDateTime nextBillingDate;
@@ -174,11 +185,17 @@ public class StripeService {
       LocalDate expiryDate = subscriptionOptional.get().getExpiryDate();
 
       // ✅ Convert `LocalDate` to `ZonedDateTime`
-      nextBillingDate = ZonedDateTime.of(
-              expiryDate.getYear(), expiryDate.getMonthValue(), expiryDate.getDayOfMonth(), // Year-Month-Day
-              0, 0, 0, 0, // Hours-Minutes-Seconds-Nanoseconds
+      nextBillingDate =
+          ZonedDateTime.of(
+              expiryDate.getYear(),
+              expiryDate.getMonthValue(),
+              expiryDate.getDayOfMonth(), // Year-Month-Day
+              0,
+              0,
+              0,
+              0, // Hours-Minutes-Seconds-Nanoseconds
               ZoneId.of("UTC") // Time Zone
-      );
+              );
 
       if (plan == SubscriptionPlan.MONTHLY) {
         priceAmountTag = "price_1Qs970DbrtjFAyfvny0ecIQz";
@@ -193,13 +210,14 @@ public class StripeService {
         trialEndTimestamp = maxAllowedTimestamp;
       }
 
-      SubscriptionCreateParams params = SubscriptionCreateParams.builder()
+      SubscriptionCreateParams params =
+          SubscriptionCreateParams.builder()
               .setCustomer(customerId)
-              .addItem(SubscriptionCreateParams.Item.builder()
+              .addItem(
+                  SubscriptionCreateParams.Item.builder()
                       .setPrice(priceAmountTag)
                       .setQuantity(subscriptionOptional.get().getPerson().longValue())
-                      .build()
-              )
+                      .build())
               .setTrialEnd(trialEndTimestamp) // ✅ Billing starts exactly on expiry date
               .setPaymentBehavior(SubscriptionCreateParams.PaymentBehavior.DEFAULT_INCOMPLETE)
               .addExpand("latest_invoice.payment_intent")
@@ -209,6 +227,4 @@ public class StripeService {
     }
     return null;
   }
-
-
 }

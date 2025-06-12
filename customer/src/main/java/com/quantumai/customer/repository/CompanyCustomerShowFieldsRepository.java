@@ -7,7 +7,7 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface CompanyCustomerShowFieldsRepository
     extends MongoRepository<CompanyCustomerShowFields, String> {
-  public Optional<CompanyCustomerShowFields> findByNameAndCompanyId(String name, String companyId);
+  public Optional<CompanyCustomerShowFields> findByNameAndCompanyId(String name, Long companyId);
 
-  public List<CompanyCustomerShowFields> findByCompanyId(String companyId);
+  public List<CompanyCustomerShowFields> findByCompanyId(Long companyId);
 }

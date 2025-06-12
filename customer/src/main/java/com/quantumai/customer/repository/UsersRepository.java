@@ -6,12 +6,12 @@ import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface UsersRepository extends MongoRepository<Users, String> {
-  public List<Users> findByCompanyId(String id);
+  public List<Users> findByCompanyId(Long id);
 
-  public Optional<Users> findByCompanyIdAndEmail(String companyId, String email);
+  public Optional<Users> findByCompanyIdAndEmail(Long companyId, String email);
 
   public Optional<Users> findByEmail(String email);
 
-  //		public Optional<Users> findByNameAndCompanyId(String name,String companyId);
-  public List<Users> findByRoleEndingWithAndCompanyId(String role, String companyId);
+  //		public Optional<Users> findByNameAndCompanyId(String name,Long companyId);
+  public List<Users> findByRoleEndingWithAndCompanyId(String role, Long companyId);
 }

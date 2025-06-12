@@ -8,6 +8,7 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 public interface SubscriptionRepository extends MongoRepository<Subscription, String> {
   List<Subscription> findAll();
 
-  List<Subscription> findByCompanyId(String companyId);
-  Optional<Subscription> findByCompanyIdAndStatus(String companyId,String status);
+  List<Subscription> findByCompanyId(Long companyId);
+
+  Optional<Subscription> findByCompanyIdAndStatus(Long companyId, String status);
 }

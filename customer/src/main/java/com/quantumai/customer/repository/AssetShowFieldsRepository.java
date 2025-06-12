@@ -6,7 +6,7 @@ import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface AssetShowFieldsRepository extends MongoRepository<AssetShowFields, String> {
-  public Optional<AssetShowFields> findByNameAndCompanyId(String name, String companyId);
+  public Optional<AssetShowFields> findByNameAndCompanyId(String name, Long companyId);
 
-  public List<AssetShowFields> findByCompanyId(String companyId);
+  public List<AssetShowFields> findByCompanyId(Long companyId);
 }

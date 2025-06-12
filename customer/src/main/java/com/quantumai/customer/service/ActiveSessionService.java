@@ -10,11 +10,16 @@ public interface ActiveSessionService {
   public void createOrUpdateSession(
       String userId, String sessionId, String userAgent, String deviceId);
 
+  public void createOrUpdateSessionMobile(
+      String userId, String sessionId, String userAgent, String mobileId);
+
   public void updateLastActivity(String sessionId);
 
   public void invalidateSession(String sessionId);
 
   public boolean isSameBrowserAndDevice(String userId, String deviceId, String userAgent);
+
+  public boolean isSameMobile(String userId, String mobileId, String userAgent);
 
   public void removeSession(String userId);
 }

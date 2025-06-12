@@ -6,5 +6,5 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface BinRepository extends MongoRepository<Bin, String> {
 
-  List<Bin> findByCompanyId(String id);
+  List<Bin> findByCompanyId(Long id);
 }

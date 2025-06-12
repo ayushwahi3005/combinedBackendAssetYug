@@ -5,7 +5,7 @@ import lombok.Data;
 @Data
 public class AssetExtraFieldsDTO {
 
-  private String companyId;
+  private Long companyId;
   private String email;
   private String id;
   private String name;

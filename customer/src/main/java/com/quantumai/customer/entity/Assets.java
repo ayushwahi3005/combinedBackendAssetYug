@@ -19,6 +19,6 @@ public class Assets {
   private String location;
   private String status;
   private String image;
-  private String companyId;
+  private Long companyId;
   private String updatedAt;
 }
