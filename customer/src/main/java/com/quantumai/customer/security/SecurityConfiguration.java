@@ -54,7 +54,10 @@ public class SecurityConfiguration {
             "/customer/removeSession/*",
             "/customer/checkUserName/*",
             "/customer/sentResetOTP",
-            "/customer/updatePassword")
+            "/customer/updatePassword",
+                "/assetyug-notifications/**",
+                "/topic/**",
+                "/app/**")
         .permitAll()
 
         // Public endpoints for admin paths
