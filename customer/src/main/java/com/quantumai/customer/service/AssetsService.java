@@ -92,7 +92,7 @@ public interface AssetsService {
 
   public List<AssetCheckInOut> filterByCheckedInOut(Long companyId, Boolean checkedIn);
 
-  public void addCategory(CategoryDTO categoryDTO) throws CategoryException;
+  public void addCategory(CategoryDTO categoryDTO) throws Exception;
 
   public void updateCategory(CategoryDTO categoryDTO);
 
@@ -116,10 +116,14 @@ public interface AssetsService {
 
   public AssetCategoryInspection getAssetInspection(String assetInspectionId) throws Exception;
 
+  public List<AssetCategoryInspection> getAllAssetInspectionByCategory(Long companyId,String category);
+
   public List<AssetCategoryInspection> getAllAssetInspection(Long companyId);
 
   public void addAssetInspectionInstance(
       AssetCategoryInspectionInstance assetCategoryInspectionInstance);
 
   public List<AssetCategoryInspectionInstance> getAllAssetCategoryInspectionValues(Long companyId);
+
+//  public List<Map<String,>> getAssetByCompanyCategory(Long companyId);
 }

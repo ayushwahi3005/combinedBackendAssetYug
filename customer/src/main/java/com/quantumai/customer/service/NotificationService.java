@@ -1,10 +1,12 @@
 package com.quantumai.customer.service;
 
-import com.quantumai.customer.dto.NotificationDTO;
+
+import com.quantumai.customer.dto.UserNotificationDTO;
 import com.quantumai.customer.entity.*;
 import com.quantumai.customer.repository.CustomerRepository;
 import com.quantumai.customer.repository.NotificationRepository;
 import com.quantumai.customer.repository.UserNotificationRepository;
+import com.quantumai.customer.repository.UserNotificationRepositoryImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -29,16 +31,20 @@ public class NotificationService {
     @Autowired
     private CustomerRepository customerRepository;
 
+    @Autowired
+    UserNotificationRepositoryImpl userNotificationRepositoryImpl;
+
     public void sendNotificationToCompany(Long companyId, Notification notification) {
         // Sends notification to a specific company
         notification.setNotificationType(NotificationType.COMPANY);
         List<Customer> customerList=customerRepository.findByCompanyId(companyId);
         Notification notification1=notificationRepository.save(notification);
         customerList.forEach((customer)->{
-            UserNotification userNotification=new UserNotification(null,customer.getEmail(),notification1.getId(),customer.getCompanyId(),false,null,null);
+            UserNotification userNotification=new UserNotification(null,customer.getEmail(),notification1.getId(),customer.getCompanyId(),false,null,LocalDateTime.now(),notification1);
 //            userNotificationList.add(userNotification);
             userNotificationRepository.save(userNotification);
-            List<com.quantumai.customer.entity.UserNotificationDTO> myList=userNotificationRepository.findRecentNotificationsWithDetails(customer.getEmail(), LocalDateTime.now().minusDays(7),LocalDateTime.now().minusMonths(1));
+            List<UserNotification> myList=userNotificationRepositoryImpl.findRecentNotificationsWithDetails(customer.getEmail());
+            System.out.println("Sending Message"+myList);
             simpMessagingTemplate.convertAndSend("/topic/user/" + customer.getEmail() + "/notifications", myList);
 
 
@@ -54,10 +60,10 @@ public class NotificationService {
         List<Customer> customerList=customerRepository.findAll();
 //        List<UserNotification> userNotificationList=new ArrayList<>();
         customerList.forEach((customer)->{
-            UserNotification userNotification=new UserNotification(null,customer.getEmail(),notification1.getId(),customer.getCompanyId(),false,null,null);
+            UserNotification userNotification=new UserNotification(null,customer.getEmail(),notification1.getId(),customer.getCompanyId(),false,null,LocalDateTime.now(),notification1);
 //            userNotificationList.add(userNotification);
             userNotificationRepository.save(userNotification);
-            List<com.quantumai.customer.entity.UserNotificationDTO> myList=userNotificationRepository.findRecentNotificationsWithDetails(customer.getEmail(), LocalDateTime.now().minusDays(7),LocalDateTime.now().minusMonths(1));
+            List<com.quantumai.customer.dto.UserNotificationDTO> myList=userNotificationRepository.findRecentNotificationsWithDetails(customer.getEmail(), LocalDateTime.now().minusDays(7),LocalDateTime.now().minusMonths(1));
             simpMessagingTemplate.convertAndSend("/topic/user/" + customer.getEmail() + "/notifications", myList);
 
 
@@ -81,5 +87,14 @@ public class NotificationService {
 //        Notification notification =new Notification("111","hello","hello message", NotificationType.GLOBAL,"INFO",10001L,LocalDateTime.now(),LocalDateTime.now().plusDays(10));
 //        sendNotificationToCompany(100003L, notification);
 //    }
-    
+    public List<UserNotification> userNotificationDTO(String email){
+        return userNotificationRepositoryImpl.findRecentNotificationsWithDetails(email);
+    }
+    public void updateUserNotificationDTO(List<UserNotification> userNotificationList){
+        userNotificationList.forEach((userNotification -> {
+            userNotification.setRead(true);
+            userNotification.setReadAt(LocalDateTime.now());
+        }));
+        userNotificationRepository.saveAll(userNotificationList);
+    }
 }

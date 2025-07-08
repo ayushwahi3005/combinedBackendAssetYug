@@ -1,6 +1,6 @@
 package com.quantumai.customer.repository;
 
-import com.quantumai.customer.entity.CompanyCustomerIdTable;
+import com.quantumai.customer.entity.IdGenerator.CompanyCustomerIdTable;
 import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
 

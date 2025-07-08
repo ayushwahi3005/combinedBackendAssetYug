@@ -33,72 +33,70 @@ public class SecurityConfiguration {
   @Bean
   public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
     http.csrf()
-        .disable()
-        .authorizeHttpRequests()
+            .disable()
+            .authorizeHttpRequests()
 
-        // Public endpoints for customer paths
-        .requestMatchers(
-            "/customer/addCustomer",
-            "/customer/getLoginToken/**",
-            "/customer/addCompanyInformation",
-            "/customer/getCompanyId/**",
-            "/customer/addUser",
-            "/customer/accountInfo/**",
-            "/customer/working/**",
-            "/users/invite/getUser/**",
-            "/customer/authenticate/**",
-            "/customer/addLoggedIn/**",
-            "/customer/isSameDevice/**",
-            "/customer/addLoggedInMobile/**",
-            "/customer/isSameBrowserAndDevice/**",
-            "/customer/removeSession/*",
-            "/customer/checkUserName/*",
-            "/customer/sentResetOTP",
-            "/customer/updatePassword",
-                "/assetyug-notifications/**",
-                "/topic/**",
-                "/app/**")
-        .permitAll()
+            // Public endpoints for customer paths
+            .requestMatchers(
+                    "/customer/addCustomer",
+                    "/customer/getLoginToken/**",
+                    "/customer/addCompanyInformation",
+                    "/customer/getCompanyId/**",
+                    "/customer/addUser",
+                    "/customer/accountInfo/**",
+                    "/customer/working/**",
+                    "/users/invite/getUser/**",
+                    "/customer/authenticate/**",
+                    "/customer/addLoggedIn/**",
+                    "/customer/isSameDevice/**",
+                    "/customer/addLoggedInMobile/**",
+                    "/customer/isSameBrowserAndDevice/**",
+                    "/customer/removeSession/*",
+                    "/customer/checkUserName/*",
+                    "/customer/sentResetOTP",
+                    "/customer/updatePassword",
+                    "/assetyug-notifications/**",
+                    "/topic/**",
+                    "/app/**")
+            .permitAll()
 
-        // Public endpoints for admin paths
-        .requestMatchers("/admin/authenticate/**", "/admin/login/**", "/admin/send-otp/**")
-        .permitAll()
+            // Public endpoints for admin paths
+            .requestMatchers("/admin/authenticate/**", "/admin/login/**", "/admin/send-otp/**")
+            .permitAll()
 
-        // Protected paths for customers
-        .requestMatchers(
-            "/customer/**",
-            "/assets/**",
-            "/users/**",
-            "/companycustomer/**",
-            "/payment/**",
-            "/subscription/**")
-        .authenticated()
+            // Protected paths for customers
+            .requestMatchers(
+                    "/customer/**",
+                    "/assets/**",
+                    "/users/**",
+                    "/companycustomer/**",
+                    "/payment/**",
+                    "/subscription/**")
+            .authenticated()
 
-        // Protected paths for admins
-        .requestMatchers("/admin/**")
-        .authenticated()
-        .anyRequest()
-        .authenticated() // Default rule to require authentication for any other request
-        .and()
+            // Protected paths for admins
+            .requestMatchers("/admin/**")
+            .authenticated()
+            .anyRequest()
+            .authenticated() // Default rule to require authentication for any other request
+            .and()
 
-        // Stateless session management
-        .sessionManagement()
-        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-        .maximumSessions(1) // Allow only one active session per user
-        .sessionRegistry(sessionRegistry()) // Enable session registry
-        .and()
-        .and()
+            // Stateless session management
+            .sessionManagement()
+            .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            .and()
 
-        // Configure different authentication providers and filters based on path
-        .authenticationProvider(customerAuthenticationProvider)
-        .authenticationProvider(adminAuthenticationProvider)
+            // Configure different authentication providers and filters based on path
+            .authenticationProvider(customerAuthenticationProvider)
+            .authenticationProvider(adminAuthenticationProvider)
 
-        // Add JWT filters based on the role paths
-        .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-        .addFilterBefore(jwtAdminAuthFilter, UsernamePasswordAuthenticationFilter.class);
+            // Add JWT filters based on the role paths
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(jwtAdminAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
     return http.build();
   }
+
 
   @Bean
   public SessionRegistry sessionRegistry() {

@@ -6,6 +6,9 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
+import com.quantumai.customer.entity.IdGenerator.AssetCategoryIdGenerator;
+import com.quantumai.customer.entity.IdGenerator.CompanyCustomerCategoryIdGenerator;
+import com.quantumai.customer.entity.IdGenerator.CompanyCustomerIdTable;
 import com.quantumai.customer.exception.CategoryException;
 import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
 import com.quantumai.customer.repository.*;
@@ -34,6 +37,11 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   @Autowired private CompanyCustomerExtraFieldsRepository extraFieldsRepository;
 
   @Autowired CompanyCustomerFileRepository companyCustomerFileRepository;
+
+
+  @Autowired private CompanyCustomerCategoryIdGeneratorRepository companyCustomerCategoryIdGeneratorRepository;
+
+  private static final String SEQ_ID = "company_customer_category_sequence";
 
   private ModelMapper modelMapper = new ModelMapper();
 
@@ -772,8 +780,21 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   }
 
   @Override
-  public void addCategory(CategoryDTO categoryDTO) throws CategoryException {
+  public void addCategory(CategoryDTO categoryDTO) throws Exception {
     CompanyCustomerCategory category = modelMapper.map(categoryDTO, CompanyCustomerCategory.class);
+
+
+      Optional<CompanyCustomerCategoryIdGenerator> companyCustomerCategoryIdGeneratorOptional =
+              companyCustomerCategoryIdGeneratorRepository.findById(SEQ_ID);
+      if (companyCustomerCategoryIdGeneratorOptional.isEmpty()) {
+          throw new Exception("Sequence Database Not Found");
+      }
+      CompanyCustomerCategoryIdGenerator companyCustomerCategoryIdGenerator = companyCustomerCategoryIdGeneratorOptional.get();
+      Long id = companyCustomerCategoryIdGenerator.getSeq();
+      category.setCompanyCustomerCategoryId(id);
+      companyCustomerCategoryIdGenerator.setSeq(id + 1);
+      companyCustomerCategoryIdGeneratorRepository.save(companyCustomerCategoryIdGenerator);
+
     Optional<CompanyCustomerCategory> OptionalCompanyCustomerCategory =
         companyCustomerCategoryRepository.findByName(categoryDTO.getName());
     if (OptionalCompanyCustomerCategory.isEmpty()) {

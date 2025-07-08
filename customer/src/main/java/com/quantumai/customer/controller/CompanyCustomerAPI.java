@@ -1357,7 +1357,7 @@ public class CompanyCustomerAPI {
 
   @PostMapping(value = "/addCategory")
   public void addCategory(@RequestBody CategoryDTO categoryDTO, @RequestHeader Long companyId)
-      throws CategoryException, NoSubscriptionError {
+          throws Exception {
     System.out.println("Category===>" + categoryDTO);
     Optional<Subscription> subscriptionOptional =
         subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");

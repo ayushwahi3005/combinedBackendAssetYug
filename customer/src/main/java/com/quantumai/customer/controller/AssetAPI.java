@@ -1639,7 +1639,7 @@ public class AssetAPI {
 
   @PostMapping(value = "/addCategory")
   public void addCategory(@RequestBody CategoryDTO categoryDTO)
-      throws CategoryException, NoSubscriptionError {
+          throws Exception {
     Optional<Subscription> subscriptionOptional =
         subscriptionRepository.findByCompanyIdAndStatus(categoryDTO.getCompanyId(), "ACTIVE");
     if (subscriptionOptional.isEmpty()) {
@@ -1732,9 +1732,15 @@ public class AssetAPI {
     return assetsService.getAssetInspection(id);
   }
 
+  @GetMapping(value = "/getAllAssetInspectionByCategory/{companyId}")
+  public List<AssetCategoryInspection> getAllAssetInspectionByCategory(@PathVariable Long companyId,@RequestParam String category)
+      throws Exception {
+    System.out.println("API CATEGORY"+category);
+    return assetsService.getAllAssetInspectionByCategory(companyId,category);
+  }
   @GetMapping(value = "/getAllAssetInspection/{companyId}")
   public List<AssetCategoryInspection> getAllAssetInspection(@PathVariable Long companyId)
-      throws Exception {
+          throws Exception {
     return assetsService.getAllAssetInspection(companyId);
   }
 
@@ -1838,6 +1844,13 @@ public class AssetAPI {
 
     return ResponseEntity.ok().headers(headers).body(excelBytes);
   }
+
+
+//  @GetMapping(value = "/getAssetByCompanyCategory/{companyId}")
+//  public Map<String, List<AssetsDTO>> getAssetByCompanyCategory(@PathVariable Long companyId) {
+//    return assetsService.getAssetByCompanyCategory(companyId);
+//  }
+
 
   private CellStyle getHeaderCellStyle(Workbook workbook) {
     CellStyle style = workbook.createCellStyle();

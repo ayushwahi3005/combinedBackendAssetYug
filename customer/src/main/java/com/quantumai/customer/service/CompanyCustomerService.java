@@ -83,7 +83,7 @@ public interface CompanyCustomerService {
 
   public String working();
 
-  public void addCategory(CategoryDTO categoryDTO) throws CategoryException;
+  public void addCategory(CategoryDTO categoryDTO) throws Exception;
 
   public List<CompanyCustomerCategory> getCategoryList(Long companyId);
 

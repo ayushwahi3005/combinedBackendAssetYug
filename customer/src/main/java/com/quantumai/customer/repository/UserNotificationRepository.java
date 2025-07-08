@@ -1,7 +1,7 @@
 package com.quantumai.customer.repository;
 
 import com.quantumai.customer.entity.UserNotification;
-import com.quantumai.customer.entity.UserNotificationDTO;
+import com.quantumai.customer.dto.UserNotificationDTO;
 import org.springframework.data.mongodb.repository.Aggregation;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
@@ -16,10 +16,13 @@ public interface UserNotificationRepository  extends MongoRepository<UserNotific
     void deleteByDeliveredAtBefore(LocalDateTime cutoff);
 
     @Aggregation(pipeline = {
-            "{ $match: { userId: ?0, $or: [ " +
+            "{ $match: { " +
+                    " userId: ?0, " +
+                    " $or: [ " +
                     "   { isRead: true, readAt: { $gte: ?1 } }, " +
                     "   { isRead: false, deliveredAt: { $gte: ?2 } } " +
-                    "] } }",
+                    " ] " +
+                    "} }",
             "{ $lookup: { " +
                     "   from: 'notification', " +
                     "   localField: 'notificationId', " +
@@ -27,7 +30,7 @@ public interface UserNotificationRepository  extends MongoRepository<UserNotific
                     "   as: 'notification' " +
                     "} }",
             "{ $unwind: '$notification' }",
-            "{ $sort: { 'deliveredAt': -1 } }"
+            "{ $sort: { deliveredAt: -1 } }"
     })
     List<UserNotificationDTO> findRecentNotificationsWithDetails(
             String userId,

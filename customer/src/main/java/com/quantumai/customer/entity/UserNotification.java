@@ -1,5 +1,6 @@
 package com.quantumai.customer.entity;
 
+import com.quantumai.customer.entity.Notification;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -25,5 +26,8 @@ public class UserNotification {
     private boolean isRead;
     private LocalDateTime readAt;
     private LocalDateTime deliveredAt;
+
+    @DBRef
+    private Notification notification;
 
 }

@@ -6,6 +6,9 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
+import com.quantumai.customer.entity.IdGenerator.AssetCategoryIdGenerator;
+import com.quantumai.customer.entity.IdGenerator.AssetIdTable;
+import com.quantumai.customer.entity.IdGenerator.CompanyPrimaryKeyTable;
 import com.quantumai.customer.exception.CategoryException;
 import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
 import com.quantumai.customer.repository.*;
@@ -49,6 +52,10 @@ public class AssetsServiceImpl implements AssetsService {
 
   @Autowired private LocationRepository locationRepository;
   @Autowired private BinRepository binRepository;
+
+  @Autowired private AssetCategoryIdGeneratorRepository assetCategoryIdGeneratorRepository;
+
+  private static final String SEQ_ID = "asset_category_sequence";
   LocalDateTime localDateTime;
 
   private ModelMapper modelMapper = new ModelMapper();
@@ -165,11 +172,11 @@ public class AssetsServiceImpl implements AssetsService {
 
     Assets asset = optionalasset.orElseThrow(() -> new Exception("No Such Asset"));
     AssetsDTO assetDTO = modelMapper.map(asset, AssetsDTO.class);
-    if (asset.getLocation().startsWith("bin")) {
+    if (asset.getLocation()!=null&&asset.getLocation().startsWith("bin")) {
       Optional<Bin> binOptional = binRepository.findById(asset.getLocation().substring(4));
       binOptional.ifPresent(bin -> assetDTO.setLocation(bin.getBinNumber()));
 
-    } else if (asset.getLocation().startsWith("location")) {
+    } else if (asset.getLocation()!=null&&asset.getLocation().startsWith("location")) {
       Optional<Location> locationOptional =
           locationRepository.findById(asset.getLocation().substring(9));
       locationOptional.ifPresent(loc -> assetDTO.setLocation(loc.getName()));
@@ -820,6 +827,12 @@ public class AssetsServiceImpl implements AssetsService {
     //		 if(searchData=="null"){
     //			 searchData="";
     //		 }
+//      if (filter instanceof Map) {
+//          Map<?, ?> filterMap = (Map<?, ?>) filter;
+//          for (Map.Entry<?, ?> entry : filterMap.entrySet()) {
+//              System.out.println(entry.getKey() + " : " + entry.getValue());
+//          }
+//      }
 
     if (filter instanceof Map) {
       // Cast the filter to a Map
@@ -868,6 +881,13 @@ public class AssetsServiceImpl implements AssetsService {
                               flag = 0;
                             }
                           }
+//                          if(keyString.equals("location")){
+//                              myValue = myValue.toLowerCase();
+//                              if (!myValue.contains(expectedValue.toLowerCase())
+//                                      && !myValue.equals(expectedValue.toLowerCase())) {
+//                                  flag = 0;
+//                              }
+//                          }
                         }
                       }
                       if (flag == 1) {
@@ -1024,11 +1044,29 @@ public class AssetsServiceImpl implements AssetsService {
     return assetCheckInOutDTOmyList;
   }
 
+
+
   @Override
-  public void addCategory(CategoryDTO categoryDTO) throws CategoryException {
+  public void addCategory(CategoryDTO categoryDTO) throws Exception {
     AssetCategory category = modelMapper.map(categoryDTO, AssetCategory.class);
+
+
+      Optional<AssetCategoryIdGenerator> AssetCategoryIdGeneratorOptional =
+              assetCategoryIdGeneratorRepository.findById(SEQ_ID);
+      if (AssetCategoryIdGeneratorOptional.isEmpty()) {
+          throw new Exception("Sequence Database Not Found");
+      }
+      AssetCategoryIdGenerator assetCategoryIdGenerator = AssetCategoryIdGeneratorOptional.get();
+      Long id = assetCategoryIdGenerator.getSeq();
+      category.setAssetCategoryId(id);
+      assetCategoryIdGenerator.setSeq(id + 1);
+      assetCategoryIdGeneratorRepository.save(assetCategoryIdGenerator);
+
+
+
     Optional<AssetCategory> optionalAssetCategory =
         assetCategoryRepository.findByName(categoryDTO.getName());
+
     if (optionalAssetCategory.isEmpty()) {
       assetCategoryRepository.save(category);
     } else {
@@ -1067,7 +1105,7 @@ public class AssetsServiceImpl implements AssetsService {
 
   @Override
   public int countAssetByCategory(String category) {
-    return assetsRepository.countByCategory(category);
+    return assetsRepository.countByCategoryIgnoreCase(category);
   }
 
   public List<AssetCategory> getActiveCategoryList(Long companyId) {
@@ -1138,11 +1176,17 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
-  public List<AssetCategoryInspection> getAllAssetInspection(Long companyId) {
-    return assetCategoryInspectionRepository.findByCompanyId(companyId);
+  public List<AssetCategoryInspection> getAllAssetInspectionByCategory(Long companyId,String category) {
+      System.out.println("===================>>>"+category);
+    return assetCategoryInspectionRepository.findByCompanyIdAndCategoryNameIgnoreCase(companyId,category);
   }
 
-  @Override
+    @Override
+    public List<AssetCategoryInspection> getAllAssetInspection(Long companyId) {
+        return assetCategoryInspectionRepository.findByCompanyId(companyId);
+    }
+
+    @Override
   public void addAssetInspectionInstance(
       AssetCategoryInspectionInstance assetCategoryInspectionInstance) {
     assetCategoryInspectionInstanceRepository.save(assetCategoryInspectionInstance);
@@ -1152,4 +1196,9 @@ public class AssetsServiceImpl implements AssetsService {
   public List<AssetCategoryInspectionInstance> getAllAssetCategoryInspectionValues(Long companyId) {
     return assetCategoryInspectionInstanceRepository.findByCompanyId(companyId);
   }
+
+//    @Override
+//    public List<String,Assets> getAssetByCompanyCategory(Long companyId) {
+//        return List.of();
+//    }
 }

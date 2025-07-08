@@ -14,5 +14,5 @@ public interface AssetsRepository extends MongoRepository<Assets, String> {
 
   List<AssetsDTO> findByCompanyIdAndSerialNumber(Long companyId, String serialNumber);
 
-  public int countByCategory(String category);
+  public int countByCategoryIgnoreCase(String category);
 }

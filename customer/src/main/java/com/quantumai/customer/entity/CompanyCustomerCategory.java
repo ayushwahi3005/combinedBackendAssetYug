@@ -9,6 +9,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 public class CompanyCustomerCategory {
 
   @Id private String id;
+  private Long companyCustomerCategoryId;
   private String name;
   private String status;
   private Long companyId;
