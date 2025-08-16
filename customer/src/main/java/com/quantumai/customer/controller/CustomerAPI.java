@@ -15,8 +15,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @CrossOrigin(
-    origins = "**",
-    allowedHeaders = {"device-id"})
+        origins = {
+                "http://localhost:4200",
+                "http://assetyugg.com.s3-website-us-east-1.amazonaws.com"
+        },
+        allowedHeaders = {"device-id", "Content-Type", "Authorization"}
+)
 @RestController
 @RequestMapping("/customer")
 public class CustomerAPI {

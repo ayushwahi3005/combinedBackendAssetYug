@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -25,6 +26,9 @@ public class JwtAdminAuthenticationFilter extends OncePerRequestFilter {
 
   @Autowired private AdminRepository adminRepository;
 
+  @Value("${allowed-origins}")
+  private String allowedOrigins;
+
   @Override
   protected void doFilterInternal(
       @NonNull HttpServletRequest request,
@@ -34,7 +38,9 @@ public class JwtAdminAuthenticationFilter extends OncePerRequestFilter {
     // TODO Auto-generated method stub
     HttpServletResponse res = (HttpServletResponse) response;
     HttpServletRequest req = (HttpServletRequest) request;
-    response.setHeader("Access-Control-Allow-Origin", "http://localhost:4200");
+//    response.setHeader("Access-Control-Allow-Origin", "http://localhost:4200");
+    response.setHeader("Access-Control-Allow-Origin", allowedOrigins);
+
     response.setHeader("Access-Control-Allow-Credentials", "true");
     response.setHeader(
         "Access-Control-Allow-Methods",

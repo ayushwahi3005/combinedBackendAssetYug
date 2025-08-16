@@ -25,7 +25,13 @@ import org.springframework.web.client.RestTemplate;
 
 @RestController
 @RequestMapping("/users")
-@CrossOrigin(origins = "**")
+@CrossOrigin(
+        origins = {
+                "http://localhost:4200",
+                "http://assetyugg.com.s3-website-us-east-1.amazonaws.com"
+        },
+        allowedHeaders = {"device-id", "Content-Type", "Authorization"}
+)
 public class UsersAPI {
   private RestTemplate restTemplate = new RestTemplate();
 
@@ -60,7 +66,7 @@ public class UsersAPI {
     if (customer.isPresent()) {
 
       Optional<Subscription> subscriptionOptional =
-          subscriptionRepository.findByCompanyIdAndStatus(customer.get().getCompanyId(), "ACTIVE");
+          subscriptionRepository.findByCompanyIdAndStatus(customer.get().getCompanyId(), SubscriptionEnum.ACTIVE);
       if (subscriptionOptional.isEmpty()) {
         throw new NoSubscriptionError("No Active Subscription");
       }
@@ -73,7 +79,7 @@ public class UsersAPI {
       throws NoSubscriptionError {
 
     Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
     if (subscriptionOptional.isEmpty()) {
       throw new NoSubscriptionError("No Active Subscription");
     }
@@ -117,7 +123,7 @@ public class UsersAPI {
     if (customer.isPresent()) {
 
       Optional<Subscription> subscriptionOptional =
-          subscriptionRepository.findByCompanyIdAndStatus(customer.get().getCompanyId(), "ACTIVE");
+          subscriptionRepository.findByCompanyIdAndStatus(customer.get().getCompanyId(), SubscriptionEnum.ACTIVE);
       if (subscriptionOptional.isEmpty()) {
         throw new NoSubscriptionError("No Active Subscription");
       }
@@ -176,7 +182,7 @@ public class UsersAPI {
     if (customer.isPresent()) {
 
       Optional<Subscription> subscriptionOptional =
-          subscriptionRepository.findByCompanyIdAndStatus(customer.get().getCompanyId(), "ACTIVE");
+          subscriptionRepository.findByCompanyIdAndStatus(customer.get().getCompanyId(), SubscriptionEnum.ACTIVE);
       if (subscriptionOptional.isEmpty()) {
         throw new NoSubscriptionError("No Active Subscription");
       }
@@ -196,7 +202,7 @@ public class UsersAPI {
     if (customer.isPresent()) {
 
       Optional<Subscription> subscriptionOptional =
-          subscriptionRepository.findByCompanyIdAndStatus(customer.get().getCompanyId(), "ACTIVE");
+          subscriptionRepository.findByCompanyIdAndStatus(customer.get().getCompanyId(), SubscriptionEnum.ACTIVE);
       if (subscriptionOptional.isEmpty()) {
         throw new NoSubscriptionError("No Active Subscription");
       }
@@ -272,7 +278,7 @@ public class UsersAPI {
     if (customer.isPresent()) {
 
       Optional<Subscription> subscriptionOptional =
-          subscriptionRepository.findByCompanyIdAndStatus(customer.get().getCompanyId(), "ACTIVE");
+          subscriptionRepository.findByCompanyIdAndStatus(customer.get().getCompanyId(), SubscriptionEnum.ACTIVE);
       if (subscriptionOptional.isEmpty()) {
         throw new NoSubscriptionError("No Active Subscription");
       }
@@ -290,7 +296,7 @@ public class UsersAPI {
     if (customer.isPresent()) {
 
       Optional<Subscription> subscriptionOptional =
-          subscriptionRepository.findByCompanyIdAndStatus(customer.get().getCompanyId(), "ACTIVE");
+          subscriptionRepository.findByCompanyIdAndStatus(customer.get().getCompanyId(), SubscriptionEnum.ACTIVE);
       if (subscriptionOptional.isEmpty()) {
         throw new NoSubscriptionError("No Active Subscription");
       }
@@ -312,7 +318,7 @@ public class UsersAPI {
     if (customer.isPresent()) {
 
       Optional<Subscription> subscriptionOptional =
-          subscriptionRepository.findByCompanyIdAndStatus(customer.get().getCompanyId(), "ACTIVE");
+          subscriptionRepository.findByCompanyIdAndStatus(customer.get().getCompanyId(), SubscriptionEnum.ACTIVE);
       if (subscriptionOptional.isEmpty()) {
         throw new NoSubscriptionError("No Active Subscription");
       }
@@ -336,7 +342,7 @@ public class UsersAPI {
     if (customer.isPresent()) {
 
       Optional<Subscription> subscriptionOptional =
-          subscriptionRepository.findByCompanyIdAndStatus(customer.get().getCompanyId(), "ACTIVE");
+          subscriptionRepository.findByCompanyIdAndStatus(customer.get().getCompanyId(), SubscriptionEnum.ACTIVE);
       if (subscriptionOptional.isEmpty()) {
         throw new NoSubscriptionError("No Active Subscription");
       }
@@ -354,7 +360,7 @@ public class UsersAPI {
     if (customer.isPresent()) {
 
       Optional<Subscription> subscriptionOptional =
-          subscriptionRepository.findByCompanyIdAndStatus(customer.get().getCompanyId(), "ACTIVE");
+          subscriptionRepository.findByCompanyIdAndStatus(customer.get().getCompanyId(), SubscriptionEnum.ACTIVE);
       if (subscriptionOptional.isEmpty()) {
         throw new NoSubscriptionError("No Active Subscription");
       }
@@ -377,7 +383,7 @@ public class UsersAPI {
     if (customer.isPresent()) {
 
       Optional<Subscription> subscriptionOptional =
-          subscriptionRepository.findByCompanyIdAndStatus(customer.get().getCompanyId(), "ACTIVE");
+          subscriptionRepository.findByCompanyIdAndStatus(customer.get().getCompanyId(), SubscriptionEnum.ACTIVE);
       if (subscriptionOptional.isEmpty()) {
         throw new NoSubscriptionError("No Active Subscription");
       }
@@ -395,7 +401,7 @@ public class UsersAPI {
     if (customer.isPresent()) {
 
       Optional<Subscription> subscriptionOptional =
-          subscriptionRepository.findByCompanyIdAndStatus(customer.get().getCompanyId(), "ACTIVE");
+          subscriptionRepository.findByCompanyIdAndStatus(customer.get().getCompanyId(), SubscriptionEnum.ACTIVE);
       if (subscriptionOptional.isEmpty()) {
         throw new NoSubscriptionError("No Active Subscription");
       }
@@ -436,7 +442,7 @@ public class UsersAPI {
       throws NoSubscriptionError {
 
     Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
     if (subscriptionOptional.isEmpty()) {
       throw new NoSubscriptionError("No Active Subscription");
     }

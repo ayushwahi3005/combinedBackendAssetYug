@@ -10,4 +10,5 @@ public class CompanyCustomerCategoryIdGenerator {
     @Id
     private String id;
     private Long seq;
+    private Long companyId;
 }

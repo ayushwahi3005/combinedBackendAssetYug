@@ -34,4 +34,8 @@ public class Payment {
   private LocalDateTime startDate;
 
   private LocalDateTime endDate;
+
+  private String paymentIntentId;
+  private String chargeId;
+  private String invoiceId;
 }

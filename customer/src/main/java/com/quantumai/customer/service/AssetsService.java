@@ -125,5 +125,7 @@ public interface AssetsService {
 
   public List<AssetCategoryInspectionInstance> getAllAssetCategoryInspectionValues(Long companyId);
 
+  public List<AssetCategoryInspectionInstance> getAllAssetCategoryInspectionInstanceByAsset(String assetId);
+
 //  public List<Map<String,>> getAssetByCompanyCategory(Long companyId);
 }

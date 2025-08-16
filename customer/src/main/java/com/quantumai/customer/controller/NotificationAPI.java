@@ -13,6 +13,13 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/notification")
+//@CrossOrigin(
+//        origins = {
+//                "http://localhost:4200",
+//                "http://assetyugg.com.s3-website-us-east-1.amazonaws.com"
+//        },
+//        allowedHeaders = {"device-id", "Content-Type", "Authorization"}
+//)
 public class NotificationAPI {
 
     private final SimpMessagingTemplate simpMessagingTemplate;

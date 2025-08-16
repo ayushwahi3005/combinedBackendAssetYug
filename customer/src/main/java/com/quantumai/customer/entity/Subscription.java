@@ -18,4 +18,6 @@ public class Subscription {
   private LocalDate expiryDate;
   private SubscriptionPlan subscriptionPlan;
   private Double amount;
+  private String stripeSubscriptionId;
+  private String stripeCustomerId;
 }

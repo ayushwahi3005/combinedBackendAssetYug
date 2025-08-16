@@ -6,6 +6,7 @@ import com.quantumai.customer.repository.CustomerRepository;
 import com.quantumai.customer.repository.UsersRepository;
 import com.quantumai.customer.security.JwtService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -34,10 +35,13 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Autowired
     CustomerRepository customerRepository;
+
+    @Value("${allowed-origins}")
+    private String allowedOrigins;
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/assetyug-notifications")
-                .setAllowedOrigins("http://localhost:4200")
+                .setAllowedOrigins(allowedOrigins)
                 .withSockJS();
     }
 

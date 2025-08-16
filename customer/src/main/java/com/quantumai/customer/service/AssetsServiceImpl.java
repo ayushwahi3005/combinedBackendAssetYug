@@ -513,12 +513,14 @@ public class AssetsServiceImpl implements AssetsService {
         .forEach(
             (x) -> {
               // System.out.println("------------------------->>>"+x.getAssetId());
-              Assets assets = assetsRepository.findByAssetIdAndCompanyId(x.getAssetId(), companyId);
-              x.setId(assets.getId());
-              x.setImage(assets.getImage());
+              Optional<Assets> assets = assetsRepository.findByAssetIdAndCompanyId(x.getAssetId(), companyId);
+              if(assets.isPresent()) {
+                  x.setId(assets.get().getId());
+                  x.setImage(assets.get().getImage());
 
-              Assets myasset = modelMapper.map(x, Assets.class);
-              assetsRepository.save(myasset);
+                  Assets myasset = modelMapper.map(x, Assets.class);
+                  assetsRepository.save(myasset);
+              }
             });
   }
 
@@ -854,7 +856,8 @@ public class AssetsServiceImpl implements AssetsService {
       }
       PaginatedResultDTO<String> assetsWithAllFields =
           getAllAssetDetails(Long.parseLong(mapping.get("companyId")));
-
+        System.out.println("=====================//////////////=====================>"+filterMap);
+        System.out.println("=====================//////////////=====================>"+assetsWithAllFields.getData());
       filteredAssetsWithAllFields =
           assetsWithAllFields.getData().stream()
               .filter(
@@ -875,11 +878,21 @@ public class AssetsServiceImpl implements AssetsService {
                               && myValue != null
                               && value != null
                               && !value.toString().isEmpty()) {
-                            myValue = myValue.toLowerCase();
-                            if (!myValue.contains(expectedValue.toLowerCase())
-                                && !myValue.equals(expectedValue.toLowerCase())) {
-                              flag = 0;
-                            }
+
+                              myValue = myValue.toLowerCase();
+                              expectedValue = expectedValue.toLowerCase();
+
+                              if (keyString.equals("status")) {
+                                  if (!myValue.equals(expectedValue)) {
+                                      flag = 0;
+                                  }
+                              } else {
+                                  if (!myValue.contains(expectedValue)
+                                          && !myValue.equals(expectedValue)) {
+                                      flag = 0;
+                                  }
+                              }
+
                           }
 //                          if(keyString.equals("location")){
 //                              myValue = myValue.toLowerCase();
@@ -951,6 +964,7 @@ public class AssetsServiceImpl implements AssetsService {
       } else {
         mySearchData = searchData;
       }
+      System.out.println("==========/////////////////////////================>"+filteredAssetsWithAllFields);
       if (mySearchData != null && mySearchData != "") {
         System.out.println("---------->" + mySearchData);
         filteredAssetsWithAllFields =
@@ -958,8 +972,36 @@ public class AssetsServiceImpl implements AssetsService {
                 .filter((data) -> data.toLowerCase().contains(mySearchData.toLowerCase()))
                 .collect(Collectors.toList());
       }
+//        ObjectMapper objectMapperNew = new ObjectMapper();
 
-      int startItem = pageNumber * pageSize;
+//        if (mySearchData != null && !mySearchData.trim().isEmpty()) {
+//            filteredAssetsWithAllFields = filteredAssetsWithAllFields.stream()
+//                    .map(json -> {
+//                        try {
+//                            return objectMapperNew.readValue(json, new TypeReference<Map<String, Object>>() {});
+//                        } catch (Exception e) {
+//                            return null;
+//                        }
+//                    })
+//                    .filter(Objects::nonNull)
+//                    .filter(map -> {
+//                        Object status = map.get("status");
+//                        return status != null && mySearchData.equalsIgnoreCase(status.toString());
+//                    })
+//                    .map(map -> {
+//                        try {
+//                            return objectMapperNew.writeValueAsString(map);
+//                        } catch (JsonProcessingException e) {
+//                            return null;
+//                        }
+//                    })
+//                    .filter(Objects::nonNull)
+//                    .collect(Collectors.toList());
+//        }
+
+        System.out.println("==========/////////////////////////================>"+filteredAssetsWithAllFields);
+
+        int startItem = pageNumber * pageSize;
       int endItem = Math.min(startItem + pageSize, filteredAssetsWithAllFields.size());
       if (startItem > filteredAssetsWithAllFields.size()) {
 
@@ -1052,7 +1094,7 @@ public class AssetsServiceImpl implements AssetsService {
 
 
       Optional<AssetCategoryIdGenerator> AssetCategoryIdGeneratorOptional =
-              assetCategoryIdGeneratorRepository.findById(SEQ_ID);
+              assetCategoryIdGeneratorRepository.findByCompanyId(categoryDTO.getCompanyId());
       if (AssetCategoryIdGeneratorOptional.isEmpty()) {
           throw new Exception("Sequence Database Not Found");
       }
@@ -1065,7 +1107,7 @@ public class AssetsServiceImpl implements AssetsService {
 
 
     Optional<AssetCategory> optionalAssetCategory =
-        assetCategoryRepository.findByName(categoryDTO.getName());
+        assetCategoryRepository.findByNameAndCompanyId(categoryDTO.getName(),categoryDTO.getCompanyId());
 
     if (optionalAssetCategory.isEmpty()) {
       assetCategoryRepository.save(category);
@@ -1196,6 +1238,14 @@ public class AssetsServiceImpl implements AssetsService {
   public List<AssetCategoryInspectionInstance> getAllAssetCategoryInspectionValues(Long companyId) {
     return assetCategoryInspectionInstanceRepository.findByCompanyId(companyId);
   }
+
+    @Override
+    public List<AssetCategoryInspectionInstance> getAllAssetCategoryInspectionInstanceByAsset(String assetId) {
+        return assetCategoryInspectionInstanceRepository.findByAssetId(assetId);
+    }
+
+
+
 
 //    @Override
 //    public List<String,Assets> getAssetByCompanyCategory(Long companyId) {

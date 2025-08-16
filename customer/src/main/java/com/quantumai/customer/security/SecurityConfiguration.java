@@ -57,6 +57,7 @@ public class SecurityConfiguration {
                     "/customer/updatePassword",
                     "/assetyug-notifications/**",
                     "/topic/**",
+                    "/stripe/*",
                     "/app/**")
             .permitAll()
 

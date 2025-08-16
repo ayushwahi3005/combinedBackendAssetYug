@@ -3,6 +3,8 @@ package com.quantumai.customer.repository;
 import com.quantumai.customer.dto.AssetsDTO;
 import com.quantumai.customer.entity.Assets;
 import java.util.List;
+import java.util.Optional;
+
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface AssetsRepository extends MongoRepository<Assets, String> {
@@ -10,7 +12,7 @@ public interface AssetsRepository extends MongoRepository<Assets, String> {
 
   List<Assets> findByCustomerId(String customerId);
 
-  Assets findByAssetIdAndCompanyId(Integer assetId, Long companyId);
+  Optional<Assets> findByAssetIdAndCompanyId(Integer assetId, Long companyId);
 
   List<AssetsDTO> findByCompanyIdAndSerialNumber(Long companyId, String serialNumber);
 

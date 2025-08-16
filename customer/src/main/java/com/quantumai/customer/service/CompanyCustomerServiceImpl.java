@@ -785,7 +785,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
 
 
       Optional<CompanyCustomerCategoryIdGenerator> companyCustomerCategoryIdGeneratorOptional =
-              companyCustomerCategoryIdGeneratorRepository.findById(SEQ_ID);
+              companyCustomerCategoryIdGeneratorRepository.findByCompanyId(categoryDTO.getCompanyId());
       if (companyCustomerCategoryIdGeneratorOptional.isEmpty()) {
           throw new Exception("Sequence Database Not Found");
       }
@@ -796,7 +796,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
       companyCustomerCategoryIdGeneratorRepository.save(companyCustomerCategoryIdGenerator);
 
     Optional<CompanyCustomerCategory> OptionalCompanyCustomerCategory =
-        companyCustomerCategoryRepository.findByName(categoryDTO.getName());
+        companyCustomerCategoryRepository.findByNameAndCompanyId(categoryDTO.getName(),categoryDTO.getCompanyId());
     if (OptionalCompanyCustomerCategory.isEmpty()) {
       companyCustomerCategoryRepository.save(category);
     } else {

@@ -12,4 +12,6 @@ public interface CompanyCustomerCategoryRepository
   public List<CompanyCustomerCategory> findByCompanyIdAndStatus(Long companyId, String status);
 
   public Optional<CompanyCustomerCategory> findByName(String name);
+
+  public Optional<CompanyCustomerCategory> findByNameAndCompanyId(String name,Long companyId);
 }

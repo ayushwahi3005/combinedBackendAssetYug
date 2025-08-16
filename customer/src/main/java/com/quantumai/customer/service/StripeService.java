@@ -1,6 +1,7 @@
 package com.quantumai.customer.service;
 
 import com.quantumai.customer.entity.CustomerStripeDetails;
+import com.quantumai.customer.entity.SubscriptionEnum;
 import com.quantumai.customer.entity.SubscriptionPlan;
 import com.quantumai.customer.repository.CustomerStripeDetailsRepository;
 import com.quantumai.customer.repository.SubscriptionRepository;
@@ -176,7 +177,7 @@ public class StripeService {
   private Subscription createSubscription(String customerId, Long companyId)
       throws StripeException {
     Optional<com.quantumai.customer.entity.Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
 
     if (subscriptionOptional.isPresent()) {
       ZonedDateTime nextBillingDate;

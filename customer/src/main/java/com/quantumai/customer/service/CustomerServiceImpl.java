@@ -6,9 +6,9 @@ import com.google.firebase.auth.UserRecord;
 import com.google.firebase.auth.UserRecord.UpdateRequest;
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
+import com.quantumai.customer.entity.IdGenerator.*;
 import com.quantumai.customer.entity.IdGenerator.AssetIdTable;
 import com.quantumai.customer.entity.IdGenerator.CompanyCustomerIdTable;
-import com.quantumai.customer.entity.IdGenerator.CompanyPrimaryKeyTable;
 import com.quantumai.customer.exception.*;
 import com.quantumai.customer.repository.*;
 import com.quantumai.customer.security.JwtService;
@@ -89,6 +89,10 @@ public class CustomerServiceImpl implements CustomerService {
   @Autowired AssetQRRepository assetQRRepository;
 
   private static final String SEQ_ID = "company_sequence";
+
+  @Autowired private AssetCategoryIdGeneratorRepository assetCategoryIdGeneratorRepository;
+
+  @Autowired private CompanyCustomerCategoryIdGeneratorRepository companyCustomerCategoryIdGeneratorRepository;
 
   @Override
   public BaseResponseDTO addCustomer(CustomerDTO customerDTO) throws Exception {
@@ -372,6 +376,8 @@ public class CustomerServiceImpl implements CustomerService {
 
       CompanyInformation ci = companyInformationRepository.save(companyInformation);
       addDummyData(ci.getId());
+      initAssetCategorySequenceForCompany(ci.getId());
+      initCompanyCustomerCategorySequenceForCompany(ci.getId());
 
       CustomRole customRole = new CustomRole();
       customRole.setCompanyId(ci.getId());
@@ -654,5 +660,26 @@ public class CustomerServiceImpl implements CustomerService {
   @Override
   public void deleteCardDetails(String id) {
     customerStripeDetailsRepository.deleteById(id);
+  }
+
+
+  public void initAssetCategorySequenceForCompany(Long companyId) {
+//    String sequenceId = companyId + "_asset_category_sequence";
+    if (assetCategoryIdGeneratorRepository.findByCompanyId(companyId).isEmpty()) {
+      AssetCategoryIdGenerator seqDoc = new AssetCategoryIdGenerator();
+      seqDoc.setSeq(1L);
+      seqDoc.setCompanyId(companyId);
+      assetCategoryIdGeneratorRepository.save(seqDoc);
+    }
+  }
+
+  public void initCompanyCustomerCategorySequenceForCompany(Long companyId) {
+//    String sequenceId = companyId + "_asset_category_sequence";
+    if (companyCustomerCategoryIdGeneratorRepository.findByCompanyId(companyId).isEmpty()) {
+      CompanyCustomerCategoryIdGenerator seqDoc = new CompanyCustomerCategoryIdGenerator();
+      seqDoc.setSeq(1L);
+      seqDoc.setCompanyId(companyId);
+      companyCustomerCategoryIdGeneratorRepository.save(seqDoc);
+    }
   }
 }

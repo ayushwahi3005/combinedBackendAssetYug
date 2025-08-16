@@ -123,7 +123,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
   @Override
   public Subscription getCurrentSubscription(Long companyId) {
     Optional<Subscription> subscription =
-        subscriptionRepository.findByCompanyIdAndStatus(companyId, "ACTIVE");
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
     return subscription.orElse(null);
   }
 
@@ -137,7 +137,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
   public void deleteUpcomingSubscription(Long companyId, String companyName, String email)
       throws Exception {
     Optional<Subscription> subscription =
-        subscriptionRepository.findByCompanyIdAndStatus(companyId, "UPCOMING");
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.UPCOMING);
     if (subscription.isPresent()) {
       paymentService.cancelUpcomingSubscriptionStripe(companyId, companyName, email);
     }
@@ -147,7 +147,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
   public void startUpcomingSubscription(Long companyId, String companyName, String email)
       throws Exception {
     Optional<Subscription> subscription =
-        subscriptionRepository.findByCompanyIdAndStatus(companyId, "UPCOMING");
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.UPCOMING);
     if (subscription.isPresent()) {
       paymentService.startUpcomingSubscriptionStripe(companyId, companyName, email);
     }
