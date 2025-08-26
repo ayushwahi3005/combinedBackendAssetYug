@@ -2,6 +2,7 @@ package com.quantumai.customer.entity;
 
 import lombok.Data;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 @Document
@@ -15,6 +16,7 @@ public class CompanyCustomer {
   private String category;
   private String status;
   private String phone;
+  // @Indexed(unique = true)
   private String email;
   private String address;
   private String apartment;

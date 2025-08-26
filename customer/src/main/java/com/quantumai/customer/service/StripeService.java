@@ -77,6 +77,13 @@ public class StripeService {
     PaymentMethod paymentMethod = PaymentMethod.retrieve(paymentMethodId);
     paymentMethod.attach(Map.of("customer", customer.getId()));
 
+    // Set as default payment method for invoices
+    Map<String, Object> invoiceSettings = new HashMap<>();
+    invoiceSettings.put("default_payment_method", paymentMethod.getId());
+    Map<String, Object> params = new HashMap<>();
+    params.put("invoice_settings", invoiceSettings);
+    customer.update(params);
+
     // ✅ Update PaymentMethod with latest Cardholder Name
     Map<String, Object> billingDetails = new HashMap<>();
     billingDetails.put("name", cardholderName); // ✅ Add cardholder name

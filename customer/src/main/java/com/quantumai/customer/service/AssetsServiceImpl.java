@@ -383,6 +383,7 @@ public class AssetsServiceImpl implements AssetsService {
     assetFile.setAssetId(assetId);
     assetFile.setFile(file.getBytes());
     assetFile.setFileName(fileName);
+    assetFile.setUploadDateTime(LocalDateTime.now());
 
     return assetFileRepository.save(assetFile);
     //		AssetFile assetFile=modelMapper.map(assetFileDTO, AssetFile.class);

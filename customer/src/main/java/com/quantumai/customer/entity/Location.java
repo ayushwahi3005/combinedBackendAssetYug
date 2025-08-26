@@ -8,7 +8,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @Document
 public class Location {
 
-  @Id private String id;
+  @Id
+  private String id;
   private Long companyId;
   private String name;
   private String parentLocation;

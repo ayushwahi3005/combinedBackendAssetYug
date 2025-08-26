@@ -1,6 +1,7 @@
 package com.quantumai.customer.service;
 
 import com.mongodb.DuplicateKeyException;
+import java.util.UUID;
 import com.quantumai.customer.entity.ActiveSession;
 import com.quantumai.customer.entity.ActiveSessionMobile;
 import com.quantumai.customer.repository.ActiveSessionMobileRepository;
@@ -137,20 +138,36 @@ public void createOrUpdateSession(String userId, String sessionId, String userAg
           .set("deviceId", deviceId)
           .set("userAgent", userAgent)
           .set("lastActivityTime", LocalDateTime.now())
-          // set these only on insert (so we don't overwrite existing sessionId/_id)
-          .setOnInsert("userId", userId)
-          .setOnInsert("_id", sessionId); // set _id to provided sessionId on insert
-
-  FindAndModifyOptions options = FindAndModifyOptions.options()
-          .upsert(true)
-          .returnNew(true);
+          // set userId only on insert
+          .setOnInsert("userId", userId);
 
   try {
-    ActiveSession updated = mongoTemplate.findAndModify(query, update, options, ActiveSession.class);
-    if (updated == null) {
-      // Defensive: if DB returned null, read it explicitly
-      updated = mongoTemplate.findOne(query, ActiveSession.class);
+    // First try to find existing session
+    ActiveSession existing = mongoTemplate.findOne(query, ActiveSession.class);
+    ActiveSession updated;
+    
+    if (existing != null) {
+      // Update existing session
+      update = new Update()
+          .set("deviceId", deviceId)
+          .set("userAgent", userAgent)
+          .set("lastActivityTime", LocalDateTime.now());
+      updated = mongoTemplate.findAndModify(
+          Query.query(Criteria.where("_id").is(existing.getSessionId())),
+          update,
+          FindAndModifyOptions.options().returnNew(true),
+          ActiveSession.class);
+    } else {
+      // Create new session with explicit sessionId
+      ActiveSession newSession = new ActiveSession();
+      newSession.setSessionId(sessionId);
+      newSession.setUserId(userId);
+      newSession.setDeviceId(deviceId);
+      newSession.setUserAgent(userAgent);
+      newSession.setLastActivityTime(LocalDateTime.now());
+      updated = mongoTemplate.save(newSession);
     }
+    
     log.info("Upserted session for {} -> id {}", userId, updated != null ? updated.getSessionId() : "null");
   } catch (DuplicateKeyException ex) {
     // Rare race: two upserts hit unique index simultaneously. Retry read-and-update.
@@ -162,13 +179,19 @@ public void createOrUpdateSession(String userId, String sessionId, String userAg
               .set("userAgent", userAgent)
               .set("lastActivityTime", LocalDateTime.now());
       mongoTemplate.findAndModify(
-              Query.query(Criteria.where("_id").is(existing.getSessionId())),
+              Query.query(Criteria.where("sessionId").is(existing.getSessionId())),
               update2,
               FindAndModifyOptions.options().returnNew(true),
               ActiveSession.class);
     } else {
-      // as a last resort, try upsert once more (very unlikely)
-      mongoTemplate.findAndModify(query, update, options, ActiveSession.class);
+      // as a last resort, try creating a new session with a new ID
+      ActiveSession newSession = new ActiveSession();
+      newSession.setSessionId(UUID.randomUUID().toString()); // Generate new session ID
+      newSession.setUserId(userId);
+      newSession.setDeviceId(deviceId);
+      newSession.setUserAgent(userAgent);
+      newSession.setLastActivityTime(LocalDateTime.now());
+      mongoTemplate.save(newSession);
     }
   }
 

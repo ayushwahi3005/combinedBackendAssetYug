@@ -16,7 +16,7 @@ public interface CustomerService {
   public void sentResetOTP(String email) throws NoEmailFoundException;
 
   public void updatePassword(String email, String otp, String password)
-      throws FirebaseAuthException, OTPException, NoEmailFoundException;
+      throws FirebaseAuthException, OTPException, NoEmailFoundException, SamePasswordException;
 
   public Boolean checkCustomer(String email) throws Exception;
 
@@ -62,7 +62,7 @@ public interface CustomerService {
 
   public void deleteLocation(String id);
 
-  public Bin addBin(Bin bin);
+  public Bin addBin(BinDTO bin);
 
   public List<BinDTO> getAllBin(Long companyId);
 

@@ -8,7 +8,10 @@ import com.quantumai.customer.exception.NoEmailFoundException;
 import com.quantumai.customer.exception.OTPException;
 import com.quantumai.customer.service.ActiveSessionService;
 import com.quantumai.customer.service.CustomerService;
+import com.quantumai.customer.service.TrialService;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +31,8 @@ public class CustomerAPI {
   @Autowired private CustomerService customerService;
 
   @Autowired private ActiveSessionService activeSessionService;
+  
+  @Autowired private TrialService trialService;
 
   @GetMapping(value = "/working")
   public ResponseEntity<String> working() throws Exception {
@@ -252,8 +257,8 @@ public class CustomerAPI {
 
   // -------------------------------------------------------
   @PostMapping(value = "/addbin")
-  public ResponseEntity<Bin> addBin(@RequestBody Bin bin) {
-    return ResponseEntity.ok(customerService.addBin(bin));
+  public ResponseEntity<Bin> addBin(@RequestBody BinDTO bindDto) {
+    return ResponseEntity.ok(customerService.addBin(bindDto));
   }
 
   @GetMapping(value = "/getAllBin/{companyId}")
@@ -328,5 +333,37 @@ public class CustomerAPI {
   public void deleteCardDetails(@PathVariable String id) {
 
     customerService.deleteCardDetails(id);
+  }
+
+  @GetMapping(value = "/trial-status/{email}")
+  public ResponseEntity<Map<String, Object>> getTrialStatus(@PathVariable String email) {
+    Map<String, Object> response = new HashMap<>();
+    
+    boolean isTrialActive = trialService.isTrialActive(email);
+    boolean isTrialExpired = trialService.isTrialExpired(email);
+    
+    response.put("isTrialActive", isTrialActive);
+    response.put("isTrialExpired", isTrialExpired);
+    
+    if (!isTrialExpired && isTrialActive) {
+      trialService.getTrialStatus(email).ifPresent(trial -> {
+        response.put("trialEndDate", trial.getTrialEndDate());
+        response.put("daysRemaining", java.time.temporal.ChronoUnit.DAYS.between(
+          java.time.LocalDateTime.now(), trial.getTrialEndDate()));
+      });
+    }
+    
+    return ResponseEntity.ok(response);
+  }
+
+  @PostMapping(value = "/activate-subscription/{email}")
+  public ResponseEntity<Map<String, String>> activateSubscription(@PathVariable String email) {
+    trialService.activatePaidSubscription(email);
+    
+    Map<String, String> response = new HashMap<>();
+    response.put("message", "Subscription activated successfully");
+    response.put("status", "success");
+    
+    return ResponseEntity.ok(response);
   }
 }

@@ -1,5 +1,6 @@
 package com.quantumai.customer.entity;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import lombok.Data;
@@ -26,6 +27,13 @@ public class Customer implements UserDetails {
 
   //	@Enumerated
   private String role;
+  
+  // Trial related fields
+  private LocalDateTime trialStartDate;
+  private LocalDateTime trialEndDate;
+  private boolean isTrialActive;
+  private boolean trialExpired;
+  private boolean trialExpirationNotificationSent;
 
   @Override
   public Collection<? extends GrantedAuthority> getAuthorities() {

@@ -27,8 +27,8 @@ import java.util.Optional;
 public class StripeWebhookController {
 
     // Must not be static; Spring does not inject into static fields.
-//    @Value("${stripe.webhook.endpoint}")
-    private final String endpointSecret="whsec_d7021a6b2f9313cc9ea4abde0a34eb4c80cdec58398f187b4049681f475a7272";
+    @Value("${stripe.webhook.endpoint}")
+    private String endpointSecret;
 
     @Autowired
     private CustomerStripeDetailsRepository customerStripeDetailsRepository;

@@ -11,4 +11,5 @@ public interface CompanyCustomerMandatoryFieldsRepository
       String name, Long companyId);
 
   public List<CompanyCustomerMandatoryFields> findByCompanyId(Long companyId);
+  public List<CompanyCustomerMandatoryFields> findByCompanyIdAndMandatory(Long companyId,Boolean mandatory);
 }

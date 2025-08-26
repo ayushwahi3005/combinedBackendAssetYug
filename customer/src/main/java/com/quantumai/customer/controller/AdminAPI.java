@@ -8,6 +8,8 @@ import com.quantumai.customer.entity.Plans;
 import com.quantumai.customer.security.JwtService;
 import com.quantumai.customer.service.AdminService;
 import com.quantumai.customer.service.SubscriptionService;
+import com.quantumai.customer.service.UserService;
+
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +28,19 @@ import org.springframework.web.bind.annotation.*;
 )
 @Slf4j
 public class AdminAPI {
+
+    @Autowired
+    private UserService userService;
+
+    @PostMapping("/resend-verification/{companyId}/{email}")
+    public ResponseEntity<String> resendUserVerification(@PathVariable Long companyId, @PathVariable String email) {
+        try {
+            userService.resendVerificationEmail(email, companyId);
+            return ResponseEntity.ok("Verification email resent.");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Failed to resend verification: " + e.getMessage());
+        }
+    }
 
   @Autowired private AdminService adminService;
 

@@ -4,12 +4,16 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
 import com.quantumai.customer.exception.CategoryException;
+import com.quantumai.customer.exception.EmailAlreadyExistsException;
 import com.quantumai.customer.exception.ImportFileRowException;
+import com.quantumai.customer.exception.NameColumnMissingException;
 import com.quantumai.customer.exception.NoSubscriptionError;
 import com.quantumai.customer.repository.*;
 import com.quantumai.customer.service.CompanyCustomerService;
@@ -50,74 +54,41 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping(value = "/companycustomer")
 public class CompanyCustomerAPI {
 
-  @Autowired private CompanyCustomerService companyCustomerService;
+    
 
-  @Autowired CompanyCustomerRepository companyCustomerRepository;
-
-  @Autowired private JavaMailSender emailSender;
-  @Autowired private CompanyCustomerExtraFieldNameRepository extraFieldNameRepository;
-
-  @Autowired private CompanyCustomerExtraFieldsRepository extraFieldsRepository;
-
-  @Autowired private CustomerService customerService;
-
-  @Autowired SubscriptionRepository subscriptionRepository;
-
-  @Autowired CompanyCustomerCategoryRepository companyCustomerCategoryRepository;
-
-  private ModelMapper modelMapper = new ModelMapper();
-
-  List<String> stateList =
-          List.of(
-                  "Alaska",
-                  "Arizona",
-                  "Arkansas",
-                  "California",
-                  "Colorado",
-                  "Connecticut",
-                  "Delaware",
-                  "Florida",
-                  "Georgia",
-                  "Hawaii",
-                  "Idaho",
-                  "Illinois",
-                  "Indiana",
-                  "Iowa",
-                  "Kansas",
-                  "Kentucky",
-                  "Louisiana",
-                  "Maine",
-                  "Maryland",
-                  "Massachusetts",
-                  "Michigan",
-                  "Minnesota",
-                  "Mississippi",
-                  "Missouri",
-                  "Montana",
-                  "Nebraska",
-                  "Nevada",
-                  "New Hampshire",
-                  "New Jersey",
-                  "New Mexico",
-                  "New York",
-                  "North Carolina",
-                  "North Dakota",
-                  "Ohio",
-                  "Oklahoma",
-                  "Oregon",
-                  "Pennsylvania",
-                  "Rhode Island",
-                  "South Carolina",
-                  "South Dakota",
-                  "Tennessee",
-                  "Texas",
-                  "Utah",
-                  "Vermont",
-                  "Virginia",
-                  "Washington",
-                  "West Virginia",
-                  "Wisconsin",
-                  "Wyoming");
+    // Services
+    @Autowired private CompanyCustomerService companyCustomerService;
+    @Autowired private CustomerService customerService;
+    
+    // Repositories
+    @Autowired private CompanyCustomerRepository companyCustomerRepository;
+    @Autowired private CompanyCustomerExtraFieldNameRepository extraFieldNameRepository;
+    @Autowired private CompanyCustomerExtraFieldsRepository extraFieldsRepository;
+    @Autowired private SubscriptionRepository subscriptionRepository;
+    @Autowired private CompanyCustomerCategoryRepository companyCustomerCategoryRepository;
+    
+    // External Services
+    @Autowired private JavaMailSender emailSender;
+    
+    // Utilities
+    private final ModelMapper modelMapper = new ModelMapper();
+    
+    // Constants
+    private static final List<String> US_STATES = List.of(
+            "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut",
+            "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois",
+            "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine",
+            "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi",
+            "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire",
+            "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota",
+            "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island",
+            "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah",
+            "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming"
+    );
+    
+    private static final int MAX_IMPORT_ROWS = 1000;
+    private static final String IMPORT_SUBJECT = "Import Report from AssetYug";
+    private static final String EXCEL_FILENAME = "CustomerReport.xlsx";
 
   @GetMapping("/working")
   public String working() {
@@ -129,11 +100,11 @@ public class CompanyCustomerAPI {
   public void deleteCompanyCustomer(@PathVariable String id, @RequestHeader Long companyId)
       throws NoSubscriptionError {
 
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    //Optional<Subscription> subscriptionOptional =
+      //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
+  //  if (subscriptionOptional.isEmpty()) {
+    //  throw new NoSubscriptionError("No Active Subscription");
+//    }
     companyCustomerService.deleteCustomer(id);
   }
 
@@ -163,26 +134,26 @@ public class CompanyCustomerAPI {
   @PostMapping("/addCompanyCustomer")
   public CompanyCustomerDTO addNewFields(
       @RequestBody CompanyCustomerDTO companyCustomerDTO, @RequestHeader Long companyId)
-      throws NoSubscriptionError {
+      throws NoSubscriptionError, EmailAlreadyExistsException {
     System.out.println("CompanyId-->" + companyId);
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    //Optional<Subscription> subscriptionOptional =
+      //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
+  //  if (subscriptionOptional.isEmpty()) {
+    //  throw new NoSubscriptionError("No Active Subscription");
+//    }
     return companyCustomerService.addCustomer(companyCustomerDTO);
   }
 
   @PutMapping("/updateCompanyCustomer")
   public void updateCompanyCustomer(
       @RequestBody CompanyCustomerDTO companyCustomerDTO, @RequestHeader Long companyId)
-      throws NoSubscriptionError {
+      throws NoSubscriptionError, EmailAlreadyExistsException {
 
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    //Optional<Subscription> subscriptionOptional =
+      //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
+  //  if (subscriptionOptional.isEmpty()) {
+    //  throw new NoSubscriptionError("No Active Subscription");
+//    }
     companyCustomerService.updateCustomer(companyCustomerDTO);
   }
 
@@ -208,11 +179,11 @@ public class CompanyCustomerAPI {
       @RequestHeader Long companyId)
       throws Exception {
 
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    //Optional<Subscription> subscriptionOptional =
+      //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
+  //  if (subscriptionOptional.isEmpty()) {
+    //  throw new NoSubscriptionError("No Active Subscription");
+//    }
     companyCustomerService.addCompanyCustomerExtraField(extraFieldNameDTO);
   }
 
@@ -225,11 +196,11 @@ public class CompanyCustomerAPI {
   @DeleteMapping("/deleteExtraFieldName/{id}")
   public void deleteExtraFieldName(@PathVariable String id, @RequestHeader Long companyId)
       throws NoSubscriptionError {
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    //Optional<Subscription> subscriptionOptional =
+      //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
+  //  if (subscriptionOptional.isEmpty()) {
+    //  throw new NoSubscriptionError("No Active Subscription");
+//    }
     companyCustomerService.deleteCompanyCustomerExtraField(id);
   }
 
@@ -238,11 +209,11 @@ public class CompanyCustomerAPI {
       @RequestBody CompanyCustomerMandatoryFields mandatoryFields, @RequestHeader Long companyId)
       throws NoSubscriptionError {
 
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    //Optional<Subscription> subscriptionOptional =
+      //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
+  //  if (subscriptionOptional.isEmpty()) {
+    //  throw new NoSubscriptionError("No Active Subscription");
+//    }
     companyCustomerService.updateMandatoryFields(mandatoryFields);
   }
 
@@ -251,11 +222,11 @@ public class CompanyCustomerAPI {
       @RequestBody CompanyCustomerShowFields showFields, @RequestHeader Long companyId)
       throws NoSubscriptionError {
 
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    //Optional<Subscription> subscriptionOptional =
+      //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
+  //  if (subscriptionOptional.isEmpty()) {
+    //  throw new NoSubscriptionError("No Active Subscription");
+//    }
     companyCustomerService.updateShowFields(showFields);
   }
 
@@ -295,11 +266,11 @@ public class CompanyCustomerAPI {
   public void showFields(@PathVariable String name, @PathVariable Long companyId)
       throws NoSubscriptionError {
 
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    //Optional<Subscription> subscriptionOptional =
+      //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
+  //  if (subscriptionOptional.isEmpty()) {
+    //  throw new NoSubscriptionError("No Active Subscription");
+//    }
     companyCustomerService.deleteShowAndMandatoryFields(companyId, name);
   }
 
@@ -313,11 +284,11 @@ public class CompanyCustomerAPI {
   public void addNewFields(
       @RequestBody CompanyCustomerExtraFieldsDTO extraFieldsDTO, @RequestHeader Long companyId)
       throws Exception {
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    //Optional<Subscription> subscriptionOptional =
+      //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
+  //  if (subscriptionOptional.isEmpty()) {
+    //  throw new NoSubscriptionError("No Active Subscription");
+//    }
     companyCustomerService.addExtraFields(extraFieldsDTO);
   }
 
@@ -329,11 +300,11 @@ public class CompanyCustomerAPI {
   @DeleteMapping("/deleteExtraFields/{id}")
   public void deleteExtraField(@PathVariable String id, Long companyId) throws Exception {
 
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    //Optional<Subscription> subscriptionOptional =
+      //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
+  //  if (subscriptionOptional.isEmpty()) {
+    //  throw new NoSubscriptionError("No Active Subscription");
+//    }
     companyCustomerService.deleteExtraFields(id);
   }
 
@@ -341,11 +312,11 @@ public class CompanyCustomerAPI {
   public void deleteCompanyCustomerExtraFields(
       @PathVariable String id, @RequestHeader Long companyId) throws Exception {
 
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    //Optional<Subscription> subscriptionOptional =
+      //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
+  //  if (subscriptionOptional.isEmpty()) {
+    //  throw new NoSubscriptionError("No Active Subscription");
+//    }
     companyCustomerService.deleteExtraFieldByCompanyCustomer(id);
   }
 
@@ -360,11 +331,11 @@ public class CompanyCustomerAPI {
       @PathVariable String companyCustomerId,
       @RequestHeader Long companyId)
       throws NoSubscriptionError {
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    //Optional<Subscription> subscriptionOptional =
+      //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
+  //  if (subscriptionOptional.isEmpty()) {
+    //  throw new NoSubscriptionError("No Active Subscription");
+//    }
     String message = "";
     try {
       companyCustomerService.addCompanyCustomerFile(file, companyCustomerId);
@@ -399,11 +370,11 @@ public class CompanyCustomerAPI {
   @DeleteMapping("deleteFile/{id}")
   public void deleteFile(@PathVariable String id, @RequestHeader Long companyId)
       throws NoSubscriptionError {
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    //Optional<Subscription> subscriptionOptional =
+      //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
+  //  if (subscriptionOptional.isEmpty()) {
+    //  throw new NoSubscriptionError("No Active Subscription");
+//    }
     companyCustomerService.deleteFile(id);
   }
 
@@ -459,19 +430,36 @@ public class CompanyCustomerAPI {
       throws CsvValidationException,
           MessagingException,
           ImportFileRowException,
-          NoSubscriptionError {
+          NoSubscriptionError, EmailAlreadyExistsException,NameColumnMissingException {
     //
-    //	//System.out.println("------||---------------------------------------/////////////////////////////////////------->"+columnMappings);
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    	System.out.println("------||---------------------------------------/////////////////////////////////////------->"+columnMappings);
+    //Optional<Subscription> subscriptionOptional =
+      //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
+  //  if (subscriptionOptional.isEmpty()) {
+    //  throw new NoSubscriptionError("No Active Subscription");
+//    }
     Map<String, String> columnMap = new HashMap<>();
+ 
+
     try {
       // Create a JsonFactory and a JsonParser
       JsonFactory jsonFactory = new JsonFactory();
       JsonParser jsonParser = jsonFactory.createParser(columnMappings);
+
+      ObjectMapper objectMapper = new ObjectMapper();
+        // ✅ Correct: use the TypeReference overload
+        Map<String, String> map= objectMapper.readValue(
+            columnMappings, 
+            new TypeReference<Map<String, String>>() {}
+        );
+
+        // check if any value is "Name"
+       
+        if(!map.containsValue("Name")){
+          throw new NameColumnMissingException("Name Column Missing");
+        }
+       
+      
 
       // Loop through JSON tokens
       String key = "", val = "";
@@ -508,9 +496,15 @@ public class CompanyCustomerAPI {
 
       // Close the JsonParser
       jsonParser.close();
-    } catch (Exception e) {
+    } 
+    catch (NameColumnMissingException e) {
+      throw e; // rethrow, don’t swallow it
+    }
+    catch (Exception e) {
       e.printStackTrace();
     }
+
+  
     // System.out.println("--------------> "+columnMap.size());
     List<CompanyCustomerDTO> assetList = new ArrayList<CompanyCustomerDTO>();
     long totalCount = Integer.MAX_VALUE;
@@ -518,8 +512,8 @@ public class CompanyCustomerAPI {
         BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
       totalCount = reader.lines().count() - 1;
       System.out.println("Total Count" + totalCount);
-      if (reader.lines().count() > 5001) {
-        throw new ImportFileRowException("Import File cannot import more than 5000 rows");
+      if (reader.lines().count() > MAX_IMPORT_ROWS + 1) {
+        throw new ImportFileRowException("Import File cannot import more than " + MAX_IMPORT_ROWS + " rows");
       }
 
     } catch (IOException e) {
@@ -596,6 +590,11 @@ public class CompanyCustomerAPI {
           if (columnMap.get(field) != null) {
             switch (columnMap.get(field).toLowerCase()) {
               case "name":
+                if(row[j].trim().equals("")){
+                  errorDesc.append("ERROR WITH NO NAME WHILE ADDING IN CUSTOMER");
+                  errorFlag = 1;
+                  break;
+                }
                 companyCustomerDTO.setName(row[j]);
                 break;
 
@@ -618,7 +617,16 @@ public class CompanyCustomerAPI {
 
                 break;
               case "email":
+                Optional<CompanyCustomer> myCustomer=companyCustomerRepository.findByEmailAndCompanyId(companyCustomerDTO.getEmail(),companyCustomerDTO.getCompanyId());
+                if(myCustomer.isPresent()){
+                  // throw new EmailAlreadyExistsException("User With Email Aready Present");
+                  errorDesc.append("User With Email Aready Present");
+                  errorFlag = 1;
+                  break;
+                }
+                
                 companyCustomerDTO.setEmail(row[j]);
+                break;
               case "address":
                 System.out.println("address//->" + row[j]);
                 companyCustomerDTO.setAddress(row[j]);
@@ -633,15 +641,18 @@ public class CompanyCustomerAPI {
               case "state":
 
                 String myState=row[j];
-                List<String> selectedStateList=stateList.stream().filter(myState::equalsIgnoreCase).toList();
+                if(!row[j].equals("")){
+                  List<String> selectedStateList=US_STATES.stream().filter(myState::equalsIgnoreCase).toList();
 
-                if(!selectedStateList.isEmpty()){
-                  companyCustomerDTO.setState(selectedStateList.get(0));
+                  if(!selectedStateList.isEmpty()){
+                    companyCustomerDTO.setState(selectedStateList.get(0));
+                  }
+                  else{
+                    errorDesc.append("ERROR WHILE ADDING IN STATE");
+                    errorFlag = 1;
+                  }
                 }
-                else{
-                  errorDesc.append("ERROR WHILE ADDING IN STATE");
-                  errorFlag = 1;
-                }
+                
 
                 break;
               case "zipcode":
@@ -792,7 +803,7 @@ public class CompanyCustomerAPI {
           }
         }
 
-          try (FileOutputStream fileOut = new FileOutputStream("CustomerReport.xlsx")) {
+          try (FileOutputStream fileOut = new FileOutputStream(EXCEL_FILENAME)) {
           workbook.write(fileOut);
         }
         workbook.close();
@@ -801,9 +812,9 @@ public class CompanyCustomerAPI {
           MimeMessageHelper helper = new MimeMessageHelper(message, true);
 
           helper.setTo(email);
-          helper.setSubject("Import Report from AssetYug");
+          helper.setSubject(IMPORT_SUBJECT);
           helper.setText("Hey, We have attached import result below");
-          helper.addAttachment("CustomerAttachment.xlsx", new File("Report.xlsx"));
+          helper.addAttachment("CustomerAttachment.xlsx", new File(EXCEL_FILENAME));
 
           emailSender.send(message);
         } catch (Exception e) {
@@ -813,7 +824,7 @@ public class CompanyCustomerAPI {
       }
       if (excelIndex == 0) {
         importHistoryDTO.setMessage("Import was Successfully Done");
-        try (FileOutputStream fileOut = new FileOutputStream("CustomerReport.xlsx")) {
+        try (FileOutputStream fileOut = new FileOutputStream(EXCEL_FILENAME)) {
           workbook.write(fileOut);
         }
         workbook.close();
@@ -822,7 +833,7 @@ public class CompanyCustomerAPI {
           MimeMessageHelper helper = new MimeMessageHelper(message, true);
 
           helper.setTo(email);
-          helper.setSubject("Import Report from AssetYug");
+          helper.setSubject(IMPORT_SUBJECT);
           helper.setText("Hey, Your Import was Successfully Done");
           //	            helper.addAttachment("ExcelAttachment.xlsx", new File("Report.xlsx"));
 
@@ -858,11 +869,11 @@ public class CompanyCustomerAPI {
           MessagingException,
           ImportFileRowException,
           NoSubscriptionError {
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    //Optional<Subscription> subscriptionOptional =
+      //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
+  //  if (subscriptionOptional.isEmpty()) {
+    //  throw new NoSubscriptionError("No Active Subscription");
+//    }
     System.out.println("------||-------->" + columnMappings);
     Map<String, String> columnMap = new HashMap<>();
     try {
@@ -912,8 +923,8 @@ public class CompanyCustomerAPI {
     try (InputStream inputStream = file.getInputStream();
         BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
       totalCount = reader.lines().count() - 1;
-      if (reader.lines().count() > 5001) {
-        throw new ImportFileRowException("Import File cannot import more than 5000 rows");
+      if (reader.lines().count() > MAX_IMPORT_ROWS + 1) {
+        throw new ImportFileRowException("Import File cannot import more than " + MAX_IMPORT_ROWS + " rows");
       }
 
     } catch (IOException e) {
@@ -1010,12 +1021,17 @@ public class CompanyCustomerAPI {
                 // System.out.println("------------------/////////----"+assetsDTO.getId());
                 if (companyCustomer == null) {
                   errorFlag = 1;
-                  errorDesc.append("ERROR WHILE UPDATING IN INVENTORYID");
+                  errorDesc.append("ERROR WHILE UPDATING IN INVENTORY ID");
                 }
                 break;
 
               case "name":
                 companyCustomer.setName(row[j]);
+                if(row[j].trim().equals("")){
+                  errorDesc.append("ERROR WITH NO NAME WHILE ADDING IN CUSTOMER");
+                  errorFlag = 1;
+                  break;
+                }
                 break;
 
               case "phone":
@@ -1037,7 +1053,15 @@ public class CompanyCustomerAPI {
 
                 break;
               case "email":
+                Optional<CompanyCustomer> myCustomer=companyCustomerRepository.findByEmailAndCompanyId(companyCustomer.getEmail(),companyCustomer.getCompanyId());
+                if(myCustomer.isPresent()&&!myCustomer.get().getId().equals(companyCustomer.getId())){
+                  // throw new EmailAlreadyExistsException("User With Email Aready Present");
+                  errorDesc.append("User With Email Aready Present");
+                  errorFlag = 1;
+                  break;
+                }
                 companyCustomer.setEmail(row[j]);
+                break;
               case "address":
                 System.out.println("address//->" + row[j]);
                 companyCustomer.setAddress(row[j]);
@@ -1052,7 +1076,7 @@ public class CompanyCustomerAPI {
               case "state":
 
                 String myState=row[j];
-                List<String> selectedStateList=stateList.stream().filter(myState::equalsIgnoreCase).toList();
+                List<String> selectedStateList=US_STATES.stream().filter(myState::equalsIgnoreCase).toList();
                 if(!selectedStateList.isEmpty()){
                   companyCustomer.setState(selectedStateList.get(0));
                 }
@@ -1259,7 +1283,7 @@ public class CompanyCustomerAPI {
             mySheet.removeRow(lastRow);
           }
         }
-        try (FileOutputStream fileOut = new FileOutputStream("CustomerReport.xlsx")) {
+        try (FileOutputStream fileOut = new FileOutputStream(EXCEL_FILENAME)) {
           workbook.write(fileOut);
         }
         workbook.close();
@@ -1267,15 +1291,15 @@ public class CompanyCustomerAPI {
         MimeMessageHelper helper = new MimeMessageHelper(message, true);
 
         helper.setTo(email);
-        helper.setSubject("Import Report from AssetYug");
+        helper.setSubject(IMPORT_SUBJECT);
         helper.setText("Hey, We have attached import result below");
-        helper.addAttachment("CustomerAttachment.xlsx", new File("CustomerReport.xlsx"));
+        helper.addAttachment("CustomerAttachment.xlsx", new File(EXCEL_FILENAME));
 
         emailSender.send(message);
       }
       if (excelIndex == 0) {
         importHistoryDTO.setMessage("Import was Successfully Done");
-        try (FileOutputStream fileOut = new FileOutputStream("CustomerReport.xlsx")) {
+        try (FileOutputStream fileOut = new FileOutputStream(EXCEL_FILENAME)) {
           workbook.write(fileOut);
         }
         workbook.close();
@@ -1283,7 +1307,7 @@ public class CompanyCustomerAPI {
         MimeMessageHelper helper = new MimeMessageHelper(message, true);
 
         helper.setTo(email);
-        helper.setSubject("Import Report from AssetYug");
+        helper.setSubject(IMPORT_SUBJECT);
         helper.setText("Hey, Your Update was Successfully Done");
         //	            helper.addAttachment("ExcelAttachment.xlsx", new File("Report.xlsx"));
 
@@ -1306,70 +1330,18 @@ public class CompanyCustomerAPI {
 
   @GetMapping(value = "/statelist")
   public ResponseEntity<List<String>> statelist() {
-    List<String> stateList =
-        List.of(
-            "Alaska",
-            "Arizona",
-            "Arkansas",
-            "California",
-            "Colorado",
-            "Connecticut",
-            "Delaware",
-            "Florida",
-            "Georgia",
-            "Hawaii",
-            "Idaho",
-            "Illinois",
-            "Indiana",
-            "Iowa",
-            "Kansas",
-            "Kentucky",
-            "Louisiana",
-            "Maine",
-            "Maryland",
-            "Massachusetts",
-            "Michigan",
-            "Minnesota",
-            "Mississippi",
-            "Missouri",
-            "Montana",
-            "Nebraska",
-            "Nevada",
-            "New Hampshire",
-            "New Jersey",
-            "New Mexico",
-            "New York",
-            "North Carolina",
-            "North Dakota",
-            "Ohio",
-            "Oklahoma",
-            "Oregon",
-            "Pennsylvania",
-            "Rhode Island",
-            "South Carolina",
-            "South Dakota",
-            "Tennessee",
-            "Texas",
-            "Utah",
-            "Vermont",
-            "Virginia",
-            "Washington",
-            "West Virginia",
-            "Wisconsin",
-            "Wyoming");
-
-    return ResponseEntity.ok(stateList);
+    return ResponseEntity.ok(US_STATES);
   }
 
   @PostMapping(value = "/addCategory")
   public void addCategory(@RequestBody CategoryDTO categoryDTO, @RequestHeader Long companyId)
           throws Exception {
     System.out.println("Category===>" + categoryDTO);
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    //Optional<Subscription> subscriptionOptional =
+      //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
+  //  if (subscriptionOptional.isEmpty()) {
+    //  throw new NoSubscriptionError("No Active Subscription");
+//    }
     companyCustomerService.addCategory(categoryDTO);
   }
 
@@ -1394,11 +1366,11 @@ public class CompanyCustomerAPI {
   public void deleteCategory(@PathVariable String id, @RequestHeader Long companyId)
       throws NoSubscriptionError {
 
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    //Optional<Subscription> subscriptionOptional =
+      //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
+  //  if (subscriptionOptional.isEmpty()) {
+    //  throw new NoSubscriptionError("No Active Subscription");
+//    }
     companyCustomerService.deleteCategory(id);
   }
 
@@ -1412,11 +1384,58 @@ public class CompanyCustomerAPI {
   public void updateCategory(@RequestBody CategoryDTO categoryDTO, @RequestHeader Long companyId)
       throws NoSubscriptionError {
 
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    //Optional<Subscription> subscriptionOptional =
+      //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
+  //  if (subscriptionOptional.isEmpty()) {
+    //  throw new NoSubscriptionError("No Active Subscription");
+//    }
     companyCustomerService.updateCategory(categoryDTO);
   }
+
+  @GetMapping("/export-company-customer/{companyId}")
+    public ResponseEntity<byte[]> exportCompanyCustomers(@PathVariable Long companyId) throws IOException {
+        List<CompanyCustomer> customers = companyCustomerRepository.findByCompanyId(companyId);
+        List<CompanyCustomerExtraFieldName> extraFieldNames = extraFieldNameRepository.findByCompanyId(companyId);
+
+        Workbook workbook = new XSSFWorkbook();
+        Sheet sheet = workbook.createSheet("Customers");
+        Row header = sheet.createRow(0);
+        int col = 0;
+        // Add default headers
+        String[] defaultHeaders = {"ID", "Name", "Email", "Phone", "Status"};
+        for (String h : defaultHeaders) {
+            header.createCell(col++).setCellValue(h);
+        }
+        // Add extra field headers
+        for (CompanyCustomerExtraFieldName extraField : extraFieldNames) {
+            header.createCell(col++).setCellValue(extraField.getName());
+        }
+        int rowIdx = 1;
+        for (CompanyCustomer customer : customers) {
+            Row row = sheet.createRow(rowIdx++);
+            int c = 0;
+            row.createCell(c++).setCellValue(customer.getId());
+            row.createCell(c++).setCellValue(customer.getName());
+            row.createCell(c++).setCellValue(customer.getEmail());
+            row.createCell(c++).setCellValue(customer.getPhone());
+            row.createCell(c++).setCellValue(customer.getStatus());
+            // Fetch custom fields
+            List<CompanyCustomerExtraFields> extras = extraFieldsRepository.findByCompanyCustomerId(customer.getId());
+            Map<String, String> extraMap = new HashMap<>();
+            for (CompanyCustomerExtraFields ef : extras) {
+                extraMap.put(ef.getName(), ef.getValue());
+            }
+            for (CompanyCustomerExtraFieldName extraField : extraFieldNames) {
+                row.createCell(c++).setCellValue(extraMap.getOrDefault(extraField.getName(), ""));
+            }
+        }
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        workbook.write(bos);
+        workbook.close();
+        byte[] excelBytes = bos.toByteArray();
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=CompanyCustomerExport.xlsx")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(excelBytes);
+    }
 }

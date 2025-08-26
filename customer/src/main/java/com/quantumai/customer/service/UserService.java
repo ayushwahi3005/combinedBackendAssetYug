@@ -4,6 +4,7 @@ import com.google.firebase.auth.FirebaseAuthException;
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
 import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
+import com.quantumai.customer.exception.TheMailException;
 import com.quantumai.customer.exception.UserCannotDeletedException;
 import com.quantumai.customer.exception.UserException;
 import io.jsonwebtoken.Claims;
@@ -11,6 +12,10 @@ import java.util.List;
 import java.util.Map;
 
 public interface UserService {
+    /**
+     * Resend verification email to user if not yet verified
+     */
+    void resendVerificationEmail(String email, Long companyId) throws UserException, TheMailException;
 
   public void sendSimpleMessage(String to, String subject, String text);
 

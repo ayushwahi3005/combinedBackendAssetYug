@@ -7,11 +7,27 @@ import java.util.Optional;
 import com.quantumai.customer.entity.SubscriptionEnum;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
-public interface SubscriptionRepository extends MongoRepository<Subscription, String> {
+import java.time.LocalDate;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.quantumai.customer.dto.SubscriptionGrowthDTO;
+import org.springframework.stereotype.Repository;
+import java.util.List;
+
+@Repository
+public interface SubscriptionRepository extends MongoRepository<Subscription, String>, SubscriptionRepositoryCustom {
   List<Subscription> findAll();
 
   List<Subscription> findByCompanyId(Long companyId);
   Optional<Subscription> findByStripeSubscriptionId(String id);
 
   Optional<Subscription> findByCompanyIdAndStatus(Long companyId, SubscriptionEnum status);
+    
+  /**
+   * Retrieves subscription growth data between the specified dates.
+   * @param start The start date (inclusive)
+   * @param end The end date (inclusive)
+   * @return A list of SubscriptionGrowthDTO containing growth metrics
+   */
+  List<SubscriptionGrowthDTO> getSubscriptionGrowth(LocalDate start, LocalDate end);
 }

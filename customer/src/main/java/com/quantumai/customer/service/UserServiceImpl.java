@@ -31,6 +31,28 @@ import org.springframework.web.client.RestTemplate;
 @Slf4j
 public class UserServiceImpl implements UserService {
 
+    @Override
+    public void resendVerificationEmail(String email, Long companyId) throws UserException, TheMailException {
+        Optional<Users> userOpt = usersRepository.findByCompanyIdAndEmail(companyId, email);
+        if (userOpt.isEmpty()) {
+            throw new UserException("User not found");
+        }
+        Users user = userOpt.get();
+        if (user.getStatus() != StatusEnum.inActive) {
+            throw new UserException("User is already verified or active");
+        }
+        // Trigger Firebase to send the verification email
+        try {
+            // Firebase user lookup (optional, can be used for validation)
+            String link = FirebaseAuth.getInstance().generateEmailVerificationLink(user.getEmail());
+            // Optionally, send this link via your backend email for customization, but Firebase will send if configured
+            // For now, send using backend for audit/logging
+            sendSimpleMessage(user.getEmail(), "Verify your email", "Please verify your email using this link: " + link);
+        } catch (Exception e) {
+            throw new UserException("Failed to trigger Firebase verification email: " + e.getMessage());
+        }
+    }
+
   @Autowired private JavaMailSender emailSender;
   @Autowired JwtService jwtService;
 

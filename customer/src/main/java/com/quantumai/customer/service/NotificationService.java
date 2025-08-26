@@ -97,4 +97,29 @@ public class NotificationService {
         }));
         userNotificationRepository.saveAll(userNotificationList);
     }
+
+    public void sendNotificationToUser(String userEmail, Notification notification) {
+        // Sends notification to a specific user
+        notification.setNotificationType(NotificationType.USER);
+        Notification savedNotification = notificationRepository.save(notification);
+        
+        // Get customer details
+        Customer customer = customerRepository.findByEmail(userEmail).orElse(null);
+        if (customer != null) {
+            UserNotification userNotification = new UserNotification(
+                null, 
+                userEmail, 
+                savedNotification.getId(), 
+                customer.getCompanyId(), 
+                false, 
+                null, 
+                LocalDateTime.now(), 
+                savedNotification
+            );
+            userNotificationRepository.save(userNotification);
+            
+            List<UserNotification> myList = userNotificationRepositoryImpl.findRecentNotificationsWithDetails(userEmail);
+            simpMessagingTemplate.convertAndSend("/topic/user/" + userEmail + "/notifications", myList);
+        }
+    }
 }

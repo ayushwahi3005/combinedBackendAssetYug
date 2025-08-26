@@ -1,6 +1,10 @@
 package com.quantumai.customer.service;
 
+import com.quantumai.customer.dto.MrrDTO;
+import com.quantumai.customer.dto.RevenueTrendDTO;
+import com.quantumai.customer.dto.SubscriptionAnalyticsDTO;
 import com.quantumai.customer.dto.SubscriptionDTO;
+import com.quantumai.customer.dto.SubscriptionGrowthDTO;
 import com.quantumai.customer.entity.Payment;
 import com.quantumai.customer.entity.Plans;
 import com.quantumai.customer.entity.Subscription;
@@ -8,6 +12,7 @@ import com.quantumai.customer.entity.SubscriptionEnum;
 import com.quantumai.customer.repository.PaymentRepository;
 import com.quantumai.customer.repository.PlansRepository;
 import com.quantumai.customer.repository.SubscriptionRepository;
+import com.quantumai.customer.repository.SubscriptionRepositoryCustom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -16,18 +21,25 @@ import java.util.List;
 import java.util.Optional;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 @Service
 public class SubscriptionServiceImpl implements SubscriptionService {
 
   @Autowired private SubscriptionRepository subscriptionRepository;
+  
+  @Autowired
+  @Qualifier("subscriptionRepositoryImpl")
+  private SubscriptionRepositoryCustom subscriptionRepositoryCustom;
 
   @Autowired private PaymentRepository paymentRepository;
 
   @Autowired private PlansRepository plansRepository;
 
   @Autowired private PaymentService paymentService;
+
+  @Autowired private SubscriptionAnalyticsService subscriptionAnalyticsService;
 
   private ModelMapper modelMapper = new ModelMapper();
 
@@ -151,5 +163,67 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     if (subscription.isPresent()) {
       paymentService.startUpcomingSubscriptionStripe(companyId, companyName, email);
     }
+  }
+
+  @Override
+  public List<SubscriptionGrowthDTO> getSubscriptionGrowth(LocalDate start, LocalDate end) {
+    if (start == null || end == null) {
+      throw new IllegalArgumentException("Start date and end date cannot be null");
+    }
+    if (start.isAfter(end)) {
+      throw new IllegalArgumentException("Start date cannot be after end date");
+    }
+    
+    return subscriptionRepositoryCustom.getSubscriptionGrowth(start, end);
+  }
+  
+  @Override
+  public List<SubscriptionAnalyticsDTO> getSubscriptionAnalytics(LocalDate start, LocalDate end, 
+      SubscriptionAnalyticsDTO.TimePeriod period) {
+    if (start == null || end == null || period == null) {
+      throw new IllegalArgumentException("Start date, end date, and period cannot be null");
+    }
+    if (start.isAfter(end)) {
+      throw new IllegalArgumentException("Start date cannot be after end date");
+    }
+    
+    return subscriptionRepositoryCustom.getSubscriptionAnalytics(start, end, period);
+  }
+  
+  @Override
+  public double calculateChurnRate(LocalDate start, LocalDate end) {
+    if (start == null || end == null) {
+      throw new IllegalArgumentException("Start date and end date cannot be null");
+    }
+    if (start.isAfter(end)) {
+      throw new IllegalArgumentException("Start date cannot be after end date");
+    }
+    
+    return subscriptionRepositoryCustom.calculateChurnRate(start, end);
+  }
+  
+  @Override
+  public List<RevenueTrendDTO> getRevenueTrends(LocalDate start, LocalDate end, 
+      SubscriptionAnalyticsDTO.TimePeriod period) {
+    if (start == null || end == null || period == null) {
+      throw new IllegalArgumentException("Start date, end date, and period cannot be null");
+    }
+    if (start.isAfter(end)) {
+      throw new IllegalArgumentException("Start date cannot be after end date");
+    }
+    
+    return subscriptionRepositoryCustom.getRevenueTrends(start, end, period);
+  }
+  
+  @Override
+  public List<MrrDTO> getMrrTrend(LocalDate start, LocalDate end) {
+    if (start == null || end == null) {
+      throw new IllegalArgumentException("Start date and end date cannot be null");
+    }
+    if (start.isAfter(end)) {
+      throw new IllegalArgumentException("Start date cannot be after end date");
+    }
+    
+    return subscriptionRepositoryCustom.getMrrTrend(start, end);
   }
 }

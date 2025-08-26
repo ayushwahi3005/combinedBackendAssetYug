@@ -1,14 +1,18 @@
 package com.quantumai.customer.dto;
 
 import com.quantumai.customer.entity.StatusEnum;
+
+import lombok.AllArgsConstructor;
 import lombok.Data;
-import org.bson.types.ObjectId;
+import lombok.NoArgsConstructor;
 
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class BinDTO {
 
   String id;
-  ObjectId locationId;
+  String locationId;
   String locationName;
   String binNumber;
   private StatusEnum status;

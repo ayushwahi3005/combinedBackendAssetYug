@@ -26,6 +26,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.aggregation.ConvertOperators;
+import org.springframework.data.mongodb.core.aggregation.LookupOperation;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -94,6 +95,8 @@ public class CustomerServiceImpl implements CustomerService {
 
   @Autowired private CompanyCustomerCategoryIdGeneratorRepository companyCustomerCategoryIdGeneratorRepository;
 
+  @Autowired private TrialService trialService;
+
   @Override
   public BaseResponseDTO addCustomer(CustomerDTO customerDTO) throws Exception {
     // TODO Auto-generated method stub
@@ -107,16 +110,20 @@ public class CustomerServiceImpl implements CustomerService {
     Customer customer = modelMapper.map(customerDTO, Customer.class);
     customer.setRole("ADMIN");
     customer.setPassword(passwordEncoder.encode(customerDTO.getPassword()));
-    customerRepository.save(customer);
+    Customer savedCustomer = customerRepository.save(customer);
+    
+    // Initialize 15-day free trial for new customer
+    trialService.initializeTrial(savedCustomer.getEmail(), savedCustomer.getCompanyId());
+    
     BaseResponseDTO baseResponseDTO = new BaseResponseDTO();
     baseResponseDTO.setSucess(true);
-    baseResponseDTO.setMessage("User Successfully Created");
+    baseResponseDTO.setMessage("User Successfully Created with 15-day free trial");
 
-    Admin admin = new Admin();
-    admin.setEmail(customer.getEmail());
-    admin.setRole("ADMIN");
-    admin.setPassword(passwordEncoder.encode("admin"));
-    adminRepository.save(admin);
+    // Admin admin = new Admin();
+    // admin.setEmail(customer.getEmail());
+    // admin.setRole("ADMIN");
+    // admin.setPassword(passwordEncoder.encode("admin"));
+    // adminRepository.save(admin);
 
     // Add User In Customer as ADMIN
 
@@ -156,16 +163,20 @@ public class CustomerServiceImpl implements CustomerService {
 
   @Override
   public void updatePassword(String email, String otp, String password)
-      throws FirebaseAuthException, OTPException, NoEmailFoundException {
+      throws FirebaseAuthException, OTPException, NoEmailFoundException, SamePasswordException {
+        
     if (otp.equals(customerOtpStorage.get(email).getOtp())
         && customerOtpStorage
             .get(email)
             .getCreateTime()
-            .isAfter(LocalDateTime.now().minusMinutes(1))) {
+            .isAfter(LocalDateTime.now().minusMinutes(5))) {
+              // System.out.println("Inside OTP");
       Optional<Customer> customer = customerRepository.findByEmail(email);
       if (customer.isPresent()) {
         Customer myCustomer = customer.get();
-
+        if(passwordEncoder.matches(password, myCustomer.getPassword())){
+          throw new SamePasswordException("New password cannot be the same as the current password");
+        }
         myCustomer.setPassword(passwordEncoder.encode(password));
         customerRepository.save(myCustomer);
         //        log.info("Updated Password: {}",password);
@@ -186,8 +197,16 @@ public class CustomerServiceImpl implements CustomerService {
       }
 
     } else {
+      if(customerOtpStorage
+      .get(email)
+      .getCreateTime()
+      .isAfter(LocalDateTime.now().minusMinutes(5))){
+        throw new OTPException("OTP is wrong or expired");
+      }
+      else{
       customerOtpStorage.remove(email);
-      throw new OTPException("OTP is wrong");
+      throw new OTPException("OTP is wrong or expired");
+      }
     }
   }
 
@@ -558,6 +577,7 @@ public class CustomerServiceImpl implements CustomerService {
 
   @Override
   public Location addLocation(Location location) {
+    location.setId(null);
     location.setStatus(StatusEnum.active);
     return locationRepository.save(location);
   }
@@ -565,8 +585,9 @@ public class CustomerServiceImpl implements CustomerService {
   @Override
   public List<Location> getAllLocation(Long companyId) {
     List<Location> myLocations = new ArrayList<>();
-
+    
     myLocations = locationRepository.findByCompanyId(companyId);
+
     return myLocations;
   }
 
@@ -576,30 +597,57 @@ public class CustomerServiceImpl implements CustomerService {
   }
 
   @Override
-  public Bin addBin(Bin bin) {
-    bin.setStatus(StatusEnum.active);
-    return binRepository.save(bin);
+  public Bin addBin(BinDTO binDTO) {
+      Optional<Location> location = locationRepository.findById(binDTO.getLocationId());
+      if (location.isEmpty()) {
+          throw new RuntimeException("Location not found with id: " + binDTO.getLocationId());
+      }
+      
+      Bin bin = new Bin();
+      if(binDTO.getId()!=null){
+        bin.setId(binDTO.getId());
+      }
+      bin.setLocationId(location.get());
+      bin.setBinNumber(binDTO.getBinNumber());
+      bin.setCompanyId(binDTO.getCompanyId());
+      bin.setStatus(StatusEnum.active);
+      // System.out.println("==========------------------------------->"+binDTO.toString());
+      return binRepository.save(bin);
   }
 
   @Override
   public List<BinDTO> getAllBin(Long companyId) {
-    //    List<Bin> myBins = new ArrayList<>();
-    //
-    //    myBins = binRepository.findByCompanyId(companyId);
-    //    return myBins;
-    Aggregation agg =
-        Aggregation.newAggregation(
-            Aggregation.match(Criteria.where("companyId").is(companyId)),
-            Aggregation.lookup("location", "locationId", "_id", "locationDetails"),
-            Aggregation.unwind("locationDetails", true),
-            Aggregation.project("id", "locationId", "binNumber", "status", "companyId")
-                .and("locationDetails.name")
-                .as("locationName"));
+       List<Bin> myBins = new ArrayList<>();
+    
+       myBins = binRepository.findByCompanyId(companyId);
+       List<BinDTO> binDTOList=new ArrayList<>();
+       myBins.forEach(ele->{
+        BinDTO myBinDTO=new BinDTO(ele.getId(),ele.getLocationId().getId(),ele.getLocationId().getName(),ele.getBinNumber(),ele.getStatus(),ele.getCompanyId());
+        binDTOList.add(myBinDTO);
+       });
+       return binDTOList;
+    // First, convert the locationId to string in a $project stage
 
-    AggregationResults<BinDTO> results = mongoTemplate.aggregate(agg, "bin", BinDTO.class);
-    return results.getMappedResults();
+
+    // Aggregation agg =
+    //     Aggregation.newAggregation(
+    //         Aggregation.match(Criteria.where("companyId").is(companyId)),
+    //         Aggregation.project()
+    //             .and("id").as("id")
+    //             .and("binNumber").as("binNumber")
+    //             .and("status").as("status")
+    //             .and("companyId").as("companyId")
+    //             .and("locationId").as("locationId"),
+    //         Aggregation.lookup("location", "locationId", "_id", "locationDetails"),
+    //         Aggregation.unwind("locationDetails", true),
+    //         Aggregation.project("id", "binNumber", "status", "companyId", "locationId")
+    //             .and("locationDetails.name").as("locationName"));
+
+    // AggregationResults<BinDTO> results = mongoTemplate.aggregate(agg, "bin", BinDTO.class);
+    // return results.getMappedResults();
   }
 
+// ...
   @Override
   public List<LocationWithBinsDTO> getLocationsWithBins(Long companyId) {
     Aggregation agg =

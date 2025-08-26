@@ -43,6 +43,8 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/assets")
 @Slf4j
 public class AssetAPI {
+
+
   @Autowired private JavaMailSender emailSender;
 
   @Autowired private AssetsService assetsService;
@@ -73,6 +75,10 @@ public class AssetAPI {
 
   @Autowired NotificationService notificationService;
 
+  @Autowired private CompanyCustomerMandatoryFieldsRepository companyCustomerMandatoryFieldsRepository;
+
+  @Autowired private AssetMandatoryFieldsRepository assetMandatoryFieldsRepository;
+
   @GetMapping("/working")
   public String working() {
     return "Working";
@@ -92,11 +98,11 @@ public class AssetAPI {
 
   @PutMapping("/addassets")
   public void addAssets(@RequestBody AssetsDTO assestsDTO) throws NoSubscriptionError {
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(assestsDTO.getCompanyId(), SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    //Optional<Subscription> subscriptionOptional =
+    //    subscriptionRepository.findByCompanyIdAndStatus(assestsDTO.getCompanyId(), SubscriptionEnum.ACTIVE);
+  //  if (subscriptionOptional.isEmpty()) {
+ //     throw new NoSubscriptionError("No Active Subscription");
+//    }
 
     assetsService.addAssets(assestsDTO);
   }
@@ -104,11 +110,11 @@ public class AssetAPI {
   @PostMapping("/addNewAssets")
   public ResponseEntity<AssetsDTO> addNewAssets(@RequestBody AssetsDTO assestsDTO)
       throws NoSubscriptionError {
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(assestsDTO.getCompanyId(), SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    //Optional<Subscription> subscriptionOptional =
+    //    subscriptionRepository.findByCompanyIdAndStatus(assestsDTO.getCompanyId(), SubscriptionEnum.ACTIVE);
+  //  if (subscriptionOptional.isEmpty()) {
+ //     throw new NoSubscriptionError("No Active Subscription");
+//    }
     AssetsDTO assetsDTO = assetsService.addAssets(assestsDTO);
     return ResponseEntity.ok(assetsDTO);
   }
@@ -848,14 +854,19 @@ public void importFile(
         @PathVariable String email)
         throws ImportFileRowException, MessagingException, NoSubscriptionError {
 
-  Optional<Subscription> subscriptionOptional =
-          subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
+  // Optional<Subscription> subscriptionOptional =
+  //         subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
+  //         if (subscriptionOptional.isEmpty()) {
+  //           throw new NoSubscriptionError("No Active Subscription");
+  //         }
   List<Location> locationList = locationRepository.findByCompanyId(companyId);
   List<Bin> binList = binRepository.findByCompanyId(companyId);
 
-  if (subscriptionOptional.isEmpty()) {
-    throw new NoSubscriptionError("No Active Subscription");
-  }
+  List<AssetMandatoryFields> assetMandatoryList= assetMandatoryFieldsRepository.findByCompanyIdAndMandatory(companyId,true);
+  
+  List<String> mandatoryColumnList=assetMandatoryList.stream().map(ele->ele.getName().toLowerCase()).toList();
+  System.out.println("=================> MandatoryList----->"+mandatoryColumnList.toString());
+  
 
   // Parse columnMappings JSON into a map
   Map<String, String> columnMap = new HashMap<>();
@@ -890,8 +901,8 @@ public void importFile(
   try (InputStream inputStream = file.getInputStream();
        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
     totalCount = reader.lines().count();
-    if (totalCount > 5001) {
-      throw new ImportFileRowException("Import File cannot import more than 5000 rows");
+    if (totalCount > 1001) {
+      throw new ImportFileRowException("Import File cannot import more than 1000 rows");
     }
   } catch (IOException e) {
     e.printStackTrace();
@@ -955,9 +966,20 @@ public void importFile(
               assetsDTO.setName(row[j]);
               break;
             case "serialnumber":
+              if(mandatoryColumnList.contains("serialnumber")&&row[j].trim().isEmpty()){
+                errorDesc.append("Serial Number Mandatory");
+                errorFlag = 1;
+                break;
+              }
               assetsDTO.setSerialNumber(row[j]);
               break;
             case "category":
+              System.out.println("=====================---------------->>>>>"+mandatoryColumnList.contains("category")+" "+row[j].trim()+" "+row[j].trim().isEmpty()+" "+row[j].trim().isBlank());
+              if(mandatoryColumnList.contains("category")&&row[j].trim().isEmpty()){
+                errorDesc.append("Category is Mandatory");
+                errorFlag = 1;
+                break;
+              }
               List<AssetCategory> categoryList = assetCategoryRepository.findByCompanyId(companyId);
               String rowValue = row[j];
               if (!rowValue.trim().isBlank()) {
@@ -974,6 +996,11 @@ public void importFile(
               }
               break;
             case "customer":
+              if(mandatoryColumnList.contains("customer")&&row[j].trim().isEmpty()){
+                errorDesc.append("Customer is Mandatory");
+                errorFlag = 1;
+                break;
+              }
               CompanyCustomerDTO myCompanyCustomerDTO =
                       companyCustomerAPI.getCompanyCustomerByLocalId(row[j], companyId);
               if (myCompanyCustomerDTO == null) {
@@ -988,6 +1015,11 @@ public void importFile(
               }
               break;
             case "location":
+            if(mandatoryColumnList.contains("location")&&row[j].trim().isEmpty()){
+              errorDesc.append("Location is Mandatory");
+              errorFlag = 1;
+              break;
+            }
               String myLocation = row[j].trim();
               List<Location> selectedLocationList = locationList.stream()
                       .filter(loc -> loc.getName().equalsIgnoreCase(myLocation))
@@ -1273,11 +1305,11 @@ public void importFile(
           ImportFileRowException,
           NoSubscriptionError {
 
-    Optional<Subscription> subscriptionOptional =
-            subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    // Optional<Subscription> subscriptionOptional =
+    //         subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
+    // if (subscriptionOptional.isEmpty()) {
+    //   throw new NoSubscriptionError("No Active Subscription");
+    // }
     System.out.println("------||-------->" + columnMappings);
 
     List<Location> locationList = locationRepository.findByCompanyId(companyId);
@@ -1316,8 +1348,8 @@ public void importFile(
     try (InputStream inputStream = file.getInputStream();
          BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
       totalCount = reader.lines().count();
-      if (totalCount > 5001) {
-        throw new ImportFileRowException("Import File cannot import more than 5000 rows");
+      if (totalCount > 1001) {
+        throw new ImportFileRowException("Import File cannot import more than 1000 rows");
       }
     } catch (IOException e) {
       e.printStackTrace();
@@ -1621,12 +1653,12 @@ public void importFile(
   public void importFile(@RequestBody AssetImageDTO assetImageDTO) throws Exception {
     Optional<Assets> assetsOptional = assetsRepository.findById(assetImageDTO.getId());
     if (assetsOptional.isPresent()) {
-      Optional<Subscription> subscriptionOptional =
-          subscriptionRepository.findByCompanyIdAndStatus(
-              assetsOptional.get().getCompanyId(), SubscriptionEnum.ACTIVE);
-      if (subscriptionOptional.isEmpty()) {
-        throw new NoSubscriptionError("No Active Subscription");
-      }
+      // Optional<Subscription> subscriptionOptional =
+      //     subscriptionRepository.findByCompanyIdAndStatus(
+      //         assetsOptional.get().getCompanyId(), SubscriptionEnum.ACTIVE);
+      // if (subscriptionOptional.isEmpty()) {
+      //   throw new NoSubscriptionError("No Active Subscription");
+      // }
     }
 
     assetsService.addImage(assetImageDTO);
@@ -1636,12 +1668,12 @@ public void importFile(
   public void removeImage(@RequestBody String id) throws Exception {
     Optional<Assets> assetsOptional = assetsRepository.findById(id);
     if (assetsOptional.isPresent()) {
-      Optional<Subscription> subscriptionOptional =
-          subscriptionRepository.findByCompanyIdAndStatus(
-              assetsOptional.get().getCompanyId(), SubscriptionEnum.ACTIVE);
-      if (subscriptionOptional.isEmpty()) {
-        throw new NoSubscriptionError("No Active Subscription");
-      }
+      // Optional<Subscription> subscriptionOptional =
+      //     subscriptionRepository.findByCompanyIdAndStatus(
+      //         assetsOptional.get().getCompanyId(), SubscriptionEnum.ACTIVE);
+      // if (subscriptionOptional.isEmpty()) {
+      //   throw new NoSubscriptionError("No Active Subscription");
+      // }
     }
     assetsService.removeImage(id);
   }
@@ -1650,12 +1682,12 @@ public void importFile(
   public void removeAsset(@RequestBody String id) throws Exception {
     Optional<Assets> assetsOptional = assetsRepository.findById(id);
     if (assetsOptional.isPresent()) {
-      Optional<Subscription> subscriptionOptional =
-          subscriptionRepository.findByCompanyIdAndStatus(
-              assetsOptional.get().getCompanyId(), SubscriptionEnum.ACTIVE);
-      if (subscriptionOptional.isEmpty()) {
-        throw new NoSubscriptionError("No Active Subscription");
-      }
+      // Optional<Subscription> subscriptionOptional =
+      //     subscriptionRepository.findByCompanyIdAndStatus(
+      //         assetsOptional.get().getCompanyId(), SubscriptionEnum.ACTIVE);
+      // if (subscriptionOptional.isEmpty()) {
+      //   throw new NoSubscriptionError("No Active Subscription");
+      // }
     }
     assetsService.removeAsset(id);
   }
@@ -1667,11 +1699,11 @@ public void importFile(
 
   @PostMapping("/addfields")
   public void addNewFields(@RequestBody AssetExtraFieldsDTO extraFieldsDTO) throws Exception {
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(extraFieldsDTO.getCompanyId(), SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    // Optional<Subscription> subscriptionOptional =
+    //     subscriptionRepository.findByCompanyIdAndStatus(extraFieldsDTO.getCompanyId(), SubscriptionEnum.ACTIVE);
+    // if (subscriptionOptional.isEmpty()) {
+    //   throw new NoSubscriptionError("No Active Subscription");
+    // }
     assetsService.addExtraFields(extraFieldsDTO);
   }
 
@@ -1684,12 +1716,12 @@ public void importFile(
   public void deleteExtraField(@PathVariable String id) throws Exception {
     Optional<AssetExtraFields> extraFields = extraFieldsRepository.findById(id);
     if (extraFields.isPresent()) {
-      Optional<Subscription> subscriptionOptional =
-          subscriptionRepository.findByCompanyIdAndStatus(
-              extraFields.get().getCompanyId(), SubscriptionEnum.ACTIVE);
-      if (subscriptionOptional.isEmpty()) {
-        throw new NoSubscriptionError("No Active Subscription");
-      }
+      // Optional<Subscription> subscriptionOptional =
+      //     subscriptionRepository.findByCompanyIdAndStatus(
+      //         extraFields.get().getCompanyId(), SubscriptionEnum.ACTIVE);
+      // if (subscriptionOptional.isEmpty()) {
+      //   throw new NoSubscriptionError("No Active Subscription");
+      // }
     }
 
     assetsService.deleteExtraFields(id);
@@ -1705,11 +1737,11 @@ public void importFile(
   public void addExtraFieldName(@RequestBody AssetExtraFieldNameDTO extraFieldNameDTO)
       throws Exception {
 
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(extraFieldNameDTO.getCompanyId(), SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    // Optional<Subscription> subscriptionOptional =
+    //     subscriptionRepository.findByCompanyIdAndStatus(extraFieldNameDTO.getCompanyId(), SubscriptionEnum.ACTIVE);
+    // if (subscriptionOptional.isEmpty()) {
+    //   throw new NoSubscriptionError("No Active Subscription");
+    // }
     assetsService.addAssetExtraField(extraFieldNameDTO);
   }
 
@@ -1718,12 +1750,12 @@ public void importFile(
     // System.out.println("-----------------------api------------------------>"+id);
     Optional<AssetExtraFieldName> extraFieldNameOptional = extraFieldNameRepository.findById(id);
     if (extraFieldNameOptional.isPresent()) {
-      Optional<Subscription> subscriptionOptional =
-          subscriptionRepository.findByCompanyIdAndStatus(
-              extraFieldNameOptional.get().getCompanyId(), SubscriptionEnum.ACTIVE);
-      if (subscriptionOptional.isEmpty()) {
-        throw new NoSubscriptionError("No Active Subscription");
-      }
+      // Optional<Subscription> subscriptionOptional =
+      //     subscriptionRepository.findByCompanyIdAndStatus(
+      //         extraFieldNameOptional.get().getCompanyId(), SubscriptionEnum.ACTIVE);
+      // if (subscriptionOptional.isEmpty()) {
+      //   throw new NoSubscriptionError("No Active Subscription");
+      // }
     }
 
     assetsService.deleteAssetExtraField(id);
@@ -1736,11 +1768,11 @@ public void importFile(
 
   @PostMapping("/addCheckInOut")
   public void addCheckInOut(@RequestBody AssetCheckInDTO checkInDTO) throws NoSubscriptionError {
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(checkInDTO.getCompanyId(), SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    // Optional<Subscription> subscriptionOptional =
+    //     subscriptionRepository.findByCompanyIdAndStatus(checkInDTO.getCompanyId(), SubscriptionEnum.ACTIVE);
+    // if (subscriptionOptional.isEmpty()) {
+    //   throw new NoSubscriptionError("No Active Subscription");
+    // }
     assetsService.addCheckInOut(checkInDTO);
   }
 
@@ -1758,12 +1790,12 @@ public void importFile(
     // System.out.println("------------------------inside Multifile------------->");
     Optional<Assets> assetsOptional = assetsRepository.findById(assetId);
     if (assetsOptional.isPresent()) {
-      Optional<Subscription> subscriptionOptional =
-          subscriptionRepository.findByCompanyIdAndStatus(
-              assetsOptional.get().getCompanyId(), SubscriptionEnum.ACTIVE);
-      if (subscriptionOptional.isEmpty()) {
-        throw new NoSubscriptionError("No Active Subscription");
-      }
+      // Optional<Subscription> subscriptionOptional =
+      //     subscriptionRepository.findByCompanyIdAndStatus(
+      //         assetsOptional.get().getCompanyId(), SubscriptionEnum.ACTIVE);
+      // if (subscriptionOptional.isEmpty()) {
+      //   throw new NoSubscriptionError("No Active Subscription");
+      // }
     }
     String message = "";
     try {
@@ -1800,12 +1832,12 @@ public void importFile(
 
     Optional<Assets> assetsOptional = assetsRepository.findById(id);
     if (assetsOptional.isPresent()) {
-      Optional<Subscription> subscriptionOptional =
-          subscriptionRepository.findByCompanyIdAndStatus(
-              assetsOptional.get().getCompanyId(), SubscriptionEnum.ACTIVE);
-      if (subscriptionOptional.isEmpty()) {
-        throw new NoSubscriptionError("No Active Subscription");
-      }
+      // Optional<Subscription> subscriptionOptional =
+      //     subscriptionRepository.findByCompanyIdAndStatus(
+      //         assetsOptional.get().getCompanyId(), SubscriptionEnum.ACTIVE);
+      // if (subscriptionOptional.isEmpty()) {
+      //   throw new NoSubscriptionError("No Active Subscription");
+      // }
     }
     assetsService.deleteFile(id);
     //		return new ResponseEntity<>(assetFileDTO.getFile(),HttpStatus.OK);
@@ -1815,21 +1847,21 @@ public void importFile(
   @PostMapping("/mandatoryFields")
   public void mandatoryFields(@RequestBody AssetMandatoryFields mandatoryFields)
       throws NoSubscriptionError {
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(mandatoryFields.getCompanyId(), SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    // Optional<Subscription> subscriptionOptional =
+    //     subscriptionRepository.findByCompanyIdAndStatus(mandatoryFields.getCompanyId(), SubscriptionEnum.ACTIVE);
+    // if (subscriptionOptional.isEmpty()) {
+    //   throw new NoSubscriptionError("No Active Subscription");
+    // }
     assetsService.updateMandatoryFields(mandatoryFields);
   }
 
   @PostMapping("/showFields")
   public void showFields(@RequestBody AssetShowFields showFields) throws NoSubscriptionError {
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(showFields.getCompanyId(), SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    // Optional<Subscription> subscriptionOptional =
+    //     subscriptionRepository.findByCompanyIdAndStatus(showFields.getCompanyId(), SubscriptionEnum.ACTIVE);
+    // if (subscriptionOptional.isEmpty()) {
+    //   throw new NoSubscriptionError("No Active Subscription");
+    // }
     assetsService.updateShowFields(showFields);
   }
 
@@ -1914,12 +1946,12 @@ public void importFile(
     List<Assets> assetsList = assetsRepository.findByCustomerId(customerId);
     if (!assetsList.isEmpty()) {
 
-      Optional<Subscription> subscriptionOptional =
-          subscriptionRepository.findByCompanyIdAndStatus(
-              assetsList.get(0).getCompanyId(), SubscriptionEnum.ACTIVE);
-      if (subscriptionOptional.isEmpty()) {
-        throw new NoSubscriptionError("No Active Subscription");
-      }
+      // Optional<Subscription> subscriptionOptional =
+      //     subscriptionRepository.findByCompanyIdAndStatus(
+      //         assetsList.get(0).getCompanyId(), SubscriptionEnum.ACTIVE);
+      // if (subscriptionOptional.isEmpty()) {
+      //   throw new NoSubscriptionError("No Active Subscription");
+      // }
     }
 
     assetsService.updateAssetsWithInActive(customerId);
@@ -1979,11 +2011,11 @@ public void importFile(
   @PostMapping(value = "/addCategory")
   public void addCategory(@RequestBody CategoryDTO categoryDTO)
           throws Exception {
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(categoryDTO.getCompanyId(), SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    // Optional<Subscription> subscriptionOptional =
+    //     subscriptionRepository.findByCompanyIdAndStatus(categoryDTO.getCompanyId(), SubscriptionEnum.ACTIVE);
+    // if (subscriptionOptional.isEmpty()) {
+    //   throw new NoSubscriptionError("No Active Subscription");
+    // }
     assetsService.addCategory(categoryDTO);
   }
 
@@ -2012,12 +2044,12 @@ public void importFile(
   public void deleteCategory(@PathVariable String id) throws NoSubscriptionError {
     Optional<AssetCategory> assetCategory = assetCategoryRepository.findById(id);
     if (assetCategory.isPresent()) {
-      Optional<Subscription> subscriptionOptional =
-          subscriptionRepository.findByCompanyIdAndStatus(
-              assetCategory.get().getCompanyId(), SubscriptionEnum.ACTIVE);
-      if (subscriptionOptional.isEmpty()) {
-        throw new NoSubscriptionError("No Active Subscription");
-      }
+      // Optional<Subscription> subscriptionOptional =
+      //     subscriptionRepository.findByCompanyIdAndStatus(
+      //         assetCategory.get().getCompanyId(), SubscriptionEnum.ACTIVE);
+      // if (subscriptionOptional.isEmpty()) {
+      //   throw new NoSubscriptionError("No Active Subscription");
+      // }
     }
 
     assetsService.deleteCategory(id);
@@ -2025,11 +2057,11 @@ public void importFile(
 
   @PutMapping(value = "/updateCategory")
   public void updateCategory(@RequestBody CategoryDTO categoryDTO) throws NoSubscriptionError {
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(categoryDTO.getCompanyId(), SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    // Optional<Subscription> subscriptionOptional =
+    //     subscriptionRepository.findByCompanyIdAndStatus(categoryDTO.getCompanyId(), SubscriptionEnum.ACTIVE);
+    // if (subscriptionOptional.isEmpty()) {
+    //   throw new NoSubscriptionError("No Active Subscription");
+    // }
     assetsService.updateCategory(categoryDTO);
   }
 
@@ -2041,12 +2073,12 @@ public void importFile(
   @PostMapping(value = "/addAssetInspection")
   public void addAssetInspection(@RequestBody AssetCategoryInspection assetCategoryInspection)
       throws NoSubscriptionError {
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(
-            assetCategoryInspection.getCompanyId(), SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    // Optional<Subscription> subscriptionOptional =
+    //     subscriptionRepository.findByCompanyIdAndStatus(
+    //         assetCategoryInspection.getCompanyId(), SubscriptionEnum.ACTIVE);
+    // if (subscriptionOptional.isEmpty()) {
+    //   throw new NoSubscriptionError("No Active Subscription");
+    // }
     assetsService.addAssetInspection(assetCategoryInspection);
   }
 
@@ -2055,12 +2087,12 @@ public void importFile(
     Optional<AssetCategoryInspection> assetCategoryInspection =
         assetCategoryInspectionRepository.findById(id);
     if (assetCategoryInspection.isPresent()) {
-      Optional<Subscription> subscriptionOptional =
-          subscriptionRepository.findByCompanyIdAndStatus(
-              assetCategoryInspection.get().getCompanyId(), SubscriptionEnum.ACTIVE);
-      if (subscriptionOptional.isEmpty()) {
-        throw new NoSubscriptionError("No Active Subscription");
-      }
+      // Optional<Subscription> subscriptionOptional =
+      //     subscriptionRepository.findByCompanyIdAndStatus(
+      //         assetCategoryInspection.get().getCompanyId(), SubscriptionEnum.ACTIVE);
+      // if (subscriptionOptional.isEmpty()) {
+      //   throw new NoSubscriptionError("No Active Subscription");
+      // }
     }
 
     assetsService.deleteAssetInspection(id);
@@ -2094,12 +2126,12 @@ public void importFile(
       @RequestBody AssetCategoryInspectionInstance assetCategoryInspection)
       throws NoSubscriptionError {
 
-    Optional<Subscription> subscriptionOptional =
-        subscriptionRepository.findByCompanyIdAndStatus(
-            assetCategoryInspection.getCompanyId(), SubscriptionEnum.ACTIVE);
-    if (subscriptionOptional.isEmpty()) {
-      throw new NoSubscriptionError("No Active Subscription");
-    }
+    // Optional<Subscription> subscriptionOptional =
+    //     subscriptionRepository.findByCompanyIdAndStatus(
+    //         assetCategoryInspection.getCompanyId(), SubscriptionEnum.ACTIVE);
+    // if (subscriptionOptional.isEmpty()) {
+    //   throw new NoSubscriptionError("No Active Subscription");
+    // }
 
     assetsService.addAssetInspectionInstance(assetCategoryInspection);
   }
@@ -2122,7 +2154,7 @@ public void importFile(
   public Location getLocationForBin(Bin bin) {
     if (bin.getLocationId() != null) {
       return locationRepository
-              .findById(bin.getLocationId().toHexString()) // Convert ObjectId → String
+              .findById(bin.getLocationId().toString()) // Convert ObjectId → String
               .orElse(null);
     }
     return null;
@@ -2145,6 +2177,57 @@ public void importFile(
         return optLoc.map(Location::getName).orElse(null);
     }
 //    return assetsService.getAllAssetCategoryInspectionValues(companyId);
+  }
+
+  @GetMapping("/export-asset-xlsx/{companyId}")
+  public ResponseEntity<byte[]> exportAssetsXlsx(@PathVariable Long companyId) throws IOException {
+    List<Assets> assets = assetsRepository.findByCompanyId(companyId);
+    List<AssetExtraFieldName> extraFieldNames = extraFieldNameRepository.findByCompanyId(companyId);
+
+    Workbook workbook = new XSSFWorkbook();
+    Sheet sheet = workbook.createSheet("Assets");
+    Row header = sheet.createRow(0);
+    int col = 0;
+    // Add default headers
+    String[] defaultHeaders = {"ID", "Name", "AssetId", "Category", "Customer", "CustomerId", "Location", "Status"};
+    for (String h : defaultHeaders) {
+      header.createCell(col++).setCellValue(h);
+    }
+    // Add extra field headers
+    for (AssetExtraFieldName extraField : extraFieldNames) {
+      header.createCell(col++).setCellValue(extraField.getName());
+    }
+    int rowIdx = 1;
+    for (Assets asset : assets) {
+      Row row = sheet.createRow(rowIdx++);
+      int c = 0;
+      row.createCell(c++).setCellValue(asset.getId());
+      row.createCell(c++).setCellValue(asset.getName());
+      row.createCell(c++).setCellValue(asset.getAssetId() != null ? asset.getAssetId().toString() : "");
+      row.createCell(c++).setCellValue(asset.getCategory());
+      row.createCell(c++).setCellValue(asset.getCustomer());
+      row.createCell(c++).setCellValue(asset.getCustomerId());
+      row.createCell(c++).setCellValue(asset.getLocation());
+      row.createCell(c++).setCellValue(asset.getStatus());
+      // row.createCell(c++).setCellValue(asset.getUpdatedAt());
+      // Fetch custom fields
+      List<AssetExtraFields> extras = extraFieldsRepository.findByAssetId(asset.getId());
+      Map<String, String> extraMap = new HashMap<>();
+      for (AssetExtraFields ef : extras) {
+        extraMap.put(ef.getName(), ef.getValue());
+      }
+      for (AssetExtraFieldName extraField : extraFieldNames) {
+        row.createCell(c++).setCellValue(extraMap.getOrDefault(extraField.getName(), ""));
+      }
+    }
+    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+    workbook.write(bos);
+    workbook.close();
+    byte[] excelBytes = bos.toByteArray();
+    return ResponseEntity.ok()
+        .header("Content-Disposition", "attachment; filename=AssetExport.xlsx")
+        .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+        .body(excelBytes);
   }
 
   @GetMapping(value = "/export-asset/{companyId}")

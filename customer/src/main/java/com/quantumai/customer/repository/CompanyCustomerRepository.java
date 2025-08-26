@@ -10,6 +10,7 @@ public interface CompanyCustomerRepository extends MongoRepository<CompanyCustom
   public List<CompanyCustomer> findByCompanyId(Long id);
 
   public Optional<CompanyCustomer> findByCompanyCustomerId(Integer id);
+  public Optional<CompanyCustomer> findByEmailAndCompanyId(String email,Long companyId);
 
   public CompanyCustomer findByCompanyCustomerIdAndCompanyId(
       Integer companyCustomerid, Long companyId);

@@ -9,5 +9,7 @@ public interface AssetMandatoryFieldsRepository
     extends MongoRepository<AssetMandatoryFields, String> {
   public Optional<AssetMandatoryFields> findByNameAndCompanyId(String name, Long companyId);
 
+  public List<AssetMandatoryFields> findByCompanyIdAndMandatory(Long companyId, boolean mandatory);
+
   public List<AssetMandatoryFields> findByCompanyId(Long companyId);
 }

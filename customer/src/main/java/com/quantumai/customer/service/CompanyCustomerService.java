@@ -6,6 +6,7 @@ import com.quantumai.customer.entity.CompanyCustomerFile;
 import com.quantumai.customer.entity.CompanyCustomerMandatoryFields;
 import com.quantumai.customer.entity.CompanyCustomerShowFields;
 import com.quantumai.customer.exception.CategoryException;
+import com.quantumai.customer.exception.EmailAlreadyExistsException;
 import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
 import java.io.IOException;
 import java.util.List;
@@ -14,13 +15,13 @@ import org.springframework.web.multipart.MultipartFile;
 
 public interface CompanyCustomerService {
 
-  public CompanyCustomerDTO addCustomer(CompanyCustomerDTO companyCustomerDTO);
+  public CompanyCustomerDTO addCustomer(CompanyCustomerDTO companyCustomerDTO) throws EmailAlreadyExistsException;
 
   public CompanyCustomerDTO getCustomer(String id);
 
   public List<CompanyCustomerDTO> getAllCustomer(Long companyId);
 
-  public void updateCustomer(CompanyCustomerDTO companyCustomerDTO);
+  public void updateCustomer(CompanyCustomerDTO companyCustomerDTO) throws EmailAlreadyExistsException;
 
   public void deleteCustomer(String id);
 
