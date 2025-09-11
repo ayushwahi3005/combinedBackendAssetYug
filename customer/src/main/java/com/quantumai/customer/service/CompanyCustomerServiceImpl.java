@@ -717,15 +717,19 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
                       String myValue = map.get(key);
                       String expectedValue = value.toString();
                       String keyString = key.toString();
-                      if (!keyString.equals("companyId")
-                          && myValue != null
-                          && !value.toString().isEmpty()) {
-                        myValue = myValue.toLowerCase();
-                        if (!myValue.contains(expectedValue.toLowerCase())
-                            && !myValue.equals(expectedValue.toLowerCase())) {
-                          System.out.println("inside->" + myValue + " " + expectedValue);
-
-                          flag = 0;
+                      if (!keyString.equals("companyId") && value != null && !value.toString().isEmpty()) {
+                        myValue = myValue != null ? myValue.toLowerCase() : "";
+                        expectedValue = expectedValue.toLowerCase();
+                        
+                        // For status field, do an exact match
+                        if (keyString.equals("status")) {
+                            if (!myValue.equals(expectedValue)) {
+                                flag = 0;
+                            }
+                        } 
+                        // For other fields, use contains for partial matching
+                        else if (!myValue.contains(expectedValue)) {
+                            flag = 0;
                         }
                       }
                     }

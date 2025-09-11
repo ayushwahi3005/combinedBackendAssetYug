@@ -28,12 +28,22 @@ import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.aggregation.ConvertOperators;
 import org.springframework.data.mongodb.core.aggregation.LookupOperation;
 import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.bson.types.ObjectId;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+import com.quantumai.customer.entity.Location;
+import com.quantumai.customer.entity.Bin;
+import com.quantumai.customer.dto.SimpleBinDTO;
+import com.quantumai.customer.dto.LocationWithBinsDTO;
 
 @Service
 @Slf4j
@@ -576,12 +586,23 @@ public class CustomerServiceImpl implements CustomerService {
   }
 
   @Override
-  public Location addLocation(Location location) {
-    location.setId(null);
-    location.setStatus(StatusEnum.active);
+  public Location addLocation(Location location) throws LocationAlreadyPresentException {
+    // location.setId(null);
+    System.out.println(location);
+    if(locationRepository.findByCompanyIdAndName(location.getCompanyId(), location.getName()).isPresent()){
+      throw new LocationAlreadyPresentException("Location With Given Name Already Present");
+    }
+    // location.setStatus(StatusEnum.active);
     return locationRepository.save(location);
   }
-
+  @Override
+  public Location updateLocation(Location location){
+    // location.setId(null);
+    System.out.println(location);
+    
+    // location.setStatus(StatusEnum.active);
+    return locationRepository.save(location);
+  }
   @Override
   public List<Location> getAllLocation(Long companyId) {
     List<Location> myLocations = new ArrayList<>();
@@ -646,25 +667,45 @@ public class CustomerServiceImpl implements CustomerService {
     // AggregationResults<BinDTO> results = mongoTemplate.aggregate(agg, "bin", BinDTO.class);
     // return results.getMappedResults();
   }
-
 // ...
   @Override
   public List<LocationWithBinsDTO> getLocationsWithBins(Long companyId) {
-    Aggregation agg =
-        Aggregation.newAggregation(
-            Aggregation.match(Criteria.where("companyId").is(companyId)),
-            Aggregation.lookup(
-                "bin", "_id", "locationId", "bins"), // join from location._id to bin.locationId
-            Aggregation.project("name")
-                .and(ConvertOperators.ToString.toString("_id"))
-                .as("id")
-                .and("bins")
-                .as("bins"));
+    // First, get all locations for the company
+    List<Location> locations = mongoTemplate.find(
+        Query.query(Criteria.where("companyId").is(companyId)), 
+        Location.class
+    );
 
-    AggregationResults<LocationWithBinsDTO> results =
-        mongoTemplate.aggregate(agg, "location", LocationWithBinsDTO.class);
-
-    return results.getMappedResults();
+    List<LocationWithBinsDTO> result = new ArrayList<>();
+    
+    for (Location location : locations) {
+        // For each location, find its bins
+        List<Bin> bins = mongoTemplate.find(
+            Query.query(Criteria.where("locationId.$id").is(new ObjectId(location.getId()))
+                .and("companyId").is(companyId)),
+            Bin.class
+        );
+        
+        // Convert bins to SimpleBinDTO
+        List<SimpleBinDTO> binDTOs = bins.stream()
+            .map(bin -> {
+                SimpleBinDTO dto = new SimpleBinDTO();
+                dto.setId(bin.getId());
+                dto.setBinNumber(bin.getBinNumber());
+                return dto;
+            })
+            .collect(Collectors.toList());
+        
+        // Create LocationWithBinsDTO
+        LocationWithBinsDTO dto = new LocationWithBinsDTO();
+        dto.setId(location.getId());
+        dto.setName(location.getName());
+        dto.setBins(binDTOs);
+        
+        result.add(dto);
+    }
+    System.out.println("----------------.......-------->>>>"+result);
+    return result;
   }
 
   @Override
@@ -729,5 +770,25 @@ public class CustomerServiceImpl implements CustomerService {
       seqDoc.setCompanyId(companyId);
       companyCustomerCategoryIdGeneratorRepository.save(seqDoc);
     }
+  }
+
+  @Override
+  public Bin updateBin(BinDTO binDTO) {
+    // TODO Auto-generated method stub
+    Optional<Location> location = locationRepository.findById(binDTO.getLocationId());
+      if (location.isEmpty()) {
+          throw new RuntimeException("Location not found with id: " + binDTO.getLocationId());
+      }
+      
+      Bin bin = new Bin();
+      if(binDTO.getId()!=null){
+        bin.setId(binDTO.getId());
+      }
+      bin.setLocationId(location.get());
+      bin.setBinNumber(binDTO.getBinNumber());
+      bin.setCompanyId(binDTO.getCompanyId());
+      bin.setStatus(binDTO.getStatus());
+      // System.out.println("==========------------------------------->"+binDTO.toString());
+      return binRepository.save(bin);
   }
 }

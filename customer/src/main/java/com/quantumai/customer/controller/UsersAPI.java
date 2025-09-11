@@ -150,7 +150,7 @@ public class UsersAPI {
 
   @GetMapping(value = "/invite/getUser/{companyId}/{details}")
   public ResponseEntity<UsersDTO> getUsers(
-      @PathVariable Long companyId, @PathVariable String details) {
+      @PathVariable Long companyId, @PathVariable String details) throws UserException {
     Claims myDetails = userService.decodeDetails(details);
     UsersDTO user = userService.getUsers(companyId, myDetails.get("email").toString());
     return ResponseEntity.ok(user);
@@ -165,7 +165,7 @@ public class UsersAPI {
 
   @GetMapping(value = "/getUserDetails/{companyId}/{email}")
   public ResponseEntity<UsersDTO> getUserDetails(
-      @PathVariable Long companyId, @PathVariable String email) {
+      @PathVariable Long companyId, @PathVariable String email) throws UserException {
 
     UsersDTO UserDTO = userService.getUsers(companyId, email);
     return ResponseEntity.ok(UserDTO);
@@ -174,7 +174,7 @@ public class UsersAPI {
   @PutMapping(value = "/userDetails")
   public ResponseEntity<String> updateUserDetails(
       @RequestBody UsersDTO usersDTO, @RequestHeader String Authorization)
-      throws NoSubscriptionError {
+      throws NoSubscriptionError, UserException {
 
     String jwt = Authorization.substring(7);
     String userEmail = jwtService.extractUserEmail(jwt);

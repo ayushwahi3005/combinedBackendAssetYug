@@ -27,9 +27,9 @@ public interface UserService {
 
   public void registerUser(Users user) throws UserException;
 
-  public UsersDTO getUsers(Long companyId, String email);
+  public UsersDTO getUsers(Long companyId, String email) throws UserException;
 
-  public void updateUser(UsersDTO usersDTO);
+  public void updateUser(UsersDTO usersDTO) throws UserException;
 
   public List<UsersDTO> getAllUsersByRole(String role, Long companyId);
 

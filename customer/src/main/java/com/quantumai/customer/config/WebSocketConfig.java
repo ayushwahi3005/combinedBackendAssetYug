@@ -1,13 +1,12 @@
 package com.quantumai.customer.config;
 
 import com.quantumai.customer.entity.Customer;
-import com.quantumai.customer.entity.Users;
 import com.quantumai.customer.repository.CustomerRepository;
-import com.quantumai.customer.repository.UsersRepository;
 import com.quantumai.customer.security.JwtService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.lang.NonNull;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessagingException;
@@ -16,7 +15,6 @@ import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
@@ -28,35 +26,32 @@ import java.util.Optional;
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Autowired
-    JwtService jwtService;
+    private JwtService jwtService;
 
     @Autowired
-    UsersRepository usersRepository;
-
-    @Autowired
-    CustomerRepository customerRepository;
+    private CustomerRepository customerRepository;
 
     @Value("${allowed-origins}")
     private String allowedOrigins;
+
     @Override
-    public void registerStompEndpoints(StompEndpointRegistry registry) {
+    public void registerStompEndpoints(@NonNull StompEndpointRegistry registry) {
         registry.addEndpoint("/assetyug-notifications")
-                .setAllowedOrigins(allowedOrigins)
+                .setAllowedOrigins(allowedOrigins.split(","))
                 .withSockJS();
     }
 
     @Override
-    public void configureMessageBroker(MessageBrokerRegistry registry) {
+    public void configureMessageBroker(@NonNull MessageBrokerRegistry registry) {
         registry.enableSimpleBroker("/topic");
-//        registry.setApplicationDestinationPrefixes("/app");
-
+        registry.setApplicationDestinationPrefixes("/app");
     }
 
     @Override
-    public void configureClientInboundChannel(ChannelRegistration registration) {
+    public void configureClientInboundChannel(@NonNull ChannelRegistration registration) {
         registration.interceptors(new ChannelInterceptor() {
             @Override
-            public Message<?> preSend(Message<?> message, MessageChannel channel) {
+            public Message<?> preSend(@NonNull Message<?> message, @NonNull MessageChannel channel) {
                 StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
 
                 // Only validate token during CONNECT
@@ -76,34 +71,19 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                         throw new MessagingException("Invalid JWT token - no user email");
                     }
 
-                    // Find user in database (admin or customer)
+                    // Find user in database
                     Optional<Customer> userDetails = customerRepository.findByEmail(userEmail);
                     if (userDetails.isEmpty()) {
                         throw new MessagingException("User not found");
                     }
 
                     // Validate token against user details
-
-                    if (!jwtService.isTokenValid(jwt,userDetails.get())) {
+                    if (!jwtService.isTokenValid(jwt, userDetails.get())) {
                         throw new MessagingException("Invalid token for user");
                     }
-
-
                 }
                 return message;
             }
-
-//            private UserDetails findUserDetails(String userEmail) {
-//                // Check admin repository first
-//                Optional<Admin> admin = adminRepository.findByEmail(userEmail);
-//                if (admin.isPresent()) {
-//                    return admin.get();
-//                }
-//
-//                // Then check customer repository
-//                Optional<Customer> customer = customerRepository.findByEmail(userEmail);
-//                return customer.orElse(null);
-//            }
         });
     }
 }

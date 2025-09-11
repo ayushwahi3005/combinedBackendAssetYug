@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
+import com.quantumai.customer.exception.LocationAlreadyPresentException;
 import com.quantumai.customer.exception.NoEmailFoundException;
 import com.quantumai.customer.exception.OTPException;
 import com.quantumai.customer.service.ActiveSessionService;
@@ -241,9 +242,15 @@ public class CustomerAPI {
   }
 
   @PostMapping(value = "/addlocation")
-  public ResponseEntity<Location> addLocation(@RequestBody Location location) {
+  public ResponseEntity<Location> addLocation(@RequestBody Location location) throws LocationAlreadyPresentException {
     return ResponseEntity.ok(customerService.addLocation(location));
   }
+
+  @PutMapping(value = "/addlocation")
+  public ResponseEntity<Location> updateLocation(@RequestBody Location location)  {
+    return ResponseEntity.ok(customerService.updateLocation(location));
+  }
+  
 
   @GetMapping(value = "/getAllLocation/{companyId}")
   public ResponseEntity<List<Location>> getAllLocation(@PathVariable Long companyId) {
@@ -258,7 +265,13 @@ public class CustomerAPI {
   // -------------------------------------------------------
   @PostMapping(value = "/addbin")
   public ResponseEntity<Bin> addBin(@RequestBody BinDTO bindDto) {
+    System.out.println(bindDto.toString());
     return ResponseEntity.ok(customerService.addBin(bindDto));
+  }
+  @PutMapping(value = "/addbin")
+  public ResponseEntity<Bin> updateBin(@RequestBody BinDTO bindDto) {
+    System.out.println(bindDto.toString());
+    return ResponseEntity.ok(customerService.updateBin(bindDto));
   }
 
   @GetMapping(value = "/getAllBin/{companyId}")

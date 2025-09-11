@@ -138,4 +138,12 @@ public class ExceptionControllerAdvice {
     errorInfo.setErrorCode(HttpStatus.BAD_REQUEST.value());
     return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
   }
+
+  @ExceptionHandler(LocationAlreadyPresentException.class)
+  public ResponseEntity<ErrorInfo> LocationAlreadyPresentException(LocationAlreadyPresentException exception) {
+    ErrorInfo errorInfo = new ErrorInfo();
+    errorInfo.setErrorMessage("Location With Given Name Already Present");
+    errorInfo.setErrorCode(HttpStatus.BAD_REQUEST.value());
+    return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
+  }
 }

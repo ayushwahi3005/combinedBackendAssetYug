@@ -12,7 +12,9 @@ import com.quantumai.customer.entity.IdGenerator.CompanyPrimaryKeyTable;
 import com.quantumai.customer.exception.CategoryException;
 import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
 import com.quantumai.customer.repository.*;
-import com.quantumai.customer.repository.AssetFileRepository;
+
+import lombok.extern.slf4j.Slf4j;
+
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -25,6 +27,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
+@Slf4j
 public class AssetsServiceImpl implements AssetsService {
 
   @Autowired private AssetFileRepository assetFileRepository;
@@ -620,6 +623,99 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
+  public PaginatedResultDTO<String> getAllAssetDetailsWithLocationDetails(Long companyId,Object filter) {
+    Map<?, ?> filterMap = (Map<?, ?>) filter;
+
+      // Get all keys
+      Set<?> keys = filterMap.keySet();
+      Map<String, String> mapping = new HashMap<String, String>();
+
+      // Print keys or do something with them
+
+      for (Map.Entry<?, ?> entry : filterMap.entrySet()) {
+        Object key = entry.getKey();
+        Object value = entry.getValue();
+        //	                //System.out.println("Key: " + key + ", Value: " + value);
+        if (value != null) {
+          mapping.put(key.toString(), value.toString());
+        }
+      }
+      String location=mapping.get("location");
+    List<AssetExtraFieldName> extraFieldNameList =
+        extraFieldNameRepository.findByCompanyId(companyId);
+
+    List<Assets> assetList = assetsRepository.findByCompanyId(companyId);
+    Map<String, String> binIdToNameMap =
+        binRepository.findByCompanyId(companyId).stream()
+            .collect(Collectors.toMap(Bin::getId, Bin::getBinNumber));
+    Map<String, String> locationIdToNameMap =
+        locationRepository.findByCompanyId(companyId).stream()
+            .collect(Collectors.toMap(Location::getId, Location::getName));
+
+    List<String> mapList = new ArrayList<>();
+    // System.out.println("++++++++++++++++++++++++++>"+location);
+    if(location!=null&&!location.isEmpty()){
+      assetList=assetList.stream().filter((data)->{
+        return data.getLocation().equals(location);
+      }).collect(Collectors.toList());
+    }
+    assetList.stream()
+        .forEach(
+            (order) -> {
+              if (order.getLocation()!=null&&order.getLocation().startsWith("bin")) {
+                order.setLocation(binIdToNameMap.get(order.getLocation().substring(4)));
+              } else if (order.getLocation()!=null&&order.getLocation().startsWith("location")) {
+                order.setLocation(locationIdToNameMap.get(order.getLocation().substring(9)));
+              }
+              List<AssetExtraFields> extraFieldsList =
+                  extraFieldsRepository.findByAssetId(order.getId());
+              Map<String, String> m = new HashMap<>();
+              extraFieldNameList.stream()
+                  .forEach(
+                      (x) -> {
+                        m.put(x.getName(), "");
+                        extraFieldsList.stream()
+                            .forEach(
+                                (x1) -> {
+                                  m.put(x1.getName(), x1.getValue());
+                                });
+                      });
+              m.put("id", order.getId());
+              m.put("image", order.getImage());
+              m.put("email", order.getEmail());
+              m.put("name", order.getName());
+              m.put("assetId", order.getAssetId().toString());
+              m.put("companyId", order.getCompanyId().toString());
+              m.put("serialNumber", order.getSerialNumber());
+              m.put("category", order.getCategory());
+              m.put("customer", order.getCustomer());
+              m.put("customerId", order.getCustomerId());
+              m.put("location", order.getLocation());
+              m.put("status", order.getStatus());
+              m.put("updatedAt", order.getUpdatedAt());
+
+              //			if(order.getDueDate()!=null) m.put("dueDate",order.getDueDate().toString());
+              //			if(order.getLastUpdate()!=null)
+              // m.put("lastUpdate",order.getLastUpdate().toString());
+              //			if(order.getPriority()!=null) m.put("priority",order.getPriority().toString());
+              //			if(order.getStatus()!=null) m.put("status",order.getStatus().toString());
+              ObjectMapper objectMapper = new ObjectMapper();
+              try {
+                // Convert POJO to JSON string
+                String json = objectMapper.writeValueAsString(m);
+
+                mapList.add(json);
+                //	            System.out.print(json);
+                //	            System.out.print(m);
+
+              } catch (Exception e) {
+                e.printStackTrace();
+              }
+            });
+
+    return new PaginatedResultDTO<>(mapList, mapList.size());
+  }
+  @Override
   public PaginatedResultDTO<String> sortAssets(
       Long companyId, String field, Integer pageNumber, Integer pageSize) {
     System.out.println("--->" + field);
@@ -826,7 +922,8 @@ public class AssetsServiceImpl implements AssetsService {
     // TODO Auto-generated method stub
     List<String> filteredAssetsWithAllFields = new ArrayList<>();
     long totalPage = 0;
-    System.out.println("----searchData--->" + searchData + "---" + searchData.length());
+    // System.out.println("----searchData--->" + searchData + "---" + searchData.length());
+    log.info("Search Data: {}",searchData);
     //		 if(searchData=="null"){
     //			 searchData="";
     //		 }
@@ -856,9 +953,11 @@ public class AssetsServiceImpl implements AssetsService {
         }
       }
       PaginatedResultDTO<String> assetsWithAllFields =
-          getAllAssetDetails(Long.parseLong(mapping.get("companyId")));
-        System.out.println("=====================//////////////=====================>"+filterMap);
-        System.out.println("=====================//////////////=====================>"+assetsWithAllFields.getData());
+      getAllAssetDetailsWithLocationDetails(Long.parseLong(mapping.get("companyId")),filter);
+        // System.out.println("=====================//////////////=====================>"+filterMap);
+        log.info("FilterMap : {}",filterMap);
+        // System.out.println("=====================//////////////=====================>"+assetsWithAllFields.getData());
+        log.info("Assets With All Fields : {}",assetsWithAllFields.getData());
       filteredAssetsWithAllFields =
           assetsWithAllFields.getData().stream()
               .filter(
@@ -876,6 +975,7 @@ public class AssetsServiceImpl implements AssetsService {
                           String expectedValue = value.toString();
                           String keyString = key.toString();
                           if (!keyString.equals("companyId")
+                          && !keyString.equals("location")
                               && myValue != null
                               && value != null
                               && !value.toString().isEmpty()) {
@@ -917,6 +1017,23 @@ public class AssetsServiceImpl implements AssetsService {
               .collect(Collectors.toList());
 
       //	            Sorting if it is enabled
+             
+  //     Map<String, String> binIdToNameMap =
+  //     binRepository.findByCompanyId(Long.parseLong(mapping.get("companyId"))).stream()
+  //         .collect(Collectors.toMap(Bin::getId, Bin::getBinNumber));
+  // Map<String, String> locationIdToNameMap =
+  //     locationRepository.findByCompanyId(Long.parseLong(mapping.get("companyId"))).stream()
+  //         .collect(Collectors.toMap(Location::getId, Location::getName));
+
+          // filteredAssetsWithAllFields.stream()
+          //   .forEach(
+          //     (order) -> {
+          //       if (order.getLocation()!=null&&order.getLocation().startsWith("bin")) {
+          //         order.setLocation(binIdToNameMap.get(order.getLocation().substring(4)));
+          //       } else if (order.getLocation()!=null&&order.getLocation().startsWith("location")) {
+          //         order.setLocation(locationIdToNameMap.get(order.getLocation().substring(9)));
+          //       }
+          // });
 
       System.out.println("Sort-" + sortField);
       System.out.println("Search-" + searchData);

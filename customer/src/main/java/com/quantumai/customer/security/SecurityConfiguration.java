@@ -56,6 +56,7 @@ public class SecurityConfiguration {
                     "/customer/sentResetOTP",
                     "/customer/updatePassword",
                     "/assetyug-notifications/**",
+                     "/invitation/**",
                     "/topic/**",
                     "/stripe/*",
                     "/app/**")
@@ -99,8 +100,8 @@ public class SecurityConfiguration {
   }
 
 
-  @Bean
-  public SessionRegistry sessionRegistry() {
-    return new SessionRegistryImpl();
-  }
+  // @Bean
+  // public SessionRegistry sessionRegistry() {
+  //   return new SessionRegistryImpl();
+  // }
 }

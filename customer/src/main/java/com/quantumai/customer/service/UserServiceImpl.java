@@ -25,7 +25,9 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
+import com.quantumai.customer.entity.StatusEnum;
 
 @Service
 @Slf4j
@@ -133,10 +135,13 @@ public class UserServiceImpl implements UserService {
   }
 
   @Override
+  @Transactional
   public void registerUser(Users user) throws UserException {
-    // TODO Auto-generated method stub
-    Optional<Users> OptionalUser =
-        usersRepository.findByCompanyIdAndEmail(user.getCompanyId(), user.getEmail());
+    // Check if user exists and is not already active
+    Optional<Users> OptionalUser = usersRepository.findByCompanyIdAndEmail(user.getCompanyId(), user.getEmail());
+    if (OptionalUser.isPresent() && OptionalUser.get().getStatus() == StatusEnum.active) {
+      throw new UserException("User with this email is already registered and active");
+    }
     Boolean exists = customerRepository.existsByEmail(user.getEmail());
 
     if ((!exists) && OptionalUser.isEmpty()) {
@@ -147,24 +152,45 @@ public class UserServiceImpl implements UserService {
   }
 
   @Override
-  public UsersDTO getUsers(Long companyId, String email) {
+  public UsersDTO getUsers(Long companyId, String email) throws UserException {
     // TODO Auto-generated method stub
     Optional<Users> Optionaluser = usersRepository.findByCompanyIdAndEmail(companyId, email);
-    UsersDTO usersDTO = modelMapper.map(Optionaluser.get(), UsersDTO.class);
+    if (Optionaluser.isEmpty()) {
+      throw new UserException("User not found");
+    }
+    Users user = Optionaluser.get();
+    // If user is already active, the token should be considered used
+    if (user.getStatus() == StatusEnum.active) {
+      throw new UserException("This invitation link has already been used");
+    }
+    UsersDTO usersDTO = modelMapper.map(user, UsersDTO.class);
     return usersDTO;
   }
 
   @Override
-  public void updateUser(UsersDTO usersDTO) {
+  @Transactional
+  public void updateUser(UsersDTO usersDTO) throws UserException {
     Optional<Users> optionaluser =
         usersRepository.findByCompanyIdAndEmail(usersDTO.getCompanyId(), usersDTO.getEmail());
-    Users users = modelMapper.map(usersDTO, Users.class);
-    optionaluser.ifPresent(
-        value -> {
-          users.setId(value.getId());
-          users.setEmail(value.getEmail());
-        });
-    usersRepository.save(users);
+    
+    if (optionaluser.isEmpty()) {
+      throw new UserException("User not found");
+    }
+    
+    Users existingUser = optionaluser.get();
+    
+    // If this is a password update (activating the account)
+    if (usersDTO.getPassword() != null && !usersDTO.getPassword().isEmpty()) {
+      // Encode the new password
+      usersDTO.setPassword(passwordEncoder.encode(usersDTO.getPassword()));
+      // Set status to active when password is set
+      usersDTO.setStatus(StatusEnum.active);
+      // The token used for signup is now invalidated by the status change
+    }
+    
+    // Map non-null fields from DTO to existing user
+    modelMapper.map(usersDTO, existingUser);
+    usersRepository.save(existingUser);
   }
 
   @Override

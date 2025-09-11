@@ -76,6 +76,8 @@ public interface AssetsService {
 
   public PaginatedResultDTO<String> getAllAssetDetails(Long companyId);
 
+  public PaginatedResultDTO<String> getAllAssetDetailsWithLocationDetails(Long companyId,Object filter);
+
   public PaginatedResultDTO<String> sortAssets(
       Long companyId, String field, Integer pageNumber, Integer pageSize);
 

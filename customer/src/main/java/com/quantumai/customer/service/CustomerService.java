@@ -18,6 +18,7 @@ public interface CustomerService {
   public void updatePassword(String email, String otp, String password)
       throws FirebaseAuthException, OTPException, NoEmailFoundException, SamePasswordException;
 
+
   public Boolean checkCustomer(String email) throws Exception;
 
   public CustomerSubscribedDTO getCustomerSubscription(String email) throws NoSubscriptionError;
@@ -56,13 +57,17 @@ public interface CustomerService {
 
   public CustomRoleDTO roleAndPermissionByName(Long companyId, String name);
 
-  public Location addLocation(Location location);
+  public Location addLocation(Location location) throws LocationAlreadyPresentException;
+
+  public Location updateLocation(Location location);
 
   public List<Location> getAllLocation(Long companyId);
 
   public void deleteLocation(String id);
 
   public Bin addBin(BinDTO bin);
+
+  public Bin updateBin(BinDTO bin);
 
   public List<BinDTO> getAllBin(Long companyId);
 
