@@ -52,6 +52,6 @@ jobs:
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
           task-definition: ./customer/ecs-task-def.json
-          service: assetyug-service
-          cluster: assetyug-cluster
+          service: asset-service-ecs-fargate-lb
+          cluster: Assetyug-Server-Cluster
           wait-for-service-stability: true
