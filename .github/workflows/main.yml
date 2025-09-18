@@ -51,7 +51,7 @@ jobs:
       - name: Deploy to ECS
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
-          task-definition: ecs-task-def.json
+          task-definition: ./customer/ecs-task-def.json
           service: assetyug-service
           cluster: assetyug-cluster
           wait-for-service-stability: true
