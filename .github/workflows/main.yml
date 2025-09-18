@@ -43,7 +43,7 @@ jobs:
       - name: Build, Tag and Push Docker image
         run: |
           IMAGE_URI=122610523600.dkr.ecr.us-east-1.amazonaws.com/assetyug-repository:latest
-          docker build -t $IMAGE_URI .
+          docker build -t $IMAGE_URI ./customer
           docker push $IMAGE_URI
           echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
 
