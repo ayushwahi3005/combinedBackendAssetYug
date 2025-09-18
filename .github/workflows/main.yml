@@ -9,6 +9,15 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
+    env:
+        MONGO_URI: ${{ secrets.MONGO_URI }}
+        MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+        MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+        STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+        STRIPE_WEBHOOK_ENDPOINT: ${{ secrets.STRIPE_WEBHOOK_ENDPOINT }}
+        JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+        FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
     steps:
       # 1️⃣ Checkout the repo
       - name: Checkout code
