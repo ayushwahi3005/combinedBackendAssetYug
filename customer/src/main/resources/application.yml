@@ -1,0 +1,19 @@
+application:
+  security:
+    jwt:
+      secret-key: ${JWT_SECRET_KEY}
+      expiration: 86400000
+      refresh-token:
+        expiration: 604800000
+
+stripe:
+  secret:
+    key: ${STRIPE_SECRET_KEY}
+  webhook:
+    endpoint: ${STRIPE_WEBHOOK_ENDPOINT}
+
+logging:
+  level:
+    org:
+      springframework:
+        security: DEBUG

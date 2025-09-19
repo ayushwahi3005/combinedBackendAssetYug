@@ -22,7 +22,21 @@
           "name": "assetyug-8080"
         }
       ],
-      "environment": [],
+      "environment": [
+        { "name": "MONGO_URI", "value": "${MONGO_URI}" },
+        { "name": "MAIL_USERNAME", "value": "${MAIL_USERNAME}" },
+        { "name": "MAIL_PASSWORD", "value": "${MAIL_PASSWORD}" },
+        { "name": "STRIPE_SECRET_KEY", "value": "${STRIPE_SECRET_KEY}" },
+        { "name": "STRIPE_WEBHOOK_ENDPOINT", "value": "${STRIPE_WEBHOOK_ENDPOINT}" },
+        { "name": "JWT_SECRET_KEY", "value": "${JWT_SECRET_KEY}" },
+        { "name": "FIREBASE_SERVICE_ACCOUNT", "value": "${FIREBASE_SERVICE_ACCOUNT}" },
+        { "name": "FIREBASE_PROJECT_ID", "value": "${FIREBASE_PROJECT_ID}" },
+        { "name": "FIREBASE_PRIVATE_KEY_ID", "value": "${FIREBASE_PRIVATE_KEY_ID}" },
+        { "name": "FIREBASE_PRIVATE_KEY", "value": "${FIREBASE_PRIVATE_KEY}" },
+        { "name": "FIREBASE_CLIENT_EMAIL", "value": "${FIREBASE_CLIENT_EMAIL}" },
+        { "name": "FIREBASE_CLIENT_ID", "value": "${FIREBASE_CLIENT_ID}" },
+        { "name": "FIREBASE_CLIENT_X509_CERT_URL", "value": "${FIREBASE_CLIENT_X509_CERT_URL}" }
+      ],
       "mountPoints": [],
       "volumesFrom": [],
       "systemControls": [],
