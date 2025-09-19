@@ -12,11 +12,13 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
+
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.nio.charset.StandardCharsets;
-import java.io.FileOutputStream;
-import java.io.FileInputStream;
+
 
 @EnableScheduling
 @SpringBootApplication
@@ -28,18 +30,27 @@ public class CustomerApplication {
 
     SpringApplication.run(CustomerApplication.class, args);
 
-    String json = Files.readString(Paths.get("upkeep.json"));
-// FOR PROD
-        json = json.replace("${FIREBASE_PROJECT_ID}", System.getenv("FIREBASE_PROJECT_ID"))
-                   .replace("${FIREBASE_PRIVATE_KEY_ID}", System.getenv("FIREBASE_PRIVATE_KEY_ID"))
-                   .replace("${FIREBASE_PRIVATE_KEY}", System.getenv("FIREBASE_PRIVATE_KEY").replace("\\n", "\n"))
-                   .replace("${FIREBASE_CLIENT_EMAIL}", System.getenv("FIREBASE_CLIENT_EMAIL"))
-                   .replace("${FIREBASE_CLIENT_ID}", System.getenv("FIREBASE_CLIENT_ID"))
-                   .replace("${FIREBASE_CLIENT_X509_CERT_URL}", System.getenv("FIREBASE_CLIENT_X509_CERT_URL"));
 
-        try (FileOutputStream out = new FileOutputStream("upkeep_resolved.json")) {
-            out.write(json.getBytes(StandardCharsets.UTF_8));
-        }
+      try {
+          String json = Files.readString(Paths.get("upkeep.json"));
+
+// FOR PROD
+          json = json.replace("${FIREBASE_PROJECT_ID}", System.getenv("FIREBASE_PROJECT_ID"))
+                  .replace("${FIREBASE_PRIVATE_KEY_ID}", System.getenv("FIREBASE_PRIVATE_KEY_ID"))
+                  .replace("${FIREBASE_PRIVATE_KEY}", System.getenv("FIREBASE_PRIVATE_KEY").replace("\\n", "\n"))
+                  .replace("${FIREBASE_CLIENT_EMAIL}", System.getenv("FIREBASE_CLIENT_EMAIL"))
+                  .replace("${FIREBASE_CLIENT_ID}", System.getenv("FIREBASE_CLIENT_ID"))
+                  .replace("${FIREBASE_CLIENT_X509_CERT_URL}", System.getenv("FIREBASE_CLIENT_X509_CERT_URL"));
+
+          try (FileOutputStream out = new FileOutputStream("upkeep_resolved.json")) {
+              out.write(json.getBytes(StandardCharsets.UTF_8));
+          } catch (IOException e) {
+
+          }
+      }
+      catch (IOException e){
+          System.out.println(e);
+      }
        
     try (FileInputStream serviceAccount = new FileInputStream("upkeep_resolved.json")) {
             FirebaseOptions options = FirebaseOptions.builder()
