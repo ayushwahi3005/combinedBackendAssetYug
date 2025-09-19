@@ -31,7 +31,7 @@ jobs:
       JWT_EXPIRATION: ${{ secrets.JWT_EXPIRATION }}
       REFRESH_TOKEN_EXPIRATION: ${{ secrets.REFRESH_TOKEN_EXPIRATION }}
 
-      # Firebase
+      # Firebase (JSON fields)
       FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
       FIREBASE_PRIVATE_KEY_ID: ${{ secrets.FIREBASE_PRIVATE_KEY_ID }}
       FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
@@ -77,20 +77,15 @@ jobs:
           docker push $IMAGE_URI
           echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
 
-      # 7️⃣ Replace placeholders in ECS task definition
-      - name: Inject secrets into ECS task definition
+      # 7️⃣ Replace secrets in ECS task definition
+      - name: Substitute secrets into ECS task definition
         run: |
-          sed -i "s|\${SPRING_DATA_MONGODB_URI}|${SPRING_DATA_MONGODB_URI}|g" ./customer/ecs-task-def.json
-          sed -i "s|\${ALLOWED_ORIGINS}|${ALLOWED_ORIGINS}|g" ./customer/ecs-task-def.json
-          sed -i "s|\${SPRING_MAIL_HOST}|${SPRING_MAIL_HOST}|g" ./customer/ecs-task-def.json
-          sed -i "s|\${SPRING_MAIL_PORT}|${SPRING_MAIL_PORT}|g" ./customer/ecs-task-def.json
-          sed -i "s|\${SPRING_MAIL_USERNAME}|${SPRING_MAIL_USERNAME}|g" ./customer/ecs-task-def.json
-          sed -i "s|\${SPRING_MAIL_PASSWORD}|${SPRING_MAIL_PASSWORD}|g" ./customer/ecs-task-def.json
+          sed -i "s|\${MONGO_URI}|${SPRING_DATA_MONGODB_URI}|g" ./customer/ecs-task-def.json
+          sed -i "s|\${MAIL_USERNAME}|${SPRING_MAIL_USERNAME}|g" ./customer/ecs-task-def.json
+          sed -i "s|\${MAIL_PASSWORD}|${SPRING_MAIL_PASSWORD}|g" ./customer/ecs-task-def.json
           sed -i "s|\${STRIPE_SECRET_KEY}|${STRIPE_SECRET_KEY}|g" ./customer/ecs-task-def.json
           sed -i "s|\${STRIPE_WEBHOOK_ENDPOINT}|${STRIPE_WEBHOOK_ENDPOINT}|g" ./customer/ecs-task-def.json
           sed -i "s|\${JWT_SECRET_KEY}|${JWT_SECRET_KEY}|g" ./customer/ecs-task-def.json
-          sed -i "s|\${JWT_EXPIRATION}|${JWT_EXPIRATION}|g" ./customer/ecs-task-def.json
-          sed -i "s|\${REFRESH_TOKEN_EXPIRATION}|${REFRESH_TOKEN_EXPIRATION}|g" ./customer/ecs-task-def.json
           sed -i "s|\${FIREBASE_PROJECT_ID}|${FIREBASE_PROJECT_ID}|g" ./customer/ecs-task-def.json
           sed -i "s|\${FIREBASE_PRIVATE_KEY_ID}|${FIREBASE_PRIVATE_KEY_ID}|g" ./customer/ecs-task-def.json
           sed -i "s|\${FIREBASE_PRIVATE_KEY}|${FIREBASE_PRIVATE_KEY}|g" ./customer/ecs-task-def.json
