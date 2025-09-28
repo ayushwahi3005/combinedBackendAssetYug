@@ -2,6 +2,8 @@ package com.quantumai.customer.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.quantumai.customer.entity.*;
 import com.quantumai.customer.repository.CustomerStripeDetailsRepository;
 import com.quantumai.customer.repository.PaymentRepository;
@@ -9,6 +11,7 @@ import com.quantumai.customer.repository.SubscriptionRepository;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Event;
 import com.stripe.model.Invoice;
+import com.stripe.model.PaymentIntent;
 import com.stripe.net.Webhook;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -53,9 +57,10 @@ public class StripeWebhookController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid signature");
         }
         log.info("EVENT------->"+event.getType());
+
         // Handle invoice.payment_succeeded (used for both subscription creation and renewal)
         if ("invoice.payment_succeeded".equals(event.getType())) {
-            log.info("------------------------>Inside Payment Succeeded");
+            log.info("------------------------>Inside Payment Succeeded. New Subscription");
             log.info("------------------------>Object {}",event.getObject());
 //            log.info("------------------------>Data {}",event.getData().toString());
 //            try {
@@ -96,14 +101,20 @@ public class StripeWebhookController {
 //                    log.info("optionalStripeDetail->: {}",optionalStripeDetail.isPresent());
 
                         log.info("Inside optionalStripeDetail Present");
-                        Optional<Subscription> optionalSubscription=subscriptionRepository.findByStripeSubscriptionId(subscriptionId);
+                        List<Subscription> subscriptionList=subscriptionRepository.findByStripeSubscriptionId(subscriptionId);
                         Optional <Payment> optionalPayment=paymentRepository.findByPaymentIntentId(paymentIntent);
-                        if(optionalSubscription.isPresent()){
-                            Subscription subscription=optionalSubscription.get();
-                            subscription.setStatus(SubscriptionEnum.ACTIVE);
+                        Optional<Subscription> optionalSubscriptionActive=subscriptionList.stream().filter((data)->data.getStatus().equals(SubscriptionEnum.PENDING)).findFirst();
 
-                            subscriptionRepository.save(subscription);
-                            log.info("Webhook Subscription Created And Subscription for Company {} is Changed to Active",subscription.getCompanyId());
+                        if(optionalSubscriptionActive.isPresent()){
+                            Subscription subscription=optionalSubscriptionActive.get();
+                            Optional<Subscription> currActiveSubscription=subscriptionRepository.findByCompanyIdAndStatus(subscription.getCompanyId(),SubscriptionEnum.ACTIVE);
+                            if(currActiveSubscription.isEmpty()) {
+                                subscription.setStatus(SubscriptionEnum.ACTIVE);
+                                subscriptionRepository.save(subscription);
+                                log.info("Webhook Subscription Created And Subscription for Company {} is Changed to Active",subscription.getCompanyId());
+                            }
+
+
                         }
                         if(optionalPayment.isPresent()){
                             Payment myPayment=optionalPayment.get();
@@ -116,6 +127,7 @@ public class StripeWebhookController {
 
                 } else if ("subscription_cycle".equals(billingReason)) {
                     // RENEWAL payment for existing subscription
+                    log.info("------->Subscription Cycle New Cycle update");
                     // TODO: Update your database, extend subscription, notify user, etc.
                         /// ////////////
                         //Since it is subscription cycle no explicit payment is being added
@@ -127,15 +139,45 @@ public class StripeWebhookController {
 //                            log.info("Webhook Subscription Billing Updated And Subscription for Company {} is Changed to Active",subscription.getCompanyId());
 //                            subscriptionRepository.save(subscription);
 //                        }
-                        Optional<Subscription> optionalSubscription=subscriptionRepository.findByStripeSubscriptionId(subscriptionId);
+                        List<Subscription> subscriptionlist=subscriptionRepository.findByStripeSubscriptionId(subscriptionId);
                         Optional <Payment> optionalPayment=paymentRepository.findByPaymentIntentId(paymentIntent);
-                        if(optionalSubscription.isPresent()){
-                            Subscription subscription=optionalSubscription.get();
-                            subscription.setStatus(SubscriptionEnum.ACTIVE);
+                        Optional<Subscription> activeSubscription=subscriptionlist.stream().filter((data)->data.getStatus().equals(SubscriptionEnum.ACTIVE)).findFirst();
+                        Optional<Subscription> upcomingSubscription=subscriptionlist.stream().filter((data)->data.getStatus().equals(SubscriptionEnum.UPCOMING)).findFirst();
 
-                            subscriptionRepository.save(subscription);
-                            log.info("Webhook Subscription Billing Updated And Subscription for Company {} is Changed to Active",subscription.getCompanyId());
+                    if(upcomingSubscription.isPresent()){
+                            log.info("Subscription Found in Cycle Update");
+                            Subscription upcomSubscription=upcomingSubscription.get();
+                        upcomSubscription.setStatus(SubscriptionEnum.ACTIVE);
+
+                            subscriptionRepository.save(upcomSubscription);
+
+
+                        Subscription currSubscription=activeSubscription.get();
+                        currSubscription.setStatus(SubscriptionEnum.EXPIRED);
+
+                        subscriptionRepository.save(currSubscription);
+
+
+                            log.info("Webhook Subscription With Upcoming Billing Changed And Subscription for Company {} is Changed to Active",currSubscription.getCompanyId());
                         }
+                    else{
+                        Subscription currSubscription=activeSubscription.get();
+                        currSubscription.setStatus(SubscriptionEnum.EXPIRED);
+                        subscriptionRepository.save(currSubscription);
+                        Subscription subscription;
+                        if(currSubscription.getSubscriptionPlan().equals(SubscriptionPlan.MONTHLY)) {
+                            subscription = new Subscription(null, currSubscription.getCompanyId(), SubscriptionEnum.ACTIVE, currSubscription.getPlan(), currSubscription.getPerson(), LocalDate.now(), LocalDate.now().plusMonths(1),currSubscription.getSubscriptionPlan(),currSubscription.getAmount(),currSubscription.getStripeSubscriptionId(),currSubscription.getStripeCustomerId());
+                        }
+                        else{
+                            subscription = new Subscription(null, currSubscription.getCompanyId(), SubscriptionEnum.ACTIVE, currSubscription.getPlan(), currSubscription.getPerson(), LocalDate.now(), LocalDate.now().plusYears(1),currSubscription.getSubscriptionPlan(),currSubscription.getAmount(),currSubscription.getStripeSubscriptionId(),currSubscription.getStripeCustomerId());
+
+                        }
+                        log.info("New Subscription Details : {}",subscription);
+                        subscriptionRepository.save(subscription);
+                        log.info("Webhook Subscription With Upcoming Billing Same And Subscription for Company {} is Changed to Active",currSubscription.getCompanyId());
+
+
+                    }
                         if(optionalPayment.isPresent()){
                             Payment myPayment=optionalPayment.get();
                             myPayment.setPaymentStatus(PaymentStatus.PAID);
@@ -149,9 +191,38 @@ public class StripeWebhookController {
                 }
 
         }
+        else if("payment_intent.succeeded".equals(event.getType())){
+            log.info("------------------------>Object11 {}",event.getData());
+            log.info("------------------------>Object22 {}",event.getData().getObject().toJson());
+            JsonObject obj = JsonParser.parseString(event.getData().getObject().toJson()).getAsJsonObject();
+            String paymentIntentId = obj.get("id").getAsString();
+            log.info("------------------------>pyamentId {}",paymentIntentId);
 
+
+//                String paymentIntentId = event.getId(); // <-- This is your paymentIntentId
+                log.info("PaymentIntent ID: {}", paymentIntentId);
+
+                Optional<Payment> payment=paymentRepository.findByPaymentIntentId(paymentIntentId);
+                payment.ifPresent((data)->{
+                    data.setPaymentStatus(PaymentStatus.PAID);
+                    paymentRepository.save(data);
+
+                    Optional<Subscription> currSubscription=subscriptionRepository.findByCompanyIdAndStatus(data.getCompanyId(),SubscriptionEnum.ACTIVE);
+                    currSubscription.ifPresent((currSubs)->{
+                        subscriptionRepository.delete(currSubs);
+                    });
+
+                    Optional<Subscription> upcomingSubscription=subscriptionRepository.findByCompanyIdAndStatus(data.getCompanyId(),SubscriptionEnum.PENDING);
+                    upcomingSubscription.ifPresent(subsc->{
+                        subsc.setStatus(SubscriptionEnum.ACTIVE);
+                        subscriptionRepository.save(subsc);
+                    });
+                });
+
+
+        }
         // Handle invoice.payment_failed
-        if ("invoice.payment_failed".equals(event.getType())) {
+        else if ("invoice.payment_failed".equals(event.getType())) {
             Invoice invoice = (Invoice) event.getDataObjectDeserializer()
                     .getObject().orElse(null);
             if (invoice != null) {

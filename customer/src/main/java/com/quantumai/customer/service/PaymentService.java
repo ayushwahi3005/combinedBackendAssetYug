@@ -614,7 +614,7 @@ public class PaymentService {
               payment.setTransactionDate(LocalDateTime.now());
 
               payment.setPaymentIntentId(paymentIntent.getId());
-              if (paymentIntent.getLatestCharge() != null) {
+              if (paymentIntent.getLatestCharge() != null&& paymentIntent.getLatestChargeObject()!=null) {
                 payment.setChargeId(paymentIntent.getLatestChargeObject().getId());
               }
 
@@ -628,7 +628,9 @@ public class PaymentService {
 //              upcomingSubscription.setStatus(SubscriptionEnum.ACTIVE);
               upcomingSubscription.setStatus(SubscriptionEnum.PENDING);
               upcomingSubscription.setStripeCustomerId(currentSubscription.getStripeCustomerId());
-              subscriptionRepository.delete(currentSubscription);
+//              subscriptionRepository.delete(currentSubscription);
+              upcomingSubscription.setSubscriptionDate(currentSubscription.getSubscriptionDate());
+              upcomingSubscription.setExpiryDate(currentSubscription.getExpiryDate());
               subscriptionRepository.save(upcomingSubscription);
             } else {
               throw new Exception("Stripe Customer ID or Payment Method ID is missing");
@@ -701,7 +703,7 @@ public class PaymentService {
               upcomingSubscription.setExpiryDate(currentSubscription.getExpiryDate());
               upcomingSubscription.setSubscriptionDate(LocalDate.now());
               upcomingSubscription.setStripeCustomerId(currentSubscription.getStripeCustomerId());
-              subscriptionRepository.delete(currentSubscription);
+//              subscriptionRepository.delete(currentSubscription);
 
               subscriptionRepository.save(upcomingSubscription);
             } else {

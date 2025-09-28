@@ -30,58 +30,58 @@ public class CustomerApplication {
 
     SpringApplication.run(CustomerApplication.class, args);
 
-
-      try {
-          String json = Files.readString(Paths.get("upkeep.json"));
-
 // FOR PROD
-          json = json.replace("${FIREBASE_PROJECT_ID}", System.getenv("FIREBASE_PROJECT_ID"))
-                  .replace("${FIREBASE_PRIVATE_KEY_ID}", System.getenv("FIREBASE_PRIVATE_KEY_ID"))
-                  .replace("${FIREBASE_PRIVATE_KEY}", System.getenv("FIREBASE_PRIVATE_KEY").replace("\\n", "\n"))
-                  .replace("${FIREBASE_CLIENT_EMAIL}", System.getenv("FIREBASE_CLIENT_EMAIL"))
-                  .replace("${FIREBASE_CLIENT_ID}", System.getenv("FIREBASE_CLIENT_ID"))
-                  .replace("${FIREBASE_CLIENT_X509_CERT_URL}", System.getenv("FIREBASE_CLIENT_X509_CERT_URL"));
-
-          try (FileOutputStream out = new FileOutputStream("upkeep_resolved.json")) {
-              out.write(json.getBytes(StandardCharsets.UTF_8));
-          } catch (IOException e) {
-
-          }
-      }
-      catch (IOException e){
-          System.out.println(e);
-      }
-       
-    try (FileInputStream serviceAccount = new FileInputStream("upkeep_resolved.json")) {
-            FirebaseOptions options = FirebaseOptions.builder()
-                    .setCredentials(GoogleCredentials.fromStream(serviceAccount))
-                    .setDatabaseUrl("https://upkeep-22aee.firebaseio.com") // change if needed
-                    .build();
-
-            if (FirebaseApp.getApps().isEmpty()) {
-                FirebaseApp.initializeApp(options);
-            }
-        } catch (IOException e) {
-      e.printStackTrace();
-    }
+//      try {
+//          String json = Files.readString(Paths.get("upkeep.json"));
+//
+//
+//          json = json.replace("${FIREBASE_PROJECT_ID}", System.getenv("FIREBASE_PROJECT_ID"))
+//                  .replace("${FIREBASE_PRIVATE_KEY_ID}", System.getenv("FIREBASE_PRIVATE_KEY_ID"))
+//                  .replace("${FIREBASE_PRIVATE_KEY}", System.getenv("FIREBASE_PRIVATE_KEY").replace("\\n", "\n"))
+//                  .replace("${FIREBASE_CLIENT_EMAIL}", System.getenv("FIREBASE_CLIENT_EMAIL"))
+//                  .replace("${FIREBASE_CLIENT_ID}", System.getenv("FIREBASE_CLIENT_ID"))
+//                  .replace("${FIREBASE_CLIENT_X509_CERT_URL}", System.getenv("FIREBASE_CLIENT_X509_CERT_URL"));
+//
+//          try (FileOutputStream out = new FileOutputStream("upkeep_resolved.json")) {
+//              out.write(json.getBytes(StandardCharsets.UTF_8));
+//          } catch (IOException e) {
+//
+//          }
+//      }
+//      catch (IOException e){
+//          System.out.println(e);
+//      }
+//
+//    try (FileInputStream serviceAccount = new FileInputStream("upkeep_resolved.json")) {
+//            FirebaseOptions options = FirebaseOptions.builder()
+//                    .setCredentials(GoogleCredentials.fromStream(serviceAccount))
+//                    .setDatabaseUrl("https://upkeep-22aee.firebaseio.com") // change if needed
+//                    .build();
+//
+//            if (FirebaseApp.getApps().isEmpty()) {
+//                FirebaseApp.initializeApp(options);
+//            }
+//        } catch (IOException e) {
+//      e.printStackTrace();
+//    }
 
      //////////
 
      /////Local
-    //   try {
-    //   FirebaseOptions options =
-    //       new FirebaseOptions.Builder()
-    //           .setCredentials(
-    //               GoogleCredentials.fromStream(
-    //                   new ClassPathResource("upkeep.json").getInputStream()))
-    //           .setDatabaseUrl("https://upkeep-22aee.firebaseio.com")
-    //           .build();
-    //   if (FirebaseApp.getApps().isEmpty()) { // <--- check with  this line
-    //     FirebaseApp.initializeApp(options);
-    //   }
-    // } catch (IOException e) {
-    //   e.printStackTrace();
-    // }
+       try {
+       FirebaseOptions options =
+           new FirebaseOptions.Builder()
+               .setCredentials(
+                   GoogleCredentials.fromStream(
+                       new ClassPathResource("upkeep.json").getInputStream()))
+               .setDatabaseUrl("https://upkeep-22aee.firebaseio.com")
+               .build();
+       if (FirebaseApp.getApps().isEmpty()) { // <--- check with  this line
+         FirebaseApp.initializeApp(options);
+       }
+     } catch (IOException e) {
+       e.printStackTrace();
+     }
   }
 
   @Autowired SubscriptionService subscriptionService;
