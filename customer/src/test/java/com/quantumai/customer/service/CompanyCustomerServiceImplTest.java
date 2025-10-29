@@ -299,7 +299,7 @@ class CompanyCustomerServiceImplTest {
     }
 
     @Test
-    void testDeleteCompanyCustomerExtraField_Success() {
+    void testDeleteCompanyCustomerExtraField_Success() throws Exception {
         // Arrange
         String fieldId = "field-id";
         CompanyCustomerExtraFieldName extraField = new CompanyCustomerExtraFieldName();

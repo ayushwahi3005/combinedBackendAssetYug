@@ -20,6 +20,8 @@ public interface SubscriptionRepository extends MongoRepository<Subscription, St
 
   List<Subscription> findByCompanyId(Long companyId);
   List<Subscription> findByStripeSubscriptionId(String id);
+  List<Subscription> findByStatus(SubscriptionEnum status);
+
 
   Optional<Subscription> findByCompanyIdAndStatus(Long companyId, SubscriptionEnum status);
     

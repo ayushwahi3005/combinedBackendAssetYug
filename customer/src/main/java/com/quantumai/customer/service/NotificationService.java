@@ -3,10 +3,8 @@ package com.quantumai.customer.service;
 
 import com.quantumai.customer.dto.UserNotificationDTO;
 import com.quantumai.customer.entity.*;
-import com.quantumai.customer.repository.CustomerRepository;
-import com.quantumai.customer.repository.NotificationRepository;
-import com.quantumai.customer.repository.UserNotificationRepository;
-import com.quantumai.customer.repository.UserNotificationRepositoryImpl;
+import com.quantumai.customer.repository.*;
+import org.checkerframework.checker.units.qual.A;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -30,6 +28,9 @@ public class NotificationService {
 
     @Autowired
     private CustomerRepository customerRepository;
+
+    @Autowired
+    private UsersRepository usersRepository;
 
     @Autowired
     UserNotificationRepositoryImpl userNotificationRepositoryImpl;
@@ -121,5 +122,24 @@ public class NotificationService {
             List<UserNotification> myList = userNotificationRepositoryImpl.findRecentNotificationsWithDetails(userEmail);
             simpMessagingTemplate.convertAndSend("/topic/user/" + userEmail + "/notifications", myList);
         }
+    }
+
+    public void sendNotificationToAdmin(Long companyId, Notification notification) {
+        // Sends notification to a specific user
+        notification.setNotificationType(NotificationType.ADMIN);
+
+        // Get customer details
+        List<Users> userList = usersRepository.findByCompanyId(companyId);
+        userList=userList.stream().filter((user)->user.getRole().getName().equals("ADMIN")).toList();
+        Notification notification1=notificationRepository.save(notification);
+        userList.forEach((user)->{
+            UserNotification userNotification=new UserNotification(null,user.getEmail(),notification1.getId(),user.getCompanyId(),false,null,LocalDateTime.now(),notification1);
+            userNotificationRepository.save(userNotification);
+            List<UserNotification> myList=userNotificationRepositoryImpl.findRecentNotificationsWithDetails(user.getEmail());
+            System.out.println("Sending Message"+myList);
+            simpMessagingTemplate.convertAndSend("/topic/user/" + user.getEmail() + "/notifications", myList);
+
+
+        });
     }
 }

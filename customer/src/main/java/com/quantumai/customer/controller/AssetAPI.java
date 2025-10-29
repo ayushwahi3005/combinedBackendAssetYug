@@ -8,9 +8,7 @@ import com.opencsv.exceptions.CsvValidationException;
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
 import com.quantumai.customer.entity.Notification;
-import com.quantumai.customer.exception.CategoryException;
-import com.quantumai.customer.exception.ImportFileRowException;
-import com.quantumai.customer.exception.NoSubscriptionError;
+import com.quantumai.customer.exception.*;
 import com.quantumai.customer.repository.*;
 import com.quantumai.customer.service.*;
 import jakarta.mail.MessagingException;
@@ -28,6 +26,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
@@ -79,6 +79,29 @@ public class AssetAPI {
 
   @Autowired private AssetMandatoryFieldsRepository assetMandatoryFieldsRepository;
 
+  @Autowired private UsersRepository usersRepository;
+
+  private void checkUserDetailsPermissionFromSpringContext(CustomRoleType customRoleType) throws UserAccessException {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    System.out.println("Spring Security"+ authentication.getName());
+    Optional<Users> usersOptional=usersRepository.findByEmail(authentication.getName());
+    if(usersOptional.isPresent()){
+      System.out.println(customRoleType.ordinal()+" "+usersOptional.get().getRole().getAssets().ordinal());
+      if(customRoleType.ordinal()>usersOptional.get().getRole().getAssets().ordinal()){
+        GenricErrorMessage genricErrorMessage=new GenricErrorMessage("User Dont Have access", HttpStatus.FORBIDDEN);
+        throw new UserAccessException(genricErrorMessage.getMessage());
+      }
+    }
+    else{
+      GenricErrorMessage genricErrorMessage=new GenricErrorMessage("User Dont Have access", HttpStatus.FORBIDDEN);
+      throw new UserAccessException(genricErrorMessage.getMessage());
+    }
+
+
+
+
+  }
+
   @GetMapping("/working")
   public String working() {
     return "Working";
@@ -87,6 +110,7 @@ public class AssetAPI {
   @GetMapping("/{companyId}")
   public List<AssetsDTO> getAssets(@PathVariable Long companyId) {
     System.out.println("CompanyId--------AssetAPI-------->" + companyId);
+
     return assetsService.getAssetsDetails(companyId);
   }
 
@@ -97,24 +121,26 @@ public class AssetAPI {
   }
 
   @PutMapping("/addassets")
-  public void addAssets(@RequestBody AssetsDTO assestsDTO) throws NoSubscriptionError {
+  public void addAssets(@RequestBody AssetsDTO assestsDTO) throws NoSubscriptionError, UserAccessException {
     //Optional<Subscription> subscriptionOptional =
     //    subscriptionRepository.findByCompanyIdAndStatus(assestsDTO.getCompanyId(), SubscriptionEnum.ACTIVE);
   //  if (subscriptionOptional.isEmpty()) {
  //     throw new NoSubscriptionError("No Active Subscription");
 //    }
-
+    System.out.println("Add AddSets Called");
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.edit);
     assetsService.addAssets(assestsDTO);
   }
 
   @PostMapping("/addNewAssets")
   public ResponseEntity<AssetsDTO> addNewAssets(@RequestBody AssetsDTO assestsDTO)
-      throws NoSubscriptionError {
+          throws NoSubscriptionError, UserAccessException {
     //Optional<Subscription> subscriptionOptional =
     //    subscriptionRepository.findByCompanyIdAndStatus(assestsDTO.getCompanyId(), SubscriptionEnum.ACTIVE);
   //  if (subscriptionOptional.isEmpty()) {
  //     throw new NoSubscriptionError("No Active Subscription");
 //    }
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     AssetsDTO assetsDTO = assetsService.addAssets(assestsDTO);
     return ResponseEntity.ok(assetsDTO);
   }
@@ -852,13 +878,14 @@ public void importFile(
         @RequestParam("columnMappings") String columnMappings,
         @PathVariable Long companyId,
         @PathVariable String email)
-        throws ImportFileRowException, MessagingException, NoSubscriptionError {
+        throws ImportFileRowException, MessagingException, NoSubscriptionError, UserAccessException {
 
   // Optional<Subscription> subscriptionOptional =
   //         subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
   //         if (subscriptionOptional.isEmpty()) {
   //           throw new NoSubscriptionError("No Active Subscription");
   //         }
+  checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
   List<Location> locationList = locationRepository.findByCompanyId(companyId);
   List<Bin> binList = binRepository.findByCompanyId(companyId);
 
@@ -1303,13 +1330,14 @@ public void importFile(
           IOException,
           MessagingException,
           ImportFileRowException,
-          NoSubscriptionError {
+          NoSubscriptionError, UserAccessException {
 
     // Optional<Subscription> subscriptionOptional =
     //         subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
     // if (subscriptionOptional.isEmpty()) {
     //   throw new NoSubscriptionError("No Active Subscription");
     // }
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.edit);
     System.out.println("------||-------->" + columnMappings);
 
     List<Location> locationList = locationRepository.findByCompanyId(companyId);
@@ -1660,7 +1688,7 @@ public void importFile(
       //   throw new NoSubscriptionError("No Active Subscription");
       // }
     }
-
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     assetsService.addImage(assetImageDTO);
   }
 
@@ -1675,6 +1703,7 @@ public void importFile(
       //   throw new NoSubscriptionError("No Active Subscription");
       // }
     }
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     assetsService.removeImage(id);
   }
 
@@ -1689,6 +1718,7 @@ public void importFile(
       //   throw new NoSubscriptionError("No Active Subscription");
       // }
     }
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
     assetsService.removeAsset(id);
   }
 
@@ -1704,6 +1734,7 @@ public void importFile(
     // if (subscriptionOptional.isEmpty()) {
     //   throw new NoSubscriptionError("No Active Subscription");
     // }
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     assetsService.addExtraFields(extraFieldsDTO);
   }
 
@@ -1723,7 +1754,7 @@ public void importFile(
       //   throw new NoSubscriptionError("No Active Subscription");
       // }
     }
-
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
     assetsService.deleteExtraFields(id);
   }
 
@@ -1742,12 +1773,14 @@ public void importFile(
     // if (subscriptionOptional.isEmpty()) {
     //   throw new NoSubscriptionError("No Active Subscription");
     // }
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     assetsService.addAssetExtraField(extraFieldNameDTO);
   }
 
   @DeleteMapping("/deleteExtraFieldName/{id}")
-  public void deleteExtraFieldName(@PathVariable String id) throws NoSubscriptionError {
+  public void deleteExtraFieldName(@PathVariable String id) throws NoSubscriptionError, UserAccessException {
     // System.out.println("-----------------------api------------------------>"+id);
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
     Optional<AssetExtraFieldName> extraFieldNameOptional = extraFieldNameRepository.findById(id);
     if (extraFieldNameOptional.isPresent()) {
       // Optional<Subscription> subscriptionOptional =
@@ -1767,12 +1800,13 @@ public void importFile(
   }
 
   @PostMapping("/addCheckInOut")
-  public void addCheckInOut(@RequestBody AssetCheckInDTO checkInDTO) throws NoSubscriptionError {
+  public void addCheckInOut(@RequestBody AssetCheckInDTO checkInDTO) throws NoSubscriptionError, UserAccessException {
     // Optional<Subscription> subscriptionOptional =
     //     subscriptionRepository.findByCompanyIdAndStatus(checkInDTO.getCompanyId(), SubscriptionEnum.ACTIVE);
     // if (subscriptionOptional.isEmpty()) {
     //   throw new NoSubscriptionError("No Active Subscription");
     // }
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     assetsService.addCheckInOut(checkInDTO);
   }
 
@@ -1828,8 +1862,8 @@ public void importFile(
   }
 
   @DeleteMapping("deleteFile/{id}")
-  public void deleteFile(@PathVariable String id) throws NoSubscriptionError {
-
+  public void deleteFile(@PathVariable String id) throws NoSubscriptionError, UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
     Optional<Assets> assetsOptional = assetsRepository.findById(id);
     if (assetsOptional.isPresent()) {
       // Optional<Subscription> subscriptionOptional =
@@ -1846,22 +1880,24 @@ public void importFile(
 
   @PostMapping("/mandatoryFields")
   public void mandatoryFields(@RequestBody AssetMandatoryFields mandatoryFields)
-      throws NoSubscriptionError {
+          throws NoSubscriptionError, UserAccessException {
     // Optional<Subscription> subscriptionOptional =
     //     subscriptionRepository.findByCompanyIdAndStatus(mandatoryFields.getCompanyId(), SubscriptionEnum.ACTIVE);
     // if (subscriptionOptional.isEmpty()) {
     //   throw new NoSubscriptionError("No Active Subscription");
     // }
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.edit);
     assetsService.updateMandatoryFields(mandatoryFields);
   }
 
   @PostMapping("/showFields")
-  public void showFields(@RequestBody AssetShowFields showFields) throws NoSubscriptionError {
+  public void showFields(@RequestBody AssetShowFields showFields) throws NoSubscriptionError, UserAccessException {
     // Optional<Subscription> subscriptionOptional =
     //     subscriptionRepository.findByCompanyIdAndStatus(showFields.getCompanyId(), SubscriptionEnum.ACTIVE);
     // if (subscriptionOptional.isEmpty()) {
     //   throw new NoSubscriptionError("No Active Subscription");
     // }
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.edit);
     assetsService.updateShowFields(showFields);
   }
 
@@ -1894,12 +1930,14 @@ public void importFile(
   }
 
   @DeleteMapping("/deleteShowAndMandatoryField/{name}/{companyId}")
-  public void showFields(@PathVariable String name, @PathVariable Long companyId) {
+  public void showFields(@PathVariable String name, @PathVariable Long companyId) throws UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
     assetsService.deleteShowAndMandatoryFields(companyId, name);
   }
 
   @PostMapping("/saveQRData")
-  public void saveQRData(@RequestBody AssetQR qr) {
+  public void saveQRData(@RequestBody AssetQR qr) throws UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     assetsService.qrDataUpdation(qr);
   }
 
@@ -1942,7 +1980,8 @@ public void importFile(
   }
 
   @PostMapping("/updateAssetsWithInActive")
-  public void updateAssetsWithInActive(@RequestBody String customerId) throws NoSubscriptionError {
+  public void updateAssetsWithInActive(@RequestBody String customerId) throws NoSubscriptionError, UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.edit);
     List<Assets> assetsList = assetsRepository.findByCustomerId(customerId);
     if (!assetsList.isEmpty()) {
 
@@ -2016,6 +2055,7 @@ public void importFile(
     // if (subscriptionOptional.isEmpty()) {
     //   throw new NoSubscriptionError("No Active Subscription");
     // }
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     assetsService.addCategory(categoryDTO);
   }
 
@@ -2041,7 +2081,8 @@ public void importFile(
   }
 
   @DeleteMapping(value = "/deleteCategory/{id}")
-  public void deleteCategory(@PathVariable String id) throws NoSubscriptionError {
+  public void deleteCategory(@PathVariable String id) throws NoSubscriptionError, UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
     Optional<AssetCategory> assetCategory = assetCategoryRepository.findById(id);
     if (assetCategory.isPresent()) {
       // Optional<Subscription> subscriptionOptional =
@@ -2056,12 +2097,13 @@ public void importFile(
   }
 
   @PutMapping(value = "/updateCategory")
-  public void updateCategory(@RequestBody CategoryDTO categoryDTO) throws NoSubscriptionError {
+  public void updateCategory(@RequestBody CategoryDTO categoryDTO) throws NoSubscriptionError, UserAccessException {
     // Optional<Subscription> subscriptionOptional =
     //     subscriptionRepository.findByCompanyIdAndStatus(categoryDTO.getCompanyId(), SubscriptionEnum.ACTIVE);
     // if (subscriptionOptional.isEmpty()) {
     //   throw new NoSubscriptionError("No Active Subscription");
     // }
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.edit);
     assetsService.updateCategory(categoryDTO);
   }
 
@@ -2072,18 +2114,20 @@ public void importFile(
 
   @PostMapping(value = "/addAssetInspection")
   public void addAssetInspection(@RequestBody AssetCategoryInspection assetCategoryInspection)
-      throws NoSubscriptionError {
+          throws NoSubscriptionError, UserAccessException {
     // Optional<Subscription> subscriptionOptional =
     //     subscriptionRepository.findByCompanyIdAndStatus(
     //         assetCategoryInspection.getCompanyId(), SubscriptionEnum.ACTIVE);
     // if (subscriptionOptional.isEmpty()) {
     //   throw new NoSubscriptionError("No Active Subscription");
     // }
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     assetsService.addAssetInspection(assetCategoryInspection);
   }
 
   @DeleteMapping(value = "/deleteAssetInspection/{id}")
-  public void deleteAssetInspection(@PathVariable String id) throws NoSubscriptionError {
+  public void deleteAssetInspection(@PathVariable String id) throws NoSubscriptionError, UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
     Optional<AssetCategoryInspection> assetCategoryInspection =
         assetCategoryInspectionRepository.findById(id);
     if (assetCategoryInspection.isPresent()) {
@@ -2117,14 +2161,15 @@ public void importFile(
 
   @PostMapping(value = "/addAssetInspectionInstance")
   public void addAssetInspection(
-      @RequestBody AssetCategoryInspectionInstance assetCategoryInspection) {
+      @RequestBody AssetCategoryInspectionInstance assetCategoryInspection) throws UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     assetsService.addAssetInspectionInstance(assetCategoryInspection);
   }
 
   @PutMapping(value = "/addAssetInspectionInstance")
   public void updateAssetInspection(
       @RequestBody AssetCategoryInspectionInstance assetCategoryInspection)
-      throws NoSubscriptionError {
+          throws NoSubscriptionError, UserAccessException {
 
     // Optional<Subscription> subscriptionOptional =
     //     subscriptionRepository.findByCompanyIdAndStatus(
@@ -2132,7 +2177,7 @@ public void importFile(
     // if (subscriptionOptional.isEmpty()) {
     //   throw new NoSubscriptionError("No Active Subscription");
     // }
-
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.edit);
     assetsService.addAssetInspectionInstance(assetCategoryInspection);
   }
 
@@ -2312,5 +2357,15 @@ public void importFile(
     font.setBold(true);
     style.setFont(font);
     return style;
+  }
+
+  @PutMapping("/extraFieldName")
+  public ResponseEntity<AssetExtraFieldName> updateExtraFieldName(@RequestBody ExtraFieldNameUpdateDTO extraFieldNameUpdateDTO) throws UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.edit);
+    AssetExtraFieldName assetExtraFieldName=assetsService.updateExtraFieldName(extraFieldNameUpdateDTO);
+    return ResponseEntity.ok(assetExtraFieldName);
+
+
+
   }
 }

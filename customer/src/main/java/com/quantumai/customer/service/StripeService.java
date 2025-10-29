@@ -7,9 +7,7 @@ import com.quantumai.customer.repository.CustomerStripeDetailsRepository;
 import com.quantumai.customer.repository.SubscriptionRepository;
 import com.stripe.Stripe;
 import com.stripe.exception.StripeException;
-import com.stripe.model.Customer;
-import com.stripe.model.PaymentMethod;
-import com.stripe.model.Subscription;
+import com.stripe.model.*;
 import com.stripe.param.CustomerListParams;
 import com.stripe.param.PaymentMethodListParams;
 import com.stripe.param.SubscriptionCreateParams;
@@ -53,6 +51,7 @@ public class StripeService {
 
     Customer customer = findCustomerByEmail(customerEmail); // ✅ Check for existing customer
     String myCustomerId = null;
+    String stripeCustomerId=null;
     if (customer == null) {
       // ✅ If no customer exists, create a new one
       Map<String, Object> customerParams = new HashMap<>();
@@ -67,8 +66,14 @@ public class StripeService {
           customerStripeDetailsRepository.findByCompanyId(companyId);
       if (optionalcustomerStripeDetails.isPresent()) {
         myCustomerId = optionalcustomerStripeDetails.get().getId();
+        stripeCustomerId=optionalcustomerStripeDetails.get().getCustomerId();
       }
-      Map<String, Object> updateParams = new HashMap<>();
+        try {
+            removeAllCards(stripeCustomerId);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        Map<String, Object> updateParams = new HashMap<>();
       updateParams.put("name", cardholderName); // Update name if changed
       customer.update(updateParams);
     }
@@ -90,22 +95,65 @@ public class StripeService {
     Map<String, Object> updatePaymentParams = new HashMap<>();
     updatePaymentParams.put("billing_details", billingDetails);
     paymentMethod.update(updatePaymentParams);
+    Optional<CustomerStripeDetails> existingCustomerDetails =
+            customerStripeDetailsRepository.findByCompanyId(companyId);
 
-    Subscription subscription = createSubscription(customer.getId(), companyId);
-
+    if (existingCustomerDetails.isEmpty() || !hasActiveSubscription(customer.getId())) {
+      Subscription subscription = createSubscription(customer.getId(), companyId);
+      CustomerStripeDetails customerStripeDetails = new CustomerStripeDetails();
+      customerStripeDetails.setId(myCustomerId);
+      customerStripeDetails.setCompanyId(companyId);
+      customerStripeDetails.setCustomerId(customer.getId());
+      customerStripeDetails.setPaymentMethodId(paymentMethod.getId());
+      customerStripeDetails.setFirstName(cardholderName);
+      customerStripeDetails.setEmail(customerEmail);
+      customerStripeDetailsRepository.save(customerStripeDetails);
+    }
     // ✅ Store in MongoDB
-    CustomerStripeDetails customerStripeDetails = new CustomerStripeDetails();
-    customerStripeDetails.setId(myCustomerId);
-    customerStripeDetails.setCompanyId(companyId);
-    customerStripeDetails.setCustomerId(customer.getId());
-    customerStripeDetails.setPaymentMethodId(paymentMethod.getId());
-    customerStripeDetails.setFirstName(cardholderName);
-    customerStripeDetails.setEmail(customerEmail);
-    customerStripeDetailsRepository.save(customerStripeDetails);
+
 
     System.out.println("Card saved successfully for customer ID: " + customer.getId());
   }
+  private boolean hasActiveSubscription(String customerId) throws StripeException {
+    Map<String, Object> params = new HashMap<>();
+    params.put("customer", customerId);
 
+    // Retrieve all subscriptions for the customer
+    SubscriptionCollection subscriptions = Subscription.list(params);
+
+    // Check for either active or trialing subscriptions
+    for (Subscription sub : subscriptions.getData()) {
+      String status = sub.getStatus();
+      if ("active".equals(status) || "trialing".equals(status)) {
+        return true; // Found an existing active/trial subscription
+      }
+    }
+    return false;
+  }
+  public void removeAllCards(String customerId) throws Exception {
+    Stripe.apiKey = secretKey;
+
+    // 1️⃣ List all card payment methods for the customer
+    Map<String, Object> params = new HashMap<>();
+    params.put("customer", customerId);
+    params.put("type", "card");
+    System.out.println("Customer ID Stripe: "+customerId);
+    PaymentMethodCollection paymentMethods = PaymentMethod.list(params);
+
+    // 2️⃣ Iterate and detach each one
+    for (PaymentMethod method : paymentMethods.getData()) {
+      String paymentMethodId = method.getId();
+      System.out.println("Removing card: " + paymentMethodId);
+
+      // Detach the card from the customer
+      method.detach();
+
+      // Optionally, call your removeCard(paymentMethodId) if it has extra logic
+      // removeCard(paymentMethodId);
+    }
+
+    System.out.println("✅ All cards removed for customer: " + customerId);
+  }
   public List<Map<String, Object>> getCustomerCards(Long customerId) throws StripeException {
     Stripe.apiKey = secretKey;
     Optional<CustomerStripeDetails> customerStripeDetails =
@@ -142,7 +190,12 @@ public class StripeService {
     PaymentMethod paymentMethod = PaymentMethod.retrieve(paymentMethodId);
 
     // ✅ Detach from Customer
-    paymentMethod.detach();
+    try {
+      paymentMethod.detach();
+    }
+    catch (Exception e){
+      System.out.println("PaymentMethod Not Attached "+e);
+    }
     Optional<CustomerStripeDetails> customerStripeDetails =
         customerStripeDetailsRepository.findByPaymentMethodId(paymentMethodId);
     if (customerStripeDetails.isPresent()) {

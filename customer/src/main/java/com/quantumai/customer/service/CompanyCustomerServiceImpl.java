@@ -18,16 +18,24 @@ import com.quantumai.customer.repository.*;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
+@Slf4j
 public class CompanyCustomerServiceImpl implements CompanyCustomerService {
 
   @Autowired
@@ -53,6 +61,9 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
 
   @Autowired
   private CompanyCustomerCategoryIdGeneratorRepository companyCustomerCategoryIdGeneratorRepository;
+
+    @Autowired
+    private MongoTemplate mongoTemplate;
 
   private static final String SEQ_ID = "company_customer_category_sequence";
 
@@ -275,19 +286,29 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   }
 
   @Override
-  public void deleteCompanyCustomerExtraField(String id) {
+  public void deleteCompanyCustomerExtraField(String id) throws Exception {
     // TODO Auto-generated method stub
     Optional<CompanyCustomerExtraFieldName> extraFieldNameOptional = extraFieldNameRepository.findById(id);
-    extraFieldNameRepository.deleteById(id);
-    CompanyCustomerExtraFieldName extraFieldName = extraFieldNameOptional.get();
-    List<CompanyCustomerExtraFields> extraFieldsList = extraFieldsRepository
-        .findByName(extraFieldName.getName().toLowerCase());
-    extraFieldsList.stream()
-        .forEach(
-            (x) -> {
-              System.out.println("-------------------------------------->" + x.getName());
-              extraFieldsRepository.delete(x);
-            });
+      if(extraFieldNameOptional.isPresent()){
+          List<CompanyCustomerExtraFields> allDataFields=extraFieldsRepository.findByNameIgnoreCaseAndCompanyId(extraFieldNameOptional.get().getName(),extraFieldNameOptional.get().getCompanyId());
+          allDataFields=allDataFields.stream().filter((data)->!(data.getValue().isEmpty()||data.getValue().isBlank())).toList();
+          if(allDataFields.isEmpty()){
+              extraFieldNameRepository.deleteById(id);
+              CompanyCustomerExtraFieldName extraFieldName = extraFieldNameOptional.get();
+              List<CompanyCustomerExtraFields> extraFieldsList = extraFieldsRepository
+                      .findByName(extraFieldName.getName().toLowerCase());
+              extraFieldsList.stream()
+                      .forEach(
+                              (x) -> {
+                                  log.info("Extra Field {} Deleted Successfully", x.getName());
+                                  extraFieldsRepository.delete(x);
+                              });
+          }
+          else{
+              throw new Exception("Cannot delete Extra Field as some customers are using this field");
+          }
+      }
+
   }
 
   @Override
@@ -879,4 +900,60 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
     Optional<CompanyCustomerCategory> categoryOptional = companyCustomerCategoryRepository.findById(id);
     return categoryOptional.orElse(null);
   }
+    public void updateNameForCompanyCustomerExtraFields(String oldName,  String newName,Long companyId) {
+        Query query = new Query();
+        query.addCriteria(
+                Criteria.where("name").regex("^" + Pattern.quote(oldName) + "$", "i") // case-insensitive exact match
+                        .and("companyId").is(companyId)
+        );
+
+        Update update = new Update().set("name", newName);
+        mongoTemplate.updateMulti(query, update, CompanyCustomerExtraFields.class);
+    }
+    public void updateNameForMandatoryFields(String oldName,  String newName,Long companyId) {
+        Query query = new Query();
+        query.addCriteria(
+                Criteria.where("name").regex("^" + Pattern.quote(oldName) + "$", "i") // case-insensitive exact match
+                        .and("companyId").is(companyId)
+        );
+
+        Update update = new Update().set("name", newName);
+        mongoTemplate.updateMulti(query, update, CompanyCustomerMandatoryFields.class);
+    }
+    public void updateNameForShowFields(String oldName,  String newName,Long companyId) {
+        Query query = new Query();
+        query.addCriteria(
+                Criteria.where("name").regex("^" + Pattern.quote(oldName) + "$", "i") // case-insensitive exact match
+                        .and("companyId").is(companyId)
+        );
+
+        Update update = new Update().set("name", newName);
+        mongoTemplate.updateMulti(query, update, CompanyCustomerShowFields.class);
+    }
+    @Override
+    public CompanyCustomerExtraFieldName updateExtraFieldName(ExtraFieldNameUpdateDTO extraFieldNameUpdateDTO) {
+        Optional<CompanyCustomerExtraFieldName> optionalField=extraFieldNameRepository.findById(extraFieldNameUpdateDTO.getId());
+        if(optionalField.isPresent()){
+            String name=optionalField.get().getName();
+            this.updateNameForCompanyCustomerExtraFields(name,extraFieldNameUpdateDTO.getName(),optionalField.get().getCompanyId());
+            this.updateNameForMandatoryFields(name,extraFieldNameUpdateDTO.getName(),optionalField.get().getCompanyId());
+            this.updateNameForShowFields(name,extraFieldNameUpdateDTO.getName(),optionalField.get().getCompanyId());
+
+
+            optionalField.get().setName(extraFieldNameUpdateDTO.getName());
+
+
+            return extraFieldNameRepository.save(optionalField.get());
+        }
+        else{
+            return null;
+        }
+    }
+
+
+//    @Override
+//    public Integer getCustomFieldCustomerCount(Long companyId, String id) {
+//        companyCustomerCategoryRepository.countByCompanyIdAndcompanyCustomerCategoryId(companyId,id);
+//        return 0;
+//    }
 }

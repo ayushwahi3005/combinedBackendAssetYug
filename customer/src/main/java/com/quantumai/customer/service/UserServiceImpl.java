@@ -1,18 +1,19 @@
 package com.quantumai.customer.service;
 
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.UserRecord;
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
-import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
-import com.quantumai.customer.exception.TheMailException;
-import com.quantumai.customer.exception.UserException;
+import com.quantumai.customer.exception.*;
 import com.quantumai.customer.repository.*;
 import com.quantumai.customer.security.JwtService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+
+import java.time.LocalDateTime;
 import java.util.*;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
@@ -33,6 +34,55 @@ import com.quantumai.customer.entity.StatusEnum;
 @Slf4j
 public class UserServiceImpl implements UserService {
 
+    @Autowired
+    private UserActivationService userActivationService;
+
+    @Override
+    public void resendFirebaseVerificationEmail(String email, Long companyId) throws UserException, TheMailException, FirebaseAuthException, UserEmailAlreadyVerifiedException {
+        log.info("Resending Firebase verification email to: {} for company: {}", email, companyId);
+        
+        // Find user by email and company ID
+        Optional<Users> userOpt = usersRepository.findByCompanyIdAndEmail(companyId, email);
+        if (userOpt.isEmpty()) {
+            log.warn("User not found with email: {} and companyId: {}", email, companyId);
+            throw new UserException("User not found with the provided email and company");
+        }
+        
+        Users user = userOpt.get();
+        UserRecord userRecord = FirebaseAuth.getInstance().getUserByEmail(email);
+        // Check if user is already active
+        if (userRecord.isEmailVerified()) {
+            log.warn("User {} is already active, no need to resend verification", email);
+            throw new UserEmailAlreadyVerifiedException("This email is already verified and active");
+        }
+        
+        try {
+            // Generate Firebase email verification link
+            String verificationLink = FirebaseAuth.getInstance().generateEmailVerificationLink(email);
+            
+            // Customize the email content
+            String subject = "Verify Your Email - Action Required";
+            String message = String.format(
+                "Hello %s,\n\n" +
+                "Please verify your email address by clicking the link below to complete your registration.\n\n" +
+                "%s\n\n" +
+                "This link will expire in 24 hours.\n\n" +
+                "If you did not create an account, please ignore this email.\n\n" +
+                "Best regards,\nThe Team",
+                email.split("@")[0], // Use the part before @ as the name
+                verificationLink
+            );
+            
+            // Send the verification email
+            sendSimpleMessage(email, subject, message);
+            log.info("Firebase verification email sent successfully to: {}", email);
+            
+        } catch (Exception e) {
+            log.error("Failed to send Firebase verification email to {}: {}", email, e.getMessage(), e);
+            throw new TheMailException("Failed to send verification email. Please try again later.", (MailException) e);
+        }
+    }
+    
     @Override
     public void resendVerificationEmail(String email, Long companyId) throws UserException, TheMailException {
         Optional<Users> userOpt = usersRepository.findByCompanyIdAndEmail(companyId, email);
@@ -136,7 +186,7 @@ public class UserServiceImpl implements UserService {
 
   @Override
   @Transactional
-  public void registerUser(Users user) throws UserException {
+  public Users registerUser(Users user) throws UserException {
     // Check if user exists and is not already active
     Optional<Users> OptionalUser = usersRepository.findByCompanyIdAndEmail(user.getCompanyId(), user.getEmail());
     if (OptionalUser.isPresent() && OptionalUser.get().getStatus() == StatusEnum.active) {
@@ -145,7 +195,7 @@ public class UserServiceImpl implements UserService {
     Boolean exists = customerRepository.existsByEmail(user.getEmail());
 
     if ((!exists) && OptionalUser.isEmpty()) {
-      usersRepository.save(user);
+      return usersRepository.save(user);
     } else {
       throw new UserException("User already Invited");
     }
@@ -154,6 +204,21 @@ public class UserServiceImpl implements UserService {
   @Override
   public UsersDTO getUsers(Long companyId, String email) throws UserException {
     // TODO Auto-generated method stub
+    Optional<Users> Optionaluser = usersRepository.findByCompanyIdAndEmail(companyId, email);
+    if (Optionaluser.isEmpty()) {
+      throw new UserException("User not found");
+    }
+    Users user = Optionaluser.get();
+    // If user is already active, the token should be considered used
+//    if (user.getStatus() == StatusEnum.active) {
+//      throw new UserException("This invitation link has already been used");
+//    }
+    UsersDTO usersDTO = modelMapper.map(user, UsersDTO.class);
+    return usersDTO;
+  }
+
+  @Override
+  public UsersDTO getUserForInvite(Long companyId, String email) throws UserException {
     Optional<Users> Optionaluser = usersRepository.findByCompanyIdAndEmail(companyId, email);
     if (Optionaluser.isEmpty()) {
       throw new UserException("User not found");
@@ -193,7 +258,36 @@ public class UserServiceImpl implements UserService {
     usersRepository.save(existingUser);
   }
 
-  @Override
+    @Override
+    public void updateUserStatus(UsersDTO usersDTO) throws UserCannotActivateException,UserException {
+        Optional<Users> optionaluser =
+                usersRepository.findByCompanyIdAndEmail(usersDTO.getCompanyId(), usersDTO.getEmail());
+
+        if (optionaluser.isEmpty()) {
+            throw new UserException("User not found");
+        }
+
+        Users existingUser = optionaluser.get();
+        log.info("Existing user details {},New Details {}",existingUser.toString(),usersDTO.toString());
+        // If this is a password update (activating the account)
+        if ((( usersDTO.getStatus().equals(StatusEnum.inActive)))||(existingUser.getStatus() .equals( StatusEnum.inActive) && usersDTO.getStatus().equals(StatusEnum.active)&& userActivationService.canActivateNewUser(existingUser.getCompanyId()))) {
+            // Encode the new password
+//            usersDTO.setPassword(passwordEncoder.encode(usersDTO.getPassword()));
+            // Set status to active when password is set
+//            usersDTO.setStatus(StatusEnum.active);
+            modelMapper.map(usersDTO, existingUser);
+            usersRepository.save(existingUser);
+            // The token used for signup is now invalidated by the status change
+        }
+        else{
+            throw new UserCannotActivateException("User Cannot be Activated");
+        }
+
+        // Map non-null fields from DTO to existing user
+
+    }
+
+    @Override
   public List<UsersDTO> getAllUsersByRole(String role, Long companyId) {
     // TODO Auto-generated method stub
     List<Users> usersList = usersRepository.findByCompanyId(companyId);
@@ -428,4 +522,14 @@ public class UserServiceImpl implements UserService {
       mandatoryFieldsRepository.delete(mandatoryFieldsOptional.get());
     }
   }
+
+    @Override
+    public void updateLastLogin(String email,Long companyId) {
+        Optional<Users> optionalUser=usersRepository.findByCompanyIdAndEmail(companyId,email);
+        optionalUser.ifPresent((data)->{
+            data.setLastLogin(LocalDateTime.now());
+            usersRepository.save(data);
+        });
+
+    }
 }

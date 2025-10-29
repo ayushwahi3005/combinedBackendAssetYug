@@ -129,5 +129,7 @@ public interface AssetsService {
 
   public List<AssetCategoryInspectionInstance> getAllAssetCategoryInspectionInstanceByAsset(String assetId);
 
+  public AssetExtraFieldName updateExtraFieldName(ExtraFieldNameUpdateDTO extraFieldNameUpdateDTO);
+
 //  public List<Map<String,>> getAssetByCompanyCategory(Long companyId);
 }

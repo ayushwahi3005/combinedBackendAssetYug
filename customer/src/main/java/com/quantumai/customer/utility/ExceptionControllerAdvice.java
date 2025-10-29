@@ -49,6 +49,14 @@ public class ExceptionControllerAdvice {
     return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
   }
 
+  @ExceptionHandler(UserEmailAlreadyVerifiedException.class)
+  public ResponseEntity<ErrorInfo> UserEmailAlreadyVerifiedException(UserEmailAlreadyVerifiedException exception) {
+    ErrorInfo errorInfo = new ErrorInfo();
+    errorInfo.setErrorMessage("This email is already verified and active");
+    errorInfo.setErrorCode(HttpStatus.BAD_REQUEST.value());
+    return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
+  }
+
   @ExceptionHandler(WrongAdminEmailException.class)
   public ResponseEntity<ErrorInfo> WrongAdminEmailException(WrongAdminEmailException exception) {
     ErrorInfo errorInfo = new ErrorInfo();
@@ -143,6 +151,22 @@ public class ExceptionControllerAdvice {
   public ResponseEntity<ErrorInfo> LocationAlreadyPresentException(LocationAlreadyPresentException exception) {
     ErrorInfo errorInfo = new ErrorInfo();
     errorInfo.setErrorMessage("Location With Given Name Already Present");
+    errorInfo.setErrorCode(HttpStatus.BAD_REQUEST.value());
+    return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
+  }
+
+  @ExceptionHandler(UserCannotActivateException.class)
+  public ResponseEntity<ErrorInfo> UserCannotActivateException(UserCannotActivateException exception) {
+    ErrorInfo errorInfo = new ErrorInfo();
+    errorInfo.setErrorMessage("User Cannot be Activated. Either Upgrade Subscription for more person or disable any other User");
+    errorInfo.setErrorCode(HttpStatus.BAD_REQUEST.value());
+    return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
+  }
+
+  @ExceptionHandler(UserAccessException.class)
+  public ResponseEntity<ErrorInfo> UserCannotActivateException(UserAccessException exception) {
+    ErrorInfo errorInfo = new ErrorInfo();
+    errorInfo.setErrorMessage("You Dont Have Access For this Request");
     errorInfo.setErrorCode(HttpStatus.BAD_REQUEST.value());
     return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
   }

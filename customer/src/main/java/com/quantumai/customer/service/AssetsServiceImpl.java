@@ -19,9 +19,14 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -57,6 +62,9 @@ public class AssetsServiceImpl implements AssetsService {
   @Autowired private BinRepository binRepository;
 
   @Autowired private AssetCategoryIdGeneratorRepository assetCategoryIdGeneratorRepository;
+
+  @Autowired
+  private MongoTemplate mongoTemplate;
 
   private static final String SEQ_ID = "asset_category_sequence";
   LocalDateTime localDateTime;
@@ -1361,12 +1369,53 @@ public class AssetsServiceImpl implements AssetsService {
     public List<AssetCategoryInspectionInstance> getAllAssetCategoryInspectionInstanceByAsset(String assetId) {
         return assetCategoryInspectionInstanceRepository.findByAssetId(assetId);
     }
+  public void updateNameForAssetExtraFields(String oldName,  String newName,Long companyId) {
+    Query query = new Query();
+    query.addCriteria(
+            Criteria.where("name").regex("^" + Pattern.quote(oldName) + "$", "i") // case-insensitive exact match
+                    .and("companyId").is(companyId)
+    );
+
+    Update update = new Update().set("name", newName);
+    mongoTemplate.updateMulti(query, update, AssetExtraFields.class);
+  }
+  public void updateNameForMandatoryFields(String oldName,  String newName,Long companyId) {
+    Query query = new Query();
+    query.addCriteria(
+            Criteria.where("name").regex("^" + Pattern.quote(oldName) + "$", "i") // case-insensitive exact match
+                    .and("companyId").is(companyId)
+    );
+
+    Update update = new Update().set("name", newName);
+    mongoTemplate.updateMulti(query, update, AssetMandatoryFields.class);
+  }
+  public void updateNameForShowFields(String oldName,  String newName,Long companyId) {
+    Query query = new Query();
+    query.addCriteria(
+            Criteria.where("name").regex("^" + Pattern.quote(oldName) + "$", "i") // case-insensitive exact match
+                    .and("companyId").is(companyId)
+    );
+
+    Update update = new Update().set("name", newName);
+    mongoTemplate.updateMulti(query, update, AssetShowFields.class);
+  }
+  @Override
+  public AssetExtraFieldName updateExtraFieldName(ExtraFieldNameUpdateDTO extraFieldNameUpdateDTO) {
+    Optional<AssetExtraFieldName> optionalField=extraFieldNameRepository.findById(extraFieldNameUpdateDTO.getId());
+    if(optionalField.isPresent()){
+      String name=optionalField.get().getName();
+      this.updateNameForAssetExtraFields(name,extraFieldNameUpdateDTO.getName(),optionalField.get().getCompanyId());
+      this.updateNameForMandatoryFields(name,extraFieldNameUpdateDTO.getName(),optionalField.get().getCompanyId());
+      this.updateNameForShowFields(name,extraFieldNameUpdateDTO.getName(),optionalField.get().getCompanyId());
 
 
+      optionalField.get().setName(extraFieldNameUpdateDTO.getName());
 
 
-//    @Override
-//    public List<String,Assets> getAssetByCompanyCategory(Long companyId) {
-//        return List.of();
-//    }
+      return extraFieldNameRepository.save(optionalField.get());
+    }
+    else{
+      return null;
+    }
+  }
 }

@@ -3,10 +3,7 @@ package com.quantumai.customer.service;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
-import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
-import com.quantumai.customer.exception.TheMailException;
-import com.quantumai.customer.exception.UserCannotDeletedException;
-import com.quantumai.customer.exception.UserException;
+import com.quantumai.customer.exception.*;
 import io.jsonwebtoken.Claims;
 import java.util.List;
 import java.util.Map;
@@ -15,7 +12,16 @@ public interface UserService {
     /**
      * Resend verification email to user if not yet verified
      */
-    void resendVerificationEmail(String email, Long companyId) throws UserException, TheMailException;
+   /**
+   * Resend the Firebase email verification link to a user
+   * @param email The email of the user
+   * @param companyId The company ID of the user
+   * @throws UserException If user is not found or already verified
+   * @throws TheMailException If there's an error sending the email
+   */
+  void resendFirebaseVerificationEmail(String email, Long companyId) throws UserException, TheMailException, FirebaseAuthException, UserEmailAlreadyVerifiedException;
+  
+  void resendVerificationEmail(String email, Long companyId) throws UserException, TheMailException;
 
   public void sendSimpleMessage(String to, String subject, String text);
 
@@ -25,11 +31,15 @@ public interface UserService {
 
   public List<UsersDTO> getAllUsers(Long companyId);
 
-  public void registerUser(Users user) throws UserException;
+  public Users registerUser(Users user) throws UserException;
 
   public UsersDTO getUsers(Long companyId, String email) throws UserException;
 
+  public UsersDTO getUserForInvite(Long companyId, String email) throws UserException;
+
   public void updateUser(UsersDTO usersDTO) throws UserException;
+
+  public void updateUserStatus(UsersDTO usersDTO) throws UserException, UserCannotActivateException;
 
   public List<UsersDTO> getAllUsersByRole(String role, Long companyId);
 
@@ -66,4 +76,6 @@ public interface UserService {
   public List<UserMandatoryFields> getAllMandatoryFields(Long companyId);
 
   public void deleteShowAndMandatoryFields(Long companyId, String name);
+
+  public void updateLastLogin(String email,Long companyId);
 }

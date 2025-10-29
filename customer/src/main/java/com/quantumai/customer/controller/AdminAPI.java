@@ -1,10 +1,18 @@
 package com.quantumai.customer.controller;
 
+import com.google.firebase.auth.FirebaseAuthException;
 import com.quantumai.customer.dto.AdminResetPassword;
 import com.quantumai.customer.dto.AuthenticationRequestDTO;
 import com.quantumai.customer.dto.AuthenticationResponseDTO;
 import com.quantumai.customer.entity.Admin;
+import com.quantumai.customer.entity.Customer;
 import com.quantumai.customer.entity.Plans;
+import com.quantumai.customer.entity.Users;
+import com.quantumai.customer.exception.TheMailException;
+import com.quantumai.customer.exception.UserEmailAlreadyVerifiedException;
+import com.quantumai.customer.exception.UserException;
+import com.quantumai.customer.repository.CustomerRepository;
+import com.quantumai.customer.repository.UsersRepository;
 import com.quantumai.customer.security.JwtService;
 import com.quantumai.customer.service.AdminService;
 import com.quantumai.customer.service.SubscriptionService;
@@ -31,6 +39,8 @@ public class AdminAPI {
 
     @Autowired
     private UserService userService;
+
+  @Autowired private UsersRepository usersRepository;
 
     @PostMapping("/resend-verification/{companyId}/{email}")
     public ResponseEntity<String> resendUserVerification(@PathVariable Long companyId, @PathVariable String email) {
@@ -136,5 +146,22 @@ public class AdminAPI {
   public List<Plans> getAllPlan() {
     //        System.out.println("----------->"+id);
     return subscriptionService.getAllPlan();
+  }
+  @GetMapping(value = "/customers")
+  public ResponseEntity<List<Users>> getAllCustomers() {
+//    System.out.println("working");
+    return ResponseEntity.ok(usersRepository.findAll());
+  }
+  @PostMapping(value = "/resend-email-firebase-verification/{companyId}/{email}")
+  public ResponseEntity<Map<String, String>> resendFirebaseVerificationEmail(
+          @PathVariable Long companyId,
+          @PathVariable String email) throws UserException, TheMailException, FirebaseAuthException, UserEmailAlreadyVerifiedException {
+
+    userService.resendFirebaseVerificationEmail(email, companyId);
+
+    return ResponseEntity.ok(Map.of(
+            "status", "success",
+            "message", "Firebase verification email has been resent successfully"
+    ));
   }
 }

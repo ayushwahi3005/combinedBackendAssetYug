@@ -8,6 +8,7 @@ import com.quantumai.customer.entity.*;
 import com.quantumai.customer.repository.CustomerStripeDetailsRepository;
 import com.quantumai.customer.repository.PaymentRepository;
 import com.quantumai.customer.repository.SubscriptionRepository;
+import com.quantumai.customer.service.UserActivationService;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Event;
 import com.stripe.model.Invoice;
@@ -42,6 +43,8 @@ public class StripeWebhookController {
 
     @Autowired private PaymentRepository paymentRepository;
 
+    @Autowired private UserActivationService userActivationService;
+
     @Transactional
     @PostMapping("/webhook")
     public ResponseEntity<String> handleStripeWebhook(
@@ -62,22 +65,7 @@ public class StripeWebhookController {
         if ("invoice.payment_succeeded".equals(event.getType())) {
             log.info("------------------------>Inside Payment Succeeded. New Subscription");
             log.info("------------------------>Object {}",event.getObject());
-//            log.info("------------------------>Data {}",event.getData().toString());
-//            try {
-//                ObjectMapper mapper = new ObjectMapper();
-//                JsonNode root = mapper.readTree(payload);
-//                JsonNode dataObject = root.path("data").path("object");
-//
-//                String paymentIntentId = dataObject.path("payment_intent").asText(null);
-//                String subscriptionId = dataObject.path("subscription").asText(null);
-//
-//                log.info("Payment Intent ID: {}" , paymentIntentId);
-//                log.info("Subscription ID: {}", subscriptionId);
-//
-//            } catch (Exception e) {
-//                e.printStackTrace();
-//                // Handle JSON parse error
-//            }
+
             Invoice invoice = (Invoice) event.getDataObjectDeserializer()
                     .getObject().orElse(null);
             log.info("Invoice data : {}",invoice);
@@ -104,6 +92,7 @@ public class StripeWebhookController {
                         List<Subscription> subscriptionList=subscriptionRepository.findByStripeSubscriptionId(subscriptionId);
                         Optional <Payment> optionalPayment=paymentRepository.findByPaymentIntentId(paymentIntent);
                         Optional<Subscription> optionalSubscriptionActive=subscriptionList.stream().filter((data)->data.getStatus().equals(SubscriptionEnum.PENDING)).findFirst();
+                        optionalSubscriptionActive.ifPresent((data)->log.info("-->optionalSubscriptionActive data: {}",data.toString()));
 
                         if(optionalSubscriptionActive.isPresent()){
                             Subscription subscription=optionalSubscriptionActive.get();
@@ -112,6 +101,8 @@ public class StripeWebhookController {
                                 subscription.setStatus(SubscriptionEnum.ACTIVE);
                                 subscriptionRepository.save(subscription);
                                 log.info("Webhook Subscription Created And Subscription for Company {} is Changed to Active",subscription.getCompanyId());
+//                                int affectedUser=userActivationService.updateActiveUsersBySubscription(subscription.getCompanyId(),subscription.getPerson());
+//                                log.info("{} Users Status activated",affectedUser);
                             }
 
 
@@ -122,6 +113,13 @@ public class StripeWebhookController {
 
                             paymentRepository.save(myPayment);
                             log.info("Webhook Subscription Created And Payment for Company {} is Changed to Paid",myPayment.getCompanyId());
+                            optionalSubscriptionActive.ifPresent((data)->{
+//                                int affectedUser=userActivationService.updateActiveUsersBySubscription(data.getCompanyId(),data.getPerson());
+//                                log.info("{} Users Status activated",affectedUser);
+                            });
+
+
+
                         }
 
 
@@ -159,6 +157,8 @@ public class StripeWebhookController {
 
 
                             log.info("Webhook Subscription With Upcoming Billing Changed And Subscription for Company {} is Changed to Active",currSubscription.getCompanyId());
+//                        int affectedUser=userActivationService.updateActiveUsersBySubscription(upcomSubscription.getCompanyId(),upcomSubscription.getPerson());
+//                        log.info("{} Users Status activated",affectedUser);
                         }
                     else{
                         Subscription currSubscription=activeSubscription.get();
@@ -175,6 +175,8 @@ public class StripeWebhookController {
                         log.info("New Subscription Details : {}",subscription);
                         subscriptionRepository.save(subscription);
                         log.info("Webhook Subscription With Upcoming Billing Same And Subscription for Company {} is Changed to Active",currSubscription.getCompanyId());
+//                        int affectedUser=userActivationService.updateActiveUsersBySubscription(subscription.getCompanyId(),subscription.getPerson());
+//                        log.info("{} Users Status activated",affectedUser);
 
 
                     }
@@ -184,6 +186,7 @@ public class StripeWebhookController {
 
                             paymentRepository.save(myPayment);
                             log.info("Webhook Subscription Created And Payment for Company {} is Changed to Paid",myPayment.getCompanyId());
+
                         }
 
                 } else {
@@ -215,6 +218,8 @@ public class StripeWebhookController {
                     Optional<Subscription> upcomingSubscription=subscriptionRepository.findByCompanyIdAndStatus(data.getCompanyId(),SubscriptionEnum.PENDING);
                     upcomingSubscription.ifPresent(subsc->{
                         subsc.setStatus(SubscriptionEnum.ACTIVE);
+//                        int affectedUser=userActivationService.updateActiveUsersBySubscription(subsc.getCompanyId(),subsc.getPerson());
+//                        log.info("{} Users Status activated",affectedUser);
                         subscriptionRepository.save(subsc);
                     });
                 });

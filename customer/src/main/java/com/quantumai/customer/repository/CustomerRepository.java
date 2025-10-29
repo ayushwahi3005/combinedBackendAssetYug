@@ -13,9 +13,10 @@ public interface CustomerRepository extends MongoRepository<Customer, String> {
 
   List<Customer> findByCompanyId(Long companyId);
 
+
   Optional<Customer> findByEmailAndCompanyId(String email, Long companyId);
 
   Long countByRoleAndCompanyId(String role, Long id);
-
+  
 
 }

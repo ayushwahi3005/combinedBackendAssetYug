@@ -107,6 +107,7 @@ public class CustomerServiceImpl implements CustomerService {
 
   @Autowired private TrialService trialService;
 
+
   @Override
   public BaseResponseDTO addCustomer(CustomerDTO customerDTO) throws Exception {
     // TODO Auto-generated method stub
@@ -121,6 +122,18 @@ public class CustomerServiceImpl implements CustomerService {
     customer.setRole("ADMIN");
     customer.setPassword(passwordEncoder.encode(customerDTO.getPassword()));
     Customer savedCustomer = customerRepository.save(customer);
+    Optional<CustomRole> customRoleOptional= customRoleRepository.findByTypeAndCompanyId(RoleType.STANDARD,customerDTO.getCompanyId());
+    Users users=new Users();
+    users.setLastLogin(LocalDateTime.now());
+    customRoleOptional.ifPresent(users::setRole);
+    users.setEmail(customer.getEmail());
+    users.setStatus(StatusEnum.active);
+    users.setFirstName(customer.getFirstName());
+    users.setLastName(customer.getLastName());
+    users.setTitle("ADMIN");
+    users.setCompanyId(customer.getCompanyId());
+    users.setMobileNumber(customer.getMobileNumber());
+    usersRepository.save(users);
     
     // Initialize 15-day free trial for new customer
     trialService.initializeTrial(savedCustomer.getEmail(), savedCustomer.getCompanyId());
@@ -299,6 +312,7 @@ public class CustomerServiceImpl implements CustomerService {
     } else if (passwordEncoder.matches(password, customer.get().getPassword())) {
 
       var jwtToken = jwtService.generateToken(customer.get(), deviceId);
+      userService.updateLastLogin(customer.get().getEmail(),customer.get().getCompanyId());
 
       return AuthenticationResponseDTO.builder()
           .token(jwtToken)

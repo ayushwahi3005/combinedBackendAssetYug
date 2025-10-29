@@ -16,8 +16,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RateLimitingConfig {
 
     // Increased rate limits
-    private static final int GENERAL_REQUESTS_PER_MINUTE = 50;
-    private static final int LOGIN_ATTEMPTS_PER_MINUTE = 10;
+    private static final int GENERAL_REQUESTS_PER_MINUTE = 100;
+    private static final int LOGIN_ATTEMPTS_PER_MINUTE = 100;
     
     private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
 

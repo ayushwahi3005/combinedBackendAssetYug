@@ -1,9 +1,9 @@
 package com.quantumai.customer.controller;
 
+import com.google.firebase.auth.FirebaseAuthException;
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
-import com.quantumai.customer.exception.NoSubscriptionError;
-import com.quantumai.customer.exception.UserException;
+import com.quantumai.customer.exception.*;
 import com.quantumai.customer.repository.CustomRoleRepository;
 import com.quantumai.customer.repository.CustomerRepository;
 import com.quantumai.customer.repository.SubscriptionRepository;
@@ -19,7 +19,10 @@ import java.util.Optional;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
@@ -56,12 +59,35 @@ public class UsersAPI {
 
   @Autowired SubscriptionRepository subscriptionRepository;
 
+
+  private void checkUserDetailsPermissionFromSpringContext(CustomRoleType customRoleType) throws UserAccessException {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    System.out.println("Spring Security"+ authentication.getName());
+    Optional<Users> usersOptional=usersRepository.findByEmail(authentication.getName());
+    if(usersOptional.isPresent()){
+      System.out.println(customRoleType.ordinal()+" "+usersOptional.get().getRole().getUsers().ordinal());
+      if(customRoleType.ordinal()>usersOptional.get().getRole().getUsers().ordinal()){
+        GenricErrorMessage genricErrorMessage=new GenricErrorMessage("User Dont Have access", HttpStatus.FORBIDDEN);
+        throw new UserAccessException(genricErrorMessage.getMessage());
+      }
+    }
+    else{
+      GenricErrorMessage genricErrorMessage=new GenricErrorMessage("User Dont Have access", HttpStatus.FORBIDDEN);
+      throw new UserAccessException(genricErrorMessage.getMessage());
+    }
+
+
+
+
+  }
+
   @PostMapping("/registerUser")
-  public void register(@RequestBody Users users, @RequestHeader String Authorization)
-      throws UserException, NoSubscriptionError {
+  public Users register(@RequestBody Users users, @RequestHeader String Authorization)
+          throws UserException, NoSubscriptionError, UserAccessException {
     //      users.setStatus(StatusEnum.active);
     String jwt = Authorization.substring(7);
     String userEmail = jwtService.extractUserEmail(jwt);
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     Optional<Customer> customer = customerRepository.findByEmail(userEmail);
     if (customer.isPresent()) {
 
@@ -71,13 +97,13 @@ public class UsersAPI {
         throw new NoSubscriptionError("No Active Subscription");
       }
     }
-    userService.registerUser(users);
+    return userService.registerUser(users);
   }
 
   @PostMapping("/send/{companyId}")
   public void sendEmail(@PathVariable Long companyId, @RequestBody Mail mail)
-      throws NoSubscriptionError {
-
+          throws NoSubscriptionError, UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     Optional<Subscription> subscriptionOptional =
         subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
     if (subscriptionOptional.isEmpty()) {
@@ -163,6 +189,19 @@ public class UsersAPI {
     return ResponseEntity.ok(userDTOList);
   }
 
+  @PostMapping(value = "/resend-email-firebase-verification/{companyId}/{email}")
+  public ResponseEntity<Map<String, String>> resendFirebaseVerificationEmail(
+      @PathVariable Long companyId,
+      @PathVariable String email) throws UserException, TheMailException, FirebaseAuthException, UserEmailAlreadyVerifiedException, UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
+    userService.resendFirebaseVerificationEmail(email, companyId);
+    
+    return ResponseEntity.ok(Map.of(
+        "status", "success",
+        "message", "Firebase verification email has been resent successfully"
+    ));
+  }
+
   @GetMapping(value = "/getUserDetails/{companyId}/{email}")
   public ResponseEntity<UsersDTO> getUserDetails(
       @PathVariable Long companyId, @PathVariable String email) throws UserException {
@@ -174,8 +213,8 @@ public class UsersAPI {
   @PutMapping(value = "/userDetails")
   public ResponseEntity<String> updateUserDetails(
       @RequestBody UsersDTO usersDTO, @RequestHeader String Authorization)
-      throws NoSubscriptionError, UserException {
-
+          throws NoSubscriptionError, UserException, UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.edit);
     String jwt = Authorization.substring(7);
     String userEmail = jwtService.extractUserEmail(jwt);
     Optional<Customer> customer = customerRepository.findByEmail(userEmail);
@@ -190,11 +229,31 @@ public class UsersAPI {
     userService.updateUser(usersDTO);
     return ResponseEntity.ok("Status Updated Successfully");
   }
+  @PutMapping(value = "/userStatusUpdate")
+  public ResponseEntity<String> userStatusUpdate(
+          @RequestBody UsersDTO usersDTO, @RequestHeader String Authorization)
+          throws NoSubscriptionError, UserException, UserCannotActivateException, UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.edit);
+    String jwt = Authorization.substring(7);
+    String userEmail = jwtService.extractUserEmail(jwt);
+    Optional<Customer> customer = customerRepository.findByEmail(userEmail);
+    if (customer.isPresent()) {
+
+      Optional<Subscription> subscriptionOptional =
+              subscriptionRepository.findByCompanyIdAndStatus(customer.get().getCompanyId(), SubscriptionEnum.ACTIVE);
+      if (subscriptionOptional.isEmpty()) {
+        throw new NoSubscriptionError("No Active Subscription");
+      }
+    }
+    userService.updateUserStatus(usersDTO);
+    return ResponseEntity.ok("Status Updated Successfully");
+  }
 
   //    @Transactional
   @PostMapping(value = "/updateUserDetails")
   public void updateUserDetails(@RequestBody UsersDTO usersDTO, HttpServletRequest request)
       throws Exception {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     String authorizationHeader = request.getHeader("Authorization");
     String jwt = authorizationHeader.substring(7);
     String userEmail = jwtService.extractUserEmail(jwt);
@@ -272,6 +331,7 @@ public class UsersAPI {
       @RequestHeader("Authorization") String authHeader)
       throws Exception {
     //		System.out.print("-,,,,---,,,,---"+authHeader);
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
     String jwt = authHeader.substring(7);
     String userEmail = jwtService.extractUserEmail(jwt);
     Optional<Customer> customer = customerRepository.findByEmail(userEmail);
@@ -290,6 +350,7 @@ public class UsersAPI {
   public void addNewFields(
       @RequestBody UserExtraFieldsDTO extraFieldsDTO, @RequestHeader String Authorization)
       throws Exception {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     String jwt = Authorization.substring(7);
     String userEmail = jwtService.extractUserEmail(jwt);
     Optional<Customer> customer = customerRepository.findByEmail(userEmail);
@@ -312,6 +373,7 @@ public class UsersAPI {
   @DeleteMapping("/deleteExtraFields/{id}")
   public void deleteExtraField(@PathVariable String id, @RequestHeader String Authorization)
       throws Exception {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
     String jwt = Authorization.substring(7);
     String userEmail = jwtService.extractUserEmail(jwt);
     Optional<Customer> customer = customerRepository.findByEmail(userEmail);
@@ -336,6 +398,8 @@ public class UsersAPI {
   public void addExtraFieldName(
       @RequestBody UserExtraFieldNameDTO extraFieldNameDTO, @RequestHeader String Authorization)
       throws Exception {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
+
     String jwt = Authorization.substring(7);
     String userEmail = jwtService.extractUserEmail(jwt);
     Optional<Customer> customer = customerRepository.findByEmail(userEmail);
@@ -352,8 +416,9 @@ public class UsersAPI {
 
   @DeleteMapping("/deleteExtraFieldName/{id}")
   public void deleteExtraFieldName(@PathVariable String id, @RequestHeader String Authorization)
-      throws NoSubscriptionError {
+          throws NoSubscriptionError, UserAccessException {
     // System.out.println("-----------------------api------------------------>"+id);
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
     String jwt = Authorization.substring(7);
     String userEmail = jwtService.extractUserEmail(jwt);
     Optional<Customer> customer = customerRepository.findByEmail(userEmail);
@@ -376,7 +441,8 @@ public class UsersAPI {
   @PostMapping("/mandatoryFields")
   public void mandatoryFields(
       @RequestBody UserMandatoryFields mandatoryFields, @RequestHeader String Authorization)
-      throws NoSubscriptionError {
+          throws NoSubscriptionError, UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     String jwt = Authorization.substring(7);
     String userEmail = jwtService.extractUserEmail(jwt);
     Optional<Customer> customer = customerRepository.findByEmail(userEmail);
@@ -394,7 +460,8 @@ public class UsersAPI {
   @PostMapping("/showFields")
   public void showFields(
       @RequestBody UserShowFields showFields, @RequestHeader String Authorization)
-      throws NoSubscriptionError {
+          throws NoSubscriptionError, UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     String jwt = Authorization.substring(7);
     String userEmail = jwtService.extractUserEmail(jwt);
     Optional<Customer> customer = customerRepository.findByEmail(userEmail);
@@ -439,8 +506,8 @@ public class UsersAPI {
 
   @DeleteMapping("/deleteShowAndMandatoryField/{name}/{companyId}")
   public void showFields(@PathVariable String name, @PathVariable Long companyId)
-      throws NoSubscriptionError {
-
+          throws NoSubscriptionError, UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
     Optional<Subscription> subscriptionOptional =
         subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
     if (subscriptionOptional.isEmpty()) {

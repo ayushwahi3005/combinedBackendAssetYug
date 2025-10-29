@@ -57,6 +57,7 @@ public class SecurityConfiguration {
                     "/customer/updatePassword",
                     "/assetyug-notifications/**",
                      "/invitation/**",
+                     "/subscription/subscription-valid/**",
                     "/topic/**",
                     "/stripe/*",
                     "/app/**")

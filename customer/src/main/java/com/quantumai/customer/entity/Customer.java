@@ -10,6 +10,8 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 @Data
 @Document
 public class Customer implements UserDetails {
@@ -23,6 +25,7 @@ public class Customer implements UserDetails {
   private String companyName;
   private Long companyId;
   private String mobileNumber;
+  @JsonIgnore
   private String password;
 
   //	@Enumerated

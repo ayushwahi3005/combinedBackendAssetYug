@@ -10,11 +10,7 @@ import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
-import com.quantumai.customer.exception.CategoryException;
-import com.quantumai.customer.exception.EmailAlreadyExistsException;
-import com.quantumai.customer.exception.ImportFileRowException;
-import com.quantumai.customer.exception.NameColumnMissingException;
-import com.quantumai.customer.exception.NoSubscriptionError;
+import com.quantumai.customer.exception.*;
 import com.quantumai.customer.repository.*;
 import com.quantumai.customer.service.CompanyCustomerService;
 import com.quantumai.customer.service.CustomerService;
@@ -38,6 +34,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -69,6 +67,8 @@ public class CompanyCustomerAPI {
     
     // External Services
     @Autowired private JavaMailSender emailSender;
+
+    @Autowired private UsersRepository usersRepository;
     
     // Utilities
     private final ModelMapper modelMapper = new ModelMapper();
@@ -90,6 +90,27 @@ public class CompanyCustomerAPI {
     private static final String IMPORT_SUBJECT = "Import Report from AssetYug";
     private static final String EXCEL_FILENAME = "CustomerReport.xlsx";
 
+  private void checkUserDetailsPermissionFromSpringContext(CustomRoleType customRoleType) throws UserAccessException {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    System.out.println("Spring Security"+ authentication.getName());
+    Optional<Users> usersOptional=usersRepository.findByEmail(authentication.getName());
+    if(usersOptional.isPresent()){
+      System.out.println(customRoleType.ordinal()+" "+usersOptional.get().getRole().getCustomers().ordinal());
+      if(customRoleType.ordinal()>usersOptional.get().getRole().getCustomers().ordinal()){
+        GenricErrorMessage genricErrorMessage=new GenricErrorMessage("User Dont Have access", HttpStatus.FORBIDDEN);
+        throw new UserAccessException(genricErrorMessage.getMessage());
+      }
+    }
+    else{
+      GenricErrorMessage genricErrorMessage=new GenricErrorMessage("User Dont Have access", HttpStatus.FORBIDDEN);
+      throw new UserAccessException(genricErrorMessage.getMessage());
+    }
+
+
+
+
+  }
+
   @GetMapping("/working")
   public String working() {
     System.out.println("working!!!");
@@ -98,8 +119,8 @@ public class CompanyCustomerAPI {
 
   @DeleteMapping("/deleteCompanyCustomer/{id}")
   public void deleteCompanyCustomer(@PathVariable String id, @RequestHeader Long companyId)
-      throws NoSubscriptionError {
-
+          throws NoSubscriptionError, UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
     //Optional<Subscription> subscriptionOptional =
       //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
   //  if (subscriptionOptional.isEmpty()) {
@@ -134,7 +155,8 @@ public class CompanyCustomerAPI {
   @PostMapping("/addCompanyCustomer")
   public CompanyCustomerDTO addNewFields(
       @RequestBody CompanyCustomerDTO companyCustomerDTO, @RequestHeader Long companyId)
-      throws NoSubscriptionError, EmailAlreadyExistsException {
+          throws NoSubscriptionError, EmailAlreadyExistsException, UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     System.out.println("CompanyId-->" + companyId);
     //Optional<Subscription> subscriptionOptional =
       //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
@@ -147,8 +169,8 @@ public class CompanyCustomerAPI {
   @PutMapping("/updateCompanyCustomer")
   public void updateCompanyCustomer(
       @RequestBody CompanyCustomerDTO companyCustomerDTO, @RequestHeader Long companyId)
-      throws NoSubscriptionError, EmailAlreadyExistsException {
-
+          throws NoSubscriptionError, EmailAlreadyExistsException, UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.edit);
     //Optional<Subscription> subscriptionOptional =
       //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
   //  if (subscriptionOptional.isEmpty()) {
@@ -178,7 +200,7 @@ public class CompanyCustomerAPI {
       @RequestBody CompanyCustomerExtraFieldNameDTO extraFieldNameDTO,
       @RequestHeader Long companyId)
       throws Exception {
-
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     //Optional<Subscription> subscriptionOptional =
       //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
   //  if (subscriptionOptional.isEmpty()) {
@@ -195,7 +217,8 @@ public class CompanyCustomerAPI {
 
   @DeleteMapping("/deleteExtraFieldName/{id}")
   public void deleteExtraFieldName(@PathVariable String id, @RequestHeader Long companyId)
-      throws NoSubscriptionError {
+          throws Exception {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
     //Optional<Subscription> subscriptionOptional =
       //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
   //  if (subscriptionOptional.isEmpty()) {
@@ -207,8 +230,8 @@ public class CompanyCustomerAPI {
   @PostMapping("/mandatoryFields")
   public void mandatoryFields(
       @RequestBody CompanyCustomerMandatoryFields mandatoryFields, @RequestHeader Long companyId)
-      throws NoSubscriptionError {
-
+          throws NoSubscriptionError, UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     //Optional<Subscription> subscriptionOptional =
       //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
   //  if (subscriptionOptional.isEmpty()) {
@@ -220,8 +243,8 @@ public class CompanyCustomerAPI {
   @PostMapping("/showFields")
   public void showFields(
       @RequestBody CompanyCustomerShowFields showFields, @RequestHeader Long companyId)
-      throws NoSubscriptionError {
-
+          throws NoSubscriptionError, UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     //Optional<Subscription> subscriptionOptional =
       //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
   //  if (subscriptionOptional.isEmpty()) {
@@ -264,8 +287,8 @@ public class CompanyCustomerAPI {
 
   @DeleteMapping("/deleteShowAndMandatoryField/{name}/{companyId}")
   public void showFields(@PathVariable String name, @PathVariable Long companyId)
-      throws NoSubscriptionError {
-
+          throws NoSubscriptionError, UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
     //Optional<Subscription> subscriptionOptional =
       //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
   //  if (subscriptionOptional.isEmpty()) {
@@ -284,6 +307,7 @@ public class CompanyCustomerAPI {
   public void addNewFields(
       @RequestBody CompanyCustomerExtraFieldsDTO extraFieldsDTO, @RequestHeader Long companyId)
       throws Exception {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     //Optional<Subscription> subscriptionOptional =
       //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
   //  if (subscriptionOptional.isEmpty()) {
@@ -299,7 +323,7 @@ public class CompanyCustomerAPI {
 
   @DeleteMapping("/deleteExtraFields/{id}")
   public void deleteExtraField(@PathVariable String id, Long companyId) throws Exception {
-
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
     //Optional<Subscription> subscriptionOptional =
       //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
   //  if (subscriptionOptional.isEmpty()) {
@@ -311,7 +335,7 @@ public class CompanyCustomerAPI {
   @DeleteMapping("/deleteCompanyCustomerExtraFields/{id}")
   public void deleteCompanyCustomerExtraFields(
       @PathVariable String id, @RequestHeader Long companyId) throws Exception {
-
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
     //Optional<Subscription> subscriptionOptional =
       //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
   //  if (subscriptionOptional.isEmpty()) {
@@ -330,7 +354,8 @@ public class CompanyCustomerAPI {
       @RequestParam("file") MultipartFile file,
       @PathVariable String companyCustomerId,
       @RequestHeader Long companyId)
-      throws NoSubscriptionError {
+          throws NoSubscriptionError, UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     //Optional<Subscription> subscriptionOptional =
       //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
   //  if (subscriptionOptional.isEmpty()) {
@@ -369,7 +394,8 @@ public class CompanyCustomerAPI {
 
   @DeleteMapping("deleteFile/{id}")
   public void deleteFile(@PathVariable String id, @RequestHeader Long companyId)
-      throws NoSubscriptionError {
+          throws NoSubscriptionError, UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
     //Optional<Subscription> subscriptionOptional =
       //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
   //  if (subscriptionOptional.isEmpty()) {
@@ -427,11 +453,12 @@ public class CompanyCustomerAPI {
       @RequestParam("columnMappings") String columnMappings,
       @PathVariable Long companyId,
       @PathVariable String email)
-      throws CsvValidationException,
+          throws CsvValidationException,
           MessagingException,
           ImportFileRowException,
-          NoSubscriptionError, EmailAlreadyExistsException,NameColumnMissingException {
+          NoSubscriptionError, EmailAlreadyExistsException, NameColumnMissingException, UserAccessException {
     //
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     	System.out.println("------||---------------------------------------/////////////////////////////////////------->"+columnMappings);
     //Optional<Subscription> subscriptionOptional =
       //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
@@ -863,12 +890,13 @@ public class CompanyCustomerAPI {
       @RequestParam("columnMappings") String columnMappings,
       @PathVariable Long companyId,
       @PathVariable String email)
-      throws CsvValidationException,
+          throws CsvValidationException,
           JsonParseException,
           IOException,
           MessagingException,
           ImportFileRowException,
-          NoSubscriptionError {
+          NoSubscriptionError, UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.edit);
     //Optional<Subscription> subscriptionOptional =
       //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
   //  if (subscriptionOptional.isEmpty()) {
@@ -1337,6 +1365,7 @@ public class CompanyCustomerAPI {
   public void addCategory(@RequestBody CategoryDTO categoryDTO, @RequestHeader Long companyId)
           throws Exception {
     System.out.println("Category===>" + categoryDTO);
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     //Optional<Subscription> subscriptionOptional =
       //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
   //  if (subscriptionOptional.isEmpty()) {
@@ -1364,13 +1393,8 @@ public class CompanyCustomerAPI {
 
   @DeleteMapping(value = "/deleteCategory/{id}")
   public void deleteCategory(@PathVariable String id, @RequestHeader Long companyId)
-      throws NoSubscriptionError {
-
-    //Optional<Subscription> subscriptionOptional =
-      //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-  //  if (subscriptionOptional.isEmpty()) {
-    //  throw new NoSubscriptionError("No Active Subscription");
-//    }
+          throws NoSubscriptionError, UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
     companyCustomerService.deleteCategory(id);
   }
 
@@ -1382,8 +1406,8 @@ public class CompanyCustomerAPI {
 
   @PutMapping(value = "/updateCategory")
   public void updateCategory(@RequestBody CategoryDTO categoryDTO, @RequestHeader Long companyId)
-      throws NoSubscriptionError {
-
+          throws NoSubscriptionError, UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.edit);
     //Optional<Subscription> subscriptionOptional =
       //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
   //  if (subscriptionOptional.isEmpty()) {
@@ -1392,6 +1416,11 @@ public class CompanyCustomerAPI {
     companyCustomerService.updateCategory(categoryDTO);
   }
 
+//  @GetMapping(value = "/CustomFieldCustomerCount/{companyId}/{id}")
+//  public Integer getCustomFieldCustomerCount(
+//          @PathVariable Long companyId, @PathVariable String id) {
+//    return companyCustomerService.getCustomFieldCustomerCount(companyId, id);
+//  }
   @GetMapping("/export-company-customer/{companyId}")
     public ResponseEntity<byte[]> exportCompanyCustomers(@PathVariable Long companyId) throws IOException {
         List<CompanyCustomer> customers = companyCustomerRepository.findByCompanyId(companyId);
@@ -1437,5 +1466,15 @@ public class CompanyCustomerAPI {
                 .header("Content-Disposition", "attachment; filename=CompanyCustomerExport.xlsx")
                 .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(excelBytes);
+    }
+
+    @PutMapping("/extraFieldName")
+    public ResponseEntity<CompanyCustomerExtraFieldName> updateExtraFieldName(@RequestBody ExtraFieldNameUpdateDTO extraFieldNameUpdateDTO) throws UserAccessException {
+      checkUserDetailsPermissionFromSpringContext(CustomRoleType.edit);
+    CompanyCustomerExtraFieldName companyCustomerExtraFieldName=companyCustomerService.updateExtraFieldName(extraFieldNameUpdateDTO);
+    return ResponseEntity.ok(companyCustomerExtraFieldName);
+
+
+
     }
 }

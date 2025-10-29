@@ -13,18 +13,22 @@ import com.quantumai.customer.repository.PaymentRepository;
 import com.quantumai.customer.repository.PlansRepository;
 import com.quantumai.customer.repository.SubscriptionRepository;
 import com.quantumai.customer.repository.SubscriptionRepositoryCustom;
+import lombok.extern.slf4j.Slf4j;
+import org.modelmapper.ModelMapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
-import org.modelmapper.ModelMapper;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.stereotype.Service;
 
 @Service
+@Slf4j
 public class SubscriptionServiceImpl implements SubscriptionService {
 
   @Autowired private SubscriptionRepository subscriptionRepository;
@@ -40,39 +44,71 @@ public class SubscriptionServiceImpl implements SubscriptionService {
   @Autowired private PaymentService paymentService;
 
   @Autowired private SubscriptionAnalyticsService subscriptionAnalyticsService;
+  
+//  @Autowired private UserActivationService userActivationService;
 
   private ModelMapper modelMapper = new ModelMapper();
 
   @Override
+  @Transactional
   public void addSubscription(SubscriptionDTO subscriptionDTO) {
     Subscription subscription = modelMapper.map(subscriptionDTO, Subscription.class);
     subscription.setSubscriptionDate(LocalDate.now());
-    //    List<Subscription> mySubscription =
-    //        subscriptionRepository.findByCompanyId(subscriptionDTO.getCompanyId());
-    //    if (mySubscription.isPresent()) {
-    //      subscription.setId(mySubscription.get().getId());
-    //    }
 
-    subscriptionRepository.save(subscription);
+    // Save the subscription first
+    subscription = subscriptionRepository.save(subscription);
+
+    // Update user activations based on the new subscription limit
+//    if (subscription.getStatus() == SubscriptionEnum.ACTIVE) {
+//      int deactivated = userActivationService.updateActiveUsersBySubscription(
+//          subscription.getCompanyId(),
+//          subscription.getPerson()
+//      );
+//
+//      if (deactivated > 0) {
+//        log.warn("Deactivated {} users for company {} to comply with new subscription limit of {}",
+//            deactivated, subscription.getCompanyId(), subscription.getPerson());
+//      }
+//    }
   }
 
   @Override
+  @Transactional
   public void updateSubscription(SubscriptionDTO subscriptionDTO) {
+    // Get the existing subscription to check for person limit changes
+    Optional<Subscription> existingOpt = subscriptionRepository.findById(subscriptionDTO.getId());
+
     Subscription subscription = modelMapper.map(subscriptionDTO, Subscription.class);
     subscription.setSubscriptionDate(LocalDate.now());
-    subscriptionRepository.save(subscription);
+    subscription = subscriptionRepository.save(subscription);
+
+    // If this is an active subscription and the person limit has changed
+//    if (subscription.getStatus() == SubscriptionEnum.ACTIVE &&
+//        existingOpt.isPresent() &&
+//        existingOpt.get().getPerson() != subscription.getPerson()) {
+//
+//      int deactivated = userActivationService.updateActiveUsersBySubscription(
+//          subscription.getCompanyId(),
+//          subscription.getPerson()
+//      );
+//
+//      if (deactivated > 0) {
+//        log.warn("Deactivated {} users for company {} to comply with updated subscription limit of {}",
+//            deactivated, subscription.getCompanyId(), subscription.getPerson());
+//      }
+//    }
   }
 
   @Override
   public void isExpired() {
-    List<Subscription> subscriptionList = subscriptionRepository.findAll();
+    List<Subscription> subscriptionList = subscriptionRepository.findByStatus(SubscriptionEnum.ACTIVE);
     subscriptionList.stream()
         .forEach(
             (subs) -> {
-              LocalDate planRenewDate = subs.getSubscriptionDate();
-              LocalDate planExpiredDate = planRenewDate.plusMonths(1);
+              // LocalDate planRenewDate = subs.getSubscriptionDate();
+              LocalDate planExpiredDate = subs.getExpiryDate();
               System.out.println(
-                  "Expired-->" + planRenewDate + " planExpiredDate->" + planExpiredDate);
+                  "Expired-->" + planExpiredDate);
               if (LocalDate.now().isAfter(planExpiredDate)
                   || LocalDateTime.now().equals(planExpiredDate)) {
                 System.out.println("Yesss");

@@ -126,6 +126,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 //        log.info("deviceId: " + deviceId + " " + (deviceId == null));
 //        log.info("mobileId: " + mobileId + " " + (mobileId == null));
         // 🔒 Reject if both headers are missing
+
         if (deviceId == null && mobileId == null) {
           response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
           response.getWriter().write("Token is invalid: missing device or mobile ID.");

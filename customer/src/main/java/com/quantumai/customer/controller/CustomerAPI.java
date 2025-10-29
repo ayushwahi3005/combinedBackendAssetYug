@@ -7,6 +7,7 @@ import com.quantumai.customer.entity.*;
 import com.quantumai.customer.exception.LocationAlreadyPresentException;
 import com.quantumai.customer.exception.NoEmailFoundException;
 import com.quantumai.customer.exception.OTPException;
+import com.quantumai.customer.repository.CustomerRepository;
 import com.quantumai.customer.service.ActiveSessionService;
 import com.quantumai.customer.service.CustomerService;
 import com.quantumai.customer.service.TrialService;
@@ -31,6 +32,8 @@ public class CustomerAPI {
 
   @Autowired private CustomerService customerService;
 
+
+
   @Autowired private ActiveSessionService activeSessionService;
   
   @Autowired private TrialService trialService;
@@ -40,6 +43,8 @@ public class CustomerAPI {
     System.out.println("working");
     return ResponseEntity.ok("Working OK");
   }
+
+
 
   @GetMapping(value = "/checkUserName/{email}")
   public ResponseEntity<Boolean> checkUserName(@PathVariable String email) throws Exception {

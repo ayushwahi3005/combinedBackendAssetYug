@@ -1,13 +1,19 @@
 package com.quantumai.customer.controller;
 
 import com.quantumai.customer.dto.SubscriptionDTO;
-import com.quantumai.customer.entity.CompanyInformation;
-import com.quantumai.customer.entity.Subscription;
+import com.quantumai.customer.entity.*;
 import com.quantumai.customer.repository.CompanyInformationRepository;
+import com.quantumai.customer.repository.SubscriptionRepository;
+import com.quantumai.customer.repository.UsersRepository;
 import com.quantumai.customer.service.SubscriptionService;
+
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import org.checkerframework.checker.units.qual.A;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,9 +28,13 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/subscription")
 public class SubscriptionAPI {
 
-  @Autowired private SubscriptionService subscriptionService;
+    private static final Logger log = LoggerFactory.getLogger(SubscriptionAPI.class);
+    @Autowired private SubscriptionService subscriptionService;
 
   @Autowired private CompanyInformationRepository companyInformationRepository;
+
+  @Autowired private SubscriptionRepository subscriptionRepository;
+  @Autowired private UsersRepository usersRepository;
 
   @PostMapping("/add")
   public void addSubscription(@RequestBody SubscriptionDTO subscriptionDTO) {
@@ -96,4 +106,14 @@ public class SubscriptionAPI {
     });
 
   }
+    @GetMapping("/subscription-valid/{companyId}")
+    public boolean isSubscriptionValid(
+            @PathVariable Long companyId)
+            throws Exception {
+      log.info("Subscription-valid is calling");
+        Optional<Subscription> subscription=subscriptionRepository.findByCompanyIdAndStatus(companyId,SubscriptionEnum.ACTIVE);
+        long activeUserCount = usersRepository.countByCompanyIdAndStatus(companyId, StatusEnum.active);
+        return subscription.map(value -> value.getPerson() >= activeUserCount).orElse(true);
+
+    }
 }

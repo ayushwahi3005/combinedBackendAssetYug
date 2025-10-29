@@ -14,4 +14,5 @@ public interface CompanyCustomerCategoryRepository
   public Optional<CompanyCustomerCategory> findByName(String name);
 
   public Optional<CompanyCustomerCategory> findByNameAndCompanyId(String name,Long companyId);
+
 }

@@ -1,10 +1,7 @@
 package com.quantumai.customer.service;
 
 import com.quantumai.customer.dto.*;
-import com.quantumai.customer.entity.CompanyCustomerCategory;
-import com.quantumai.customer.entity.CompanyCustomerFile;
-import com.quantumai.customer.entity.CompanyCustomerMandatoryFields;
-import com.quantumai.customer.entity.CompanyCustomerShowFields;
+import com.quantumai.customer.entity.*;
 import com.quantumai.customer.exception.CategoryException;
 import com.quantumai.customer.exception.EmailAlreadyExistsException;
 import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
@@ -36,7 +33,7 @@ public interface CompanyCustomerService {
 
   public List<CompanyCustomerExtraFieldNameDTO> getCompanyCustomerExtraField(Long companyId);
 
-  public void deleteCompanyCustomerExtraField(String id);
+  public void deleteCompanyCustomerExtraField(String id) throws Exception;
 
   public void updateMandatoryFields(CompanyCustomerMandatoryFields mandatoryFields);
 
@@ -97,4 +94,8 @@ public interface CompanyCustomerService {
   public int countCompanyCustomerByCategory(String category);
 
   public CompanyCustomerCategory getCategoryListById(Long companyId, String id);
+
+  public CompanyCustomerExtraFieldName updateExtraFieldName(ExtraFieldNameUpdateDTO extraFieldNameUpdateDTO);
+
+//  public Integer getCustomFieldCustomerCount(Long companyId, String id);
 }
