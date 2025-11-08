@@ -30,6 +30,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartFile;
 
 @CrossOrigin(
@@ -1819,31 +1820,27 @@ public void importFile(
 
   @PostMapping("/addFile/{assetId}")
   public ResponseEntity<ResponseMessageDTO> addAssetFile(
-      @RequestParam("file") MultipartFile file, @PathVariable String assetId)
-      throws NoSubscriptionError {
-    // System.out.println("------------------------inside Multifile------------->");
+          @RequestParam("file") MultipartFile file,
+          @PathVariable String assetId) throws NoSubscriptionError {
+
     Optional<Assets> assetsOptional = assetsRepository.findById(assetId);
-    if (assetsOptional.isPresent()) {
-      // Optional<Subscription> subscriptionOptional =
-      //     subscriptionRepository.findByCompanyIdAndStatus(
-      //         assetsOptional.get().getCompanyId(), SubscriptionEnum.ACTIVE);
-      // if (subscriptionOptional.isEmpty()) {
-      //   throw new NoSubscriptionError("No Active Subscription");
-      // }
+    if (assetsOptional.isEmpty()) {
+      ResponseMessageDTO response = new ResponseMessageDTO();
+      response.setResponseMessage("Asset not found");
+      return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
     }
-    String message = "";
+
     try {
       assetsService.addAssetFile(file, assetId);
-      message = "Uploaded the file successfully: " + file.getOriginalFilename();
-      ResponseMessageDTO responseMessageDTO = new ResponseMessageDTO();
-      responseMessageDTO.setResponseMessage(message);
-      return new ResponseEntity<>(responseMessageDTO, HttpStatus.ACCEPTED);
+
+      ResponseMessageDTO response = new ResponseMessageDTO();
+      response.setResponseMessage("Uploaded the file successfully: " + file.getOriginalFilename());
+      return new ResponseEntity<>(response, HttpStatus.OK);
+
     } catch (IOException e) {
-      // TODO Auto-generated catch block
-      message = "Could not upload the file: " + file.getOriginalFilename() + "!";
-      ResponseMessageDTO responseMessageDTO = new ResponseMessageDTO();
-      responseMessageDTO.setResponseMessage(message);
-      return new ResponseEntity<>(responseMessageDTO, HttpStatus.EXPECTATION_FAILED);
+      ResponseMessageDTO response = new ResponseMessageDTO();
+      response.setResponseMessage("Could not upload the file: " + file.getOriginalFilename());
+      return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
