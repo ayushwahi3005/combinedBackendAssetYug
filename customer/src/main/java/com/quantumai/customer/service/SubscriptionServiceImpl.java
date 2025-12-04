@@ -54,7 +54,9 @@ public class SubscriptionServiceImpl implements SubscriptionService {
   public void addSubscription(SubscriptionDTO subscriptionDTO) {
     Subscription subscription = modelMapper.map(subscriptionDTO, Subscription.class);
     subscription.setSubscriptionDate(LocalDate.now());
-
+    if(subscriptionDTO.getSubscriptionName().trim().isEmpty() || subscriptionDTO.getSubscriptionName().trim().isBlank()){
+      subscription.setSubscriptionName("Growth");
+    }
     // Save the subscription first
     subscription = subscriptionRepository.save(subscription);
 
@@ -77,7 +79,9 @@ public class SubscriptionServiceImpl implements SubscriptionService {
   public void updateSubscription(SubscriptionDTO subscriptionDTO) {
     // Get the existing subscription to check for person limit changes
     Optional<Subscription> existingOpt = subscriptionRepository.findById(subscriptionDTO.getId());
-
+    if(subscriptionDTO.getSubscriptionName().trim().isBlank()||subscriptionDTO.getSubscriptionName().trim().isEmpty()){
+      subscriptionDTO.setSubscriptionName("Growth");
+    }
     Subscription subscription = modelMapper.map(subscriptionDTO, Subscription.class);
     subscription.setSubscriptionDate(LocalDate.now());
     subscription = subscriptionRepository.save(subscription);

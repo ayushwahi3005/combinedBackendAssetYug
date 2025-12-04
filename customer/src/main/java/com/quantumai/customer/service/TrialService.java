@@ -27,7 +27,9 @@ public class TrialService {
 
     /**
      * Initialize trial for a new customer
+     *
      */
+    int trial_period=7;
     public void initializeTrial(String customerEmail, Long companyId) {
         Optional<TrialStatus> existingTrial = trialStatusRepository.findByCustomerEmail(customerEmail);
         
@@ -36,7 +38,7 @@ public class TrialService {
             trialStatus.setCustomerEmail(customerEmail);
             trialStatus.setCompanyId(companyId);
             trialStatus.setTrialStartDate(LocalDateTime.now());
-            trialStatus.setTrialEndDate(LocalDateTime.now().plusDays(15));
+            trialStatus.setTrialEndDate(LocalDateTime.now().plusDays(trial_period));
             trialStatus.setTrialActive(true);
             trialStatus.setTrialExpired(false);
             trialStatus.setTrialExpirationNotificationSent(false);
@@ -49,7 +51,7 @@ public class TrialService {
             if (customer.isPresent()) {
                 Customer c = customer.get();
                 c.setTrialStartDate(LocalDateTime.now());
-                c.setTrialEndDate(LocalDateTime.now().plusDays(15));
+                c.setTrialEndDate(LocalDateTime.now().plusDays(trial_period));
                 c.setTrialActive(true);
                 c.setTrialExpired(false);
                 c.setTrialExpirationNotificationSent(false);
@@ -149,7 +151,7 @@ public class TrialService {
         // Send expiration notification
         Notification notification = new Notification();
         notification.setTitle("Free Trial Expired");
-        notification.setMessage("Your 15-day free trial has expired. Please upgrade to a paid plan to continue using our services.");
+        notification.setMessage("Your 7-day free trial has expired. Please upgrade to a paid plan to continue using our services.");
         notification.setAlertType("TRIAL_EXPIRED");
         notification.setCreatedAt(LocalDateTime.now());
         
@@ -197,5 +199,10 @@ public class TrialService {
                 customerRepository.save(c);
             }
         }
+    }
+
+    public TrialStatus getTrialDetails(Long companyId){
+        Optional<TrialStatus> trialStatusOptional=trialStatusRepository.findByCompanyId(companyId);
+        return trialStatusOptional.orElse(null);
     }
 }

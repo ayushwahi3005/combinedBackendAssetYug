@@ -1361,6 +1361,8 @@ public class CompanyCustomerAPI {
     return ResponseEntity.ok(US_STATES);
   }
 
+
+
   @PostMapping(value = "/addCategory")
   public void addCategory(@RequestBody CategoryDTO categoryDTO, @RequestHeader Long companyId)
           throws Exception {

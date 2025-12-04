@@ -78,8 +78,7 @@ public class PaymentAPI {
         System.out.println(
             "===>Create subscription" + planString.equalsIgnoreCase("ANNUAL") + " " + plan);
       }
-      //       = SubscriptionPlan.valueOf(obj.get("subscriptionPlan").toString().toUpperCase());
-
+      //       = SubscriptionPlan.valueOf(obj.get("subscriptionPlan").toString().toUpperCase())
       com.stripe.model.Subscription stripeSubscription =
           paymentService.createSubscription(
               Long.parseLong(obj.get("companyId").asText()),
@@ -89,7 +88,8 @@ public class PaymentAPI {
               plan,
               obj.get("quantity").asLong(),
               obj.get("amount").asDouble(),
-              obj.get("cardHolderName").asText());
+              obj.get("cardHolderName").asText(),
+                  obj.get("currentPlanName").asText());
       Map<String, String> response = new HashMap<>();
       //      response.put("clientSecret", clientSecret);
       //      System.out.println("---Subscription-->>>>>>>>"+stripeSubscription.getCustomer());

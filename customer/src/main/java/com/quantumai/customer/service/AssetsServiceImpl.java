@@ -1346,6 +1346,9 @@ public class AssetsServiceImpl implements AssetsService {
   @Override
   public List<AssetCategoryInspection> getAllAssetInspectionByCategory(Long companyId,String category) {
       System.out.println("===================>>>"+category);
+      if(category.trim().isEmpty()){
+          return null;
+      }
     return assetCategoryInspectionRepository.findByCompanyIdAndCategoryNameIgnoreCase(companyId,category);
   }
 

@@ -165,11 +165,15 @@ public class StripeWebhookController {
                         currSubscription.setStatus(SubscriptionEnum.EXPIRED);
                         subscriptionRepository.save(currSubscription);
                         Subscription subscription;
+                        String planName=currSubscription.getSubscriptionName();
+                        if(currSubscription.getSubscriptionName().trim().isEmpty()||currSubscription.getSubscriptionName().trim().isBlank()){
+                            planName="Growth";
+                        }
                         if(currSubscription.getSubscriptionPlan().equals(SubscriptionPlan.MONTHLY)) {
-                            subscription = new Subscription(null, currSubscription.getCompanyId(), SubscriptionEnum.ACTIVE, currSubscription.getPlan(), currSubscription.getPerson(), LocalDate.now(), LocalDate.now().plusMonths(1),currSubscription.getSubscriptionPlan(),currSubscription.getAmount(),currSubscription.getStripeSubscriptionId(),currSubscription.getStripeCustomerId());
+                            subscription = new Subscription(null, currSubscription.getCompanyId(), SubscriptionEnum.ACTIVE, currSubscription.getPlan(), currSubscription.getPerson(), LocalDate.now(), LocalDate.now().plusMonths(1),currSubscription.getSubscriptionPlan(),currSubscription.getAmount(),currSubscription.getStripeSubscriptionId(),currSubscription.getStripeCustomerId(),planName);
                         }
                         else{
-                            subscription = new Subscription(null, currSubscription.getCompanyId(), SubscriptionEnum.ACTIVE, currSubscription.getPlan(), currSubscription.getPerson(), LocalDate.now(), LocalDate.now().plusYears(1),currSubscription.getSubscriptionPlan(),currSubscription.getAmount(),currSubscription.getStripeSubscriptionId(),currSubscription.getStripeCustomerId());
+                            subscription = new Subscription(null, currSubscription.getCompanyId(), SubscriptionEnum.ACTIVE, currSubscription.getPlan(), currSubscription.getPerson(), LocalDate.now(), LocalDate.now().plusYears(1),currSubscription.getSubscriptionPlan(),currSubscription.getAmount(),currSubscription.getStripeSubscriptionId(),currSubscription.getStripeCustomerId(),planName);
 
                         }
                         log.info("New Subscription Details : {}",subscription);

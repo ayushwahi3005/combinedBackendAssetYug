@@ -110,7 +110,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
 
     companyCustomer.setUpdatedAt(LocalDateTime.now().toString());
 
-      if(companyCustomerRepository.findByEmailAndCompanyId(companyCustomer.getEmail(),companyCustomer.getCompanyId()).isPresent()){
+      if(!companyCustomer.getEmail().trim().isEmpty()&&companyCustomerRepository.findByEmailAndCompanyId(companyCustomer.getEmail(),companyCustomer.getCompanyId()).isPresent()){
         throw new EmailAlreadyExistsException("User With Email Aready Present");
       }
       else{
@@ -218,6 +218,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
               m.put("apartment", order.getApartment());
               m.put("city", order.getCity());
               m.put("state", order.getState());
+              m.put("country",order.getCountry());
               m.put("companyCustomerId", order.getCompanyCustomerId().toString());
               m.put("updatedAt", order.getUpdatedAt());
               if (order.getPhone() != null)
@@ -580,6 +581,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
               m.put("apartment", order.getApartment());
               m.put("city", order.getCity());
               m.put("state", order.getState());
+              m.put("country",order.getCountry());
               m.put("status", order.getStatus());
               m.put("updatedAt", order.getUpdatedAt());
               if (order.getZipCode() != null) {

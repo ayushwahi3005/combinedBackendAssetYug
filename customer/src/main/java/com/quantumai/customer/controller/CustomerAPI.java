@@ -38,6 +38,11 @@ public class CustomerAPI {
   
   @Autowired private TrialService trialService;
 
+  @GetMapping(value = "/trial-status-details/{companyId}")
+  public ResponseEntity<TrialStatus> getTrialStatus(@PathVariable Long companyId) throws Exception {
+    return ResponseEntity.ok(trialService.getTrialDetails(companyId));
+  }
+
   @GetMapping(value = "/working")
   public ResponseEntity<String> working() throws Exception {
     System.out.println("working");

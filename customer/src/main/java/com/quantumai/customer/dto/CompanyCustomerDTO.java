@@ -17,6 +17,7 @@ public class CompanyCustomerDTO {
   private String apartment;
   private String city;
   private String state;
+  private String country;
   private Integer zipCode;
   private String updatedAt;
 }

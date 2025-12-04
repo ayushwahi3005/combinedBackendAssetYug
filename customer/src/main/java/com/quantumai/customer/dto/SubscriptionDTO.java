@@ -19,4 +19,5 @@ public class SubscriptionDTO {
   private Double amount;
   private String stripeSubscriptionId;
   private String stripeCustomerId;
+  private String subscriptionName;
 }

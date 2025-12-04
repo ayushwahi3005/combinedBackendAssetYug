@@ -65,7 +65,8 @@ public class PaymentService {
       SubscriptionPlan planSelected,
       Long quantity,
       Double amount,
-      String cardHolderName)
+      String cardHolderName,
+      String currentPlanName)
       throws Exception {
     List<com.quantumai.customer.entity.Subscription> subscriptionList =
         subscriptionRepository.findByCompanyId(companyId);
@@ -137,6 +138,7 @@ public class PaymentService {
             newSubscription.setPerson(quantity.intValue());
             newSubscription.setStripeSubscriptionId(subscriptionId);
             newSubscription.setStripeCustomerId(optionalCustomerStripeDetails.get().getCustomerId());
+            newSubscription.setSubscriptionName(currentPlanName);
             subscriptionRepository.save(newSubscription);
           }
         } else if (planSelected == SubscriptionPlan.ANNUAL) {
@@ -186,6 +188,7 @@ public class PaymentService {
             newSubscription.setPerson(quantity.intValue());
             newSubscription.setStripeSubscriptionId(subscription.getId());
             newSubscription.setStripeCustomerId(optionalCustomerStripeDetails.get().getCustomerId());
+            newSubscription.setSubscriptionName(currentPlanName);
             subscriptionRepository.save(newSubscription);
           }
         }
@@ -235,6 +238,7 @@ public class PaymentService {
             newSubscription.setPerson(quantity.intValue());
             newSubscription.setStripeSubscriptionId(subscriptionId);
             newSubscription.setStripeCustomerId(optionalCustomerStripeDetails.get().getCustomerId());
+            newSubscription.setSubscriptionName(currentPlanName);
             subscriptionRepository.save(newSubscription);
           }
         } else if (planSelected == SubscriptionPlan.MONTHLY) {
@@ -271,6 +275,7 @@ public class PaymentService {
           newSubscription.setPerson(quantity.intValue());
           newSubscription.setStripeSubscriptionId(subscription.getId());
           newSubscription.setStripeCustomerId(optionalCustomerStripeDetails.get().getCustomerId());
+          newSubscription.setSubscriptionName(currentPlanName);
           subscriptionRepository.save(newSubscription);
         }
       }
@@ -353,6 +358,7 @@ public class PaymentService {
       newSubscription.setPerson(quantity.intValue());
       newSubscription.setStripeSubscriptionId(subscription.getId());
       newSubscription.setStripeCustomerId(customerId);
+      newSubscription.setSubscriptionName(currentPlanName);
       subscriptionRepository.save(newSubscription);
 
       saveCard(paymentMethodId, email, cardHolderName, companyId);
@@ -631,6 +637,7 @@ public class PaymentService {
 //              subscriptionRepository.delete(currentSubscription);
               upcomingSubscription.setSubscriptionDate(currentSubscription.getSubscriptionDate());
               upcomingSubscription.setExpiryDate(currentSubscription.getExpiryDate());
+              upcomingSubscription.setSubscriptionName(currentSubscription.getSubscriptionName());
               subscriptionRepository.save(upcomingSubscription);
             } else {
               throw new Exception("Stripe Customer ID or Payment Method ID is missing");
@@ -704,7 +711,7 @@ public class PaymentService {
               upcomingSubscription.setSubscriptionDate(LocalDate.now());
               upcomingSubscription.setStripeCustomerId(currentSubscription.getStripeCustomerId());
 //              subscriptionRepository.delete(currentSubscription);
-
+              upcomingSubscription.setSubscriptionName(currentSubscription.getSubscriptionName());
               subscriptionRepository.save(upcomingSubscription);
             } else {
               throw new Exception("Stripe Customer ID or Payment Method ID is missing");

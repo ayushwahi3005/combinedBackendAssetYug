@@ -11,6 +11,7 @@ import java.util.Optional;
 @Repository
 public interface TrialStatusRepository extends MongoRepository<TrialStatus, String> {
     Optional<TrialStatus> findByCustomerEmail(String customerEmail);
+    Optional<TrialStatus> findByCompanyId(Long companyId);
     List<TrialStatus> findByIsTrialActiveTrue();
     List<TrialStatus> findByTrialEndDateBeforeAndIsTrialActiveTrueAndTrialExpiredFalse(LocalDateTime currentTime);
     List<TrialStatus> findByTrialEndDateBetweenAndIsTrialActiveTrueAndTrialExpirationNotificationSentFalse(
