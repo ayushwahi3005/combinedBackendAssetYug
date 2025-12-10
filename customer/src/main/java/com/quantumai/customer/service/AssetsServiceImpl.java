@@ -16,7 +16,9 @@ import com.quantumai.customer.repository.*;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
@@ -1421,4 +1423,46 @@ public class AssetsServiceImpl implements AssetsService {
       return null;
     }
   }
+
+    @Override
+    public List<AssetCheckInOutData> getAssetCheckInOutData(Long companyId) {
+        List<Assets> assetsList = assetsRepository.findByCompanyId(companyId);
+        List<AssetCheckInOutData> assetCheckInOutDataList = new ArrayList<>();
+        assetsList.stream().forEach((asset) -> {
+            AssetCheckInOutData assetCheckInOutData = new AssetCheckInOutData();
+            assetCheckInOutData.setAssetId(asset.getAssetId());
+            assetCheckInOutData.setAssetName(asset.getName());
+            Optional<AssetCheckInOut> assetCheckInOutOptional = checkInOutRepository.findByAssetId(asset.getId());
+            if(assetCheckInOutOptional.isPresent()){
+                AssetCheckInOut assetCheckInOut = assetCheckInOutOptional.get();
+                assetCheckInOut.getDetailsList().stream()
+                        .sorted(Comparator.comparing(AssetCheckInOutDetails::getDate).reversed())
+                        .findFirst()
+                        .ifPresent(latest -> {
+                            // use latest
+                            assetCheckInOutData.setAction(latest.getStatus());
+                            assetCheckInOutData.setDate(latest.getDate());
+                            assetCheckInOutData.setTime(latest.getUpdateTime().toLocalTime().withNano(0));
+                            assetCheckInOutData.setLocation(latest.getLocation());
+                            assetCheckInOutData.setUsername(latest.getEmployee());
+                        });
+            }
+            else{
+                assetCheckInOutData.setAction("Checked In");
+                LocalDate date = LocalDateTime.parse(asset.getUpdatedAt())
+                        .toLocalDate();
+
+              LocalTime timeOnly = LocalDateTime.parse(asset.getUpdatedAt()).toLocalTime().withNano(0);
+                assetCheckInOutData.setTime(timeOnly);
+                assetCheckInOutData.setDate(date);
+//                assetCheckInOutData.setTime(dateTime);
+                assetCheckInOutData.setLocation("NA");
+                assetCheckInOutData.setUsername("NA");
+            }
+
+
+            assetCheckInOutDataList.add(assetCheckInOutData);
+        });
+        return assetCheckInOutDataList;
+    }
 }

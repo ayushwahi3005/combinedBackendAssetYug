@@ -131,5 +131,7 @@ public interface AssetsService {
 
   public AssetExtraFieldName updateExtraFieldName(ExtraFieldNameUpdateDTO extraFieldNameUpdateDTO);
 
+  public List<AssetCheckInOutData> getAssetCheckInOutData(Long companyId);
+
 //  public List<Map<String,>> getAssetByCompanyCategory(Long companyId);
 }

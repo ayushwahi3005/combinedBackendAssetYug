@@ -2043,6 +2043,12 @@ public void importFile(
 
     return assetsService.filterByCheckedInOut(companyId, checkedIn);
   }
+  @GetMapping("/checkInOutAssetData/{companyId}")
+  public List<AssetCheckInOutData> getCheckInOutData(
+          @PathVariable Long companyId) {
+
+    return assetsService.getAssetCheckInOutData(companyId);
+  }
 
   @PostMapping(value = "/addCategory")
   public void addCategory(@RequestBody CategoryDTO categoryDTO)

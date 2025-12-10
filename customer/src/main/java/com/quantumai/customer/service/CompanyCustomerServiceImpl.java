@@ -111,7 +111,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
     companyCustomer.setUpdatedAt(LocalDateTime.now().toString());
 
       if(!companyCustomer.getEmail().trim().isEmpty()&&companyCustomerRepository.findByEmailAndCompanyId(companyCustomer.getEmail(),companyCustomer.getCompanyId()).isPresent()){
-        throw new EmailAlreadyExistsException("User With Email Aready Present");
+        throw new EmailAlreadyExistsException("User With Email Already Present");
       }
       else{
         CompanyCustomer saved = companyCustomerRepository.save(companyCustomer);
