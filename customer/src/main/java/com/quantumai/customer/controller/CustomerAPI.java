@@ -4,9 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
-import com.quantumai.customer.exception.LocationAlreadyPresentException;
-import com.quantumai.customer.exception.NoEmailFoundException;
-import com.quantumai.customer.exception.OTPException;
+import com.quantumai.customer.exception.*;
 import com.quantumai.customer.repository.CustomerRepository;
 import com.quantumai.customer.service.ActiveSessionService;
 import com.quantumai.customer.service.CustomerService;
@@ -14,6 +12,8 @@ import com.quantumai.customer.service.TrialService;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 )
 @RestController
 @RequestMapping("/customer")
+@Slf4j
 public class CustomerAPI {
 
   @Autowired private CustomerService customerService;
@@ -156,6 +157,7 @@ public class CustomerAPI {
   @PostMapping(value = "/updateCompanyInformation")
   public ResponseEntity<CompanyInformation> updateCompanyInformation(
       @RequestBody CompanyInformation companyInformation) throws Exception {
+    log.info("Updating company information for company info: {}", companyInformation);
     customerService.addCompanyInformation(companyInformation);
 
     return ResponseEntity.ok(companyInformation);
@@ -237,11 +239,11 @@ public class CustomerAPI {
   }
 
   @GetMapping(value = "/countByRole/{companyId}/{roleName}")
-  public ResponseEntity<Long> countByRole(
+  public ResponseEntity<CountNameByRole> countByRole(
       @PathVariable Long companyId, @PathVariable String roleName) throws Exception {
-    Long count = customerService.countByRoleName(roleName, companyId);
-    System.out.println("count->" + count + " " + roleName);
-    return ResponseEntity.ok(count);
+//    Long count = customerService.countByRoleName(roleName, companyId);
+//    System.out.println("count->" + count + " " + roleName);
+    return ResponseEntity.ok(customerService.countByRoleName(roleName, companyId));
   }
 
   @GetMapping(value = "/roleAndPermissionByName/get/{companyId}/{name}")
@@ -268,13 +270,13 @@ public class CustomerAPI {
   }
 
   @DeleteMapping(value = "/deleteLocation/{id}")
-  public void deleteLocation(@PathVariable String id) {
+  public void deleteLocation(@PathVariable String id) throws LocationDeletionException {
     customerService.deleteLocation(id);
   }
 
   // -------------------------------------------------------
   @PostMapping(value = "/addbin")
-  public ResponseEntity<Bin> addBin(@RequestBody BinDTO bindDto) {
+  public ResponseEntity<Bin> addBin(@RequestBody BinDTO bindDto) throws BinAlreadyPresentException {
     System.out.println(bindDto.toString());
     return ResponseEntity.ok(customerService.addBin(bindDto));
   }
@@ -297,7 +299,7 @@ public class CustomerAPI {
   }
 
   @DeleteMapping(value = "/deleteBin/{id}")
-  public void deleteBin(@PathVariable String id) {
+  public void deleteBin(@PathVariable String id) throws LocationDeletionException {
     customerService.deleteBin(id);
   }
 

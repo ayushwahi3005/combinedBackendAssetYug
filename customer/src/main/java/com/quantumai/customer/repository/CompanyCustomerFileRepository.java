@@ -5,6 +5,8 @@ import java.util.List;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface CompanyCustomerFileRepository
-    extends MongoRepository<CompanyCustomerFile, String> {
+    extends MongoRepository<CompanyCustomerFile, String> , CompanyScopedRepository{
   public List<CompanyCustomerFile> findByCompanyCustomerId(String assetId);
+
+  public void deleteByCompanyId(Long companyId);
 }

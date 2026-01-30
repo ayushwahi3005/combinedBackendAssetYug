@@ -5,6 +5,8 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.Optional;
 
-public interface AssetCategoryIdGeneratorRepository extends MongoRepository<AssetCategoryIdGenerator,String> {
+public interface AssetCategoryIdGeneratorRepository extends MongoRepository<AssetCategoryIdGenerator,String> , CompanyScopedRepository{
     Optional<AssetCategoryIdGenerator>  findByCompanyId(Long companyId);
+
+    public void deleteByCompanyId(Long companyId);
 }

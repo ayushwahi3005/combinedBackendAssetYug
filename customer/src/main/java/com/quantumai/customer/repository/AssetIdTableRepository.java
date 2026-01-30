@@ -4,6 +4,8 @@ import com.quantumai.customer.entity.IdGenerator.AssetIdTable;
 import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
-public interface AssetIdTableRepository extends MongoRepository<AssetIdTable, String> {
+public interface AssetIdTableRepository extends MongoRepository<AssetIdTable, String>, CompanyScopedRepository {
   public Optional<AssetIdTable> findByCompanyId(Long id);
+
+  public void deleteByCompanyId(Long companyId);
 }

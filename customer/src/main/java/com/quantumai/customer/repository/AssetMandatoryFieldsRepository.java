@@ -6,10 +6,12 @@ import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface AssetMandatoryFieldsRepository
-    extends MongoRepository<AssetMandatoryFields, String> {
+    extends MongoRepository<AssetMandatoryFields, String> , CompanyScopedRepository{
   public Optional<AssetMandatoryFields> findByNameAndCompanyId(String name, Long companyId);
 
   public List<AssetMandatoryFields> findByCompanyIdAndMandatory(Long companyId, boolean mandatory);
 
   public List<AssetMandatoryFields> findByCompanyId(Long companyId);
+
+  public void deleteByCompanyId(Long companyId);
 }

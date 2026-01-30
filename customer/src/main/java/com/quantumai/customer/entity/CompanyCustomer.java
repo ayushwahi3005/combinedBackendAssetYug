@@ -23,6 +23,6 @@ public class CompanyCustomer {
   private String city;
   private String state;
   private String country;
-  private Integer zipCode;
+  private String zipCode;
   private String updatedAt;
 }

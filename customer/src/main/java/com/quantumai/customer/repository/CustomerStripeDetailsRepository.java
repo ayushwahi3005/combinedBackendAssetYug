@@ -5,9 +5,11 @@ import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface CustomerStripeDetailsRepository
-    extends MongoRepository<CustomerStripeDetails, String> {
+    extends MongoRepository<CustomerStripeDetails, String> , CompanyScopedRepository{
   Optional<CustomerStripeDetails> findByCompanyId(Long companyId);
   Optional<CustomerStripeDetails> findByCustomerId(String customerId);
 
   Optional<CustomerStripeDetails> findByPaymentMethodId(String paymentMethodId);
+
+  public void deleteByCompanyId(Long companyId);
 }

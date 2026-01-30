@@ -6,7 +6,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
-public interface ImportHistoryRepository extends MongoRepository<ImportHistory, String> {
+public interface ImportHistoryRepository extends MongoRepository<ImportHistory, String> , CompanyScopedRepository{
 
   Page<ImportHistoryDTO> findByCompanyId(Long companyId, Pageable pageable);
+
+  public void deleteByCompanyId(Long companyId);
 }

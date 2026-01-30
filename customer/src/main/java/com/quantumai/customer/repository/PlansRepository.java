@@ -5,8 +5,10 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
-public interface PlansRepository extends MongoRepository<Plans, String> {
+public interface PlansRepository extends MongoRepository<Plans, String>{
   List<Plans> findAll();
 
   Optional<Plans> getById(String id);
+
+//  public void deleteByCompanyId(Long companyId);
 }

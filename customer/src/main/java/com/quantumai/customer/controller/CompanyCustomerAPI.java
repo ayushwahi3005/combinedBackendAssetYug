@@ -23,6 +23,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
+
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -64,6 +66,7 @@ public class CompanyCustomerAPI {
   @Autowired private SubscriptionRepository subscriptionRepository;
   @Autowired private CompanyCustomerCategoryRepository companyCustomerCategoryRepository;
   @Autowired private CompanyCustomerMandatoryFieldsRepository mandatoryFieldsRepository;
+  @Autowired private CustomerRepository customerRepository;
 
   // External Services
   @Autowired private JavaMailSender emailSender;
@@ -87,7 +90,7 @@ public class CompanyCustomerAPI {
   );
 
   private static final int MAX_IMPORT_ROWS = 1000;
-  private static final String IMPORT_SUBJECT = "Import Report from AssetYug";
+  private static final String IMPORT_SUBJECT = "Customer Import Result  - AssetYug";
   private static final String EXCEL_FILENAME = "CustomerReport.xlsx";
 
   private Map<String, List<String>> data;
@@ -439,6 +442,7 @@ public class CompanyCustomerAPI {
     //      throw new NoSubscriptionError("No Active Subscription");
     //    }
 
+
     if (asc == null) {
       asc = true;
     }
@@ -784,7 +788,7 @@ public class CompanyCustomerAPI {
                 }
                 else{
                   try {
-                    companyCustomerDTO.setZipCode(Integer.parseInt(row[j]));
+                    companyCustomerDTO.setZipCode(row[j]);
                   } catch (NumberFormatException e) {
                     errorDesc.append("ERROR IN ZIPCODE FORMAT");
                     errorFlag = 1;
@@ -881,7 +885,10 @@ public class CompanyCustomerAPI {
             if (value.isEmpty()) {
               log.info("Value is empty");
               errorFlag = 1;
-              errorDesc.append("Mandatory field ").append(defaultName.toUpperCase()).append(" is not mapped.");
+              if(!errorDesc.isEmpty()){
+                errorDesc.append(". Mandatory field ").append(defaultName.toUpperCase()).append(" is not mapped.");
+              }
+
             }
           }
         }
@@ -999,13 +1006,34 @@ public class CompanyCustomerAPI {
           workbook.write(fileOut);
         }
         workbook.close();
+        String subjectName = "User";
+        Optional<Customer> customerOptional=
+                customerRepository.findByEmail(email);
+        if(customerOptional.isPresent()){
+          Customer customer=customerOptional.get();
+          String fullName=customer.getFirstName() + " " + customer.getLastName();
+          if(customer.getFirstName()!=null&&customer.getLastName()!=null){
+            subjectName=fullName;
+          }
+          else {
+            subjectName="User";
+          }
+        }
         try {
           MimeMessage message = emailSender.createMimeMessage();
           MimeMessageHelper helper = new MimeMessageHelper(message, true);
 
+
           helper.setTo(email);
           helper.setSubject(IMPORT_SUBJECT);
-          helper.setText("Hey, We have attached import result below");
+          helper.setText("Hi,\n" +
+                  "\n" +
+                  "Your import has been completed. Please check the attached file for the errors that need correction. Once fixed, please reupload only the data listed in the file.\n" +
+                  "\n" +
+                  "If you need any help or additional information, feel free to reach out.\n" +
+                  "\n" +
+                  "Best regards,\n" +
+                  "Asset Yug Team");
           helper.addAttachment("CustomerAttachment.xlsx", new File(EXCEL_FILENAME));
 
           emailSender.send(message);
@@ -1015,18 +1043,42 @@ public class CompanyCustomerAPI {
         }
       }
       if (excelIndex == 1) {
-        importHistoryDTO.setMessage("Import was Successfully Done");
+        String subjectName = "User";
+        Optional<Customer> customerOptional=
+                customerRepository.findByEmail(email);
+        if(customerOptional.isPresent()){
+          Customer customer=customerOptional.get();
+          String fullName=customer.getFirstName() + " " + customer.getLastName();
+          if(customer.getFirstName()!=null&&customer.getLastName()!=null){
+            subjectName=fullName;
+          }
+          else {
+            subjectName="User";
+          }
+        }
+        importHistoryDTO.setMessage("Hi "+ subjectName+",\n" +
+                "\n" +
+                "Your import has been completed successfully. All data has been processed and is now available in the system.\n" +
+                "\n" +
+                "Best regards,\n" +
+                "AssetYug Team");
         try (FileOutputStream fileOut = new FileOutputStream(EXCEL_FILENAME)) {
           workbook.write(fileOut);
         }
         workbook.close();
+   
         try {
           MimeMessage message = emailSender.createMimeMessage();
           MimeMessageHelper helper = new MimeMessageHelper(message, true);
 
           helper.setTo(email);
           helper.setSubject(IMPORT_SUBJECT);
-          helper.setText("Hey, Your Import was Successfully Done");
+          helper.setText("Hi,\n" +
+                  "\n" +
+                  "Your import has been completed successfully. All data has been processed and is now available in the system.\n" +
+                  "\n" +
+                  "Best regards,\n" +
+                  "AssetYug Team");
 
           emailSender.send(message);
         } catch (Exception e) {
@@ -1294,7 +1346,7 @@ public class CompanyCustomerAPI {
                 break;
               case "zipcode":
                 System.out.println("zipCode//->" + row[j]);
-                companyCustomer.setZipCode(Integer.parseInt(row[j]));
+                companyCustomer.setZipCode(row[j]);
                 break;
               case "status":
                 if ((row[j].equalsIgnoreCase("active"))
@@ -1476,6 +1528,19 @@ public class CompanyCustomerAPI {
         importHistoryDTO.setComplete(complete);
         importHistoryDTO = customerService.addImportHistory(importHistoryDTO);
       }
+      String subjectName = "User";
+      Optional<Customer> customerOptional=
+              customerRepository.findByEmail(email);
+      if(customerOptional.isPresent()){
+        Customer customer=customerOptional.get();
+        String fullName=customer.getFirstName() + " " + customer.getLastName();
+        if(customer.getFirstName()!=null&&customer.getLastName()!=null){
+          subjectName=fullName;
+        }
+        else {
+          subjectName="User";
+        }
+      }
       if (excelIndex > 0) {
         importHistoryDTO.setMessage("We have sent import result via email");
         Sheet mySheet = workbook.getSheetAt(0);
@@ -1497,14 +1562,28 @@ public class CompanyCustomerAPI {
         MimeMessageHelper helper = new MimeMessageHelper(message, true);
 
         helper.setTo(email);
+
         helper.setSubject(IMPORT_SUBJECT);
-        helper.setText("Hey, We have attached import result below");
+        helper.setText("""
+                Hi,
+
+                Your import has been completed. Please check the attached file for the errors that need correction. Once fixed, please reupload only the data listed in the file.
+
+                If you need any help or additional information, feel free to reach out.
+
+                Best regards,
+                Asset Yug Team""");
         helper.addAttachment("CustomerAttachment.xlsx", new File(EXCEL_FILENAME));
 
         emailSender.send(message);
       }
       if (excelIndex == 0) {
-        importHistoryDTO.setMessage("Import was Successfully Done");
+        importHistoryDTO.setMessage("Hi "+subjectName+",\n" +
+                "\n" +
+                "Your import has been completed successfully. All data has been processed and is now available in the system.\n" +
+                "\n" +
+                "Best regards,\n" +
+                "AssetYug Team");
         try (FileOutputStream fileOut = new FileOutputStream(EXCEL_FILENAME)) {
           workbook.write(fileOut);
         }
@@ -1611,7 +1690,7 @@ public class CompanyCustomerAPI {
     Row header = sheet.createRow(0);
     int col = 0;
     // Add default headers
-    String[] defaultHeaders = {"ID", "Name", "Email", "Phone", "Status"};
+    String[] defaultHeaders = {"ID", "Name","Address", "Email","Category", "Phone", "Status"};
     for (String h : defaultHeaders) {
       header.createCell(col++).setCellValue(h);
     }
@@ -1623,11 +1702,47 @@ public class CompanyCustomerAPI {
     for (CompanyCustomer customer : customers) {
       Row row = sheet.createRow(rowIdx++);
       int c = 0;
-      row.createCell(c++).setCellValue(customer.getId());
+      row.createCell(c++).setCellValue(customer.getCompanyCustomerId());
       row.createCell(c++).setCellValue(customer.getName());
+      StringBuilder sb = new StringBuilder();
+
+      if (customer.getAddress() != null && !customer.getAddress().isEmpty())
+        sb.append(customer.getAddress());
+
+      if (customer.getCity() != null && !customer.getCity().isEmpty()) {
+        if (!sb.isEmpty()) sb.append(", ");
+        sb.append(customer.getCity());
+      }
+
+      if (customer.getState() != null && !customer.getState().isEmpty()) {
+        if (!sb.isEmpty()) sb.append(", ");
+        sb.append(customer.getState());
+      }
+
+      if (customer.getCountry() != null && !customer.getCountry().isEmpty()) {
+        if (!sb.isEmpty()) sb.append(", ");
+        sb.append(customer.getCountry());
+      }
+
+      if (customer.getZipCode() != null && !customer.getZipCode().isEmpty()) {
+        sb.append(" ").append(customer.getZipCode());
+      }
+
+      row.createCell(c++).setCellValue(sb.toString());
+
       row.createCell(c++).setCellValue(customer.getEmail());
+      row.createCell(c++).setCellValue(customer.getCategory());
       row.createCell(c++).setCellValue(customer.getPhone());
-      row.createCell(c++).setCellValue(customer.getStatus());
+      String status = customer.getStatus();
+
+      if (status != null && !status.isEmpty()) {
+        status = status.substring(0, 1).toUpperCase() + status.substring(1).toLowerCase();
+      } else {
+        status = "";
+      }
+
+      row.createCell(c++).setCellValue(status);
+
       // Fetch custom fields
       List<CompanyCustomerExtraFields> extras = extraFieldsRepository.findByCompanyCustomerId(customer.getId());
       Map<String, String> extraMap = new HashMap<>();

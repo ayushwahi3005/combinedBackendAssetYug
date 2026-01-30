@@ -6,8 +6,9 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
 
-public interface AssetsRepository extends MongoRepository<Assets, String> {
+public interface AssetsRepository extends MongoRepository<Assets, String> , CompanyScopedRepository{
   List<Assets> findByCompanyId(Long companyId);
 
   List<Assets> findByCustomerId(String customerId);
@@ -17,4 +18,12 @@ public interface AssetsRepository extends MongoRepository<Assets, String> {
   List<AssetsDTO> findByCompanyIdAndSerialNumber(Long companyId, String serialNumber);
 
   public int countByCategoryIgnoreCase(String category);
+
+//  List<Assets> findByCompanyIdAndLocationId(Long companyId, String locationId);
+  List<Assets> findByCompanyIdAndLocation(Long companyId, String location);
+
+  public void deleteByCompanyId(Long companyId);
+
+
+
 }

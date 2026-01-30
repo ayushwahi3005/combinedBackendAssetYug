@@ -12,5 +12,9 @@ public class AssetCheckInDTO {
   private String employee;
   private String notes;
   private String location;
+  private String userLongitude;
+  private String userLatitude;
+  private String ipAddress;
+  private String userLocation;
   private Long companyId;
 }

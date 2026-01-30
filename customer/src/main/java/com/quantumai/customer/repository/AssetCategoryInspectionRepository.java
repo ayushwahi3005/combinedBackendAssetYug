@@ -8,7 +8,7 @@ import org.springframework.data.mongodb.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface AssetCategoryInspectionRepository
-    extends MongoRepository<AssetCategoryInspection, String> {
+    extends MongoRepository<AssetCategoryInspection, String>, CompanyScopedRepository {
 
   public Optional<AssetCategoryInspection> findByName(String name);
 
@@ -18,6 +18,8 @@ public interface AssetCategoryInspectionRepository
 
   @Query("{ 'companyId': ?0, '$or': [ { 'categoryName': { $regex: ?1, $options: 'i' } }, { 'categoryName': { $regex: '^none$', $options: 'i' } } ] }")
   List<AssetCategoryInspection> findByCompanyIdAndCategoryNameIgnoreCase(Long companyId, String category);
+
+  public void deleteByCompanyId(Long companyId);
 
 //List<AssetCategoryInspection> findByCompanyIdAndCategoryNameIgnoreCase(Long companyId, String category);
 }

@@ -12,6 +12,7 @@ public class CompanyInformation {
   private String customerEmail;
   private String companyName;
   private String comapanyLogo;
+  private String country;
   //	private String accountId;
   private String address1;
   private String address2;

@@ -13,10 +13,12 @@ public class Location {
   private Long companyId;
   private String name;
   private String parentLocation;
+  private String parentLocationName;
   private String address;
   private String apartment;
   private String city;
   private String state;
+  private String country;
   private StatusEnum status;
-  private Integer zipCode;
+  private String zipCode;
 }

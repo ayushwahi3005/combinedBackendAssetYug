@@ -29,6 +29,7 @@ import java.util.Optional;
 
 @Service
 @Slf4j
+@Transactional
 public class SubscriptionServiceImpl implements SubscriptionService {
 
   @Autowired private SubscriptionRepository subscriptionRepository;

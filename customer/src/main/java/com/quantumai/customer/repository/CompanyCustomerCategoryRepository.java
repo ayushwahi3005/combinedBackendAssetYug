@@ -6,7 +6,7 @@ import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface CompanyCustomerCategoryRepository
-    extends MongoRepository<CompanyCustomerCategory, String> {
+    extends MongoRepository<CompanyCustomerCategory, String> , CompanyScopedRepository{
   public List<CompanyCustomerCategory> findByCompanyId(Long companyId);
 
   public List<CompanyCustomerCategory> findByCompanyIdAndStatus(Long companyId, String status);
@@ -14,5 +14,7 @@ public interface CompanyCustomerCategoryRepository
   public Optional<CompanyCustomerCategory> findByName(String name);
 
   public Optional<CompanyCustomerCategory> findByNameAndCompanyId(String name,Long companyId);
+
+  public void deleteByCompanyId(Long companyId);
 
 }

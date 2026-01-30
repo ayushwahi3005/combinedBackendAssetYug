@@ -6,9 +6,11 @@ import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface UserMandatoryFieldsRepository
-    extends MongoRepository<UserMandatoryFields, String> {
+    extends MongoRepository<UserMandatoryFields, String>, CompanyScopedRepository {
   public Optional<UserMandatoryFields> findByNameIgnoreCaseAndCompanyId(
       String name, Long companyId);
 
   public List<UserMandatoryFields> findByCompanyId(Long companyId);
+
+  public void deleteByCompanyId(Long companyId);
 }

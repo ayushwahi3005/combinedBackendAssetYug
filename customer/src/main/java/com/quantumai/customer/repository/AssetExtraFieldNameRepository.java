@@ -5,9 +5,11 @@ import java.util.List;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface AssetExtraFieldNameRepository
-    extends MongoRepository<AssetExtraFieldName, String> {
+    extends MongoRepository<AssetExtraFieldName, String> , CompanyScopedRepository{
   public AssetExtraFieldName findByNameIgnoreCaseAndCompanyId(String name, Long companyId);
 
 
   public List<AssetExtraFieldName> findByCompanyId(Long companyId);
+
+  public void deleteByCompanyId(Long companyId);
 }

@@ -53,7 +53,7 @@ public interface CustomerService {
 
   public List<CustomRoleDTO> getRoleAndPermission(Long companyId);
 
-  public Long countByRoleName(String name, Long companyId);
+  public CountNameByRole countByRoleName(String name, Long companyId);
 
   public CustomRoleDTO roleAndPermissionByName(Long companyId, String name);
 
@@ -63,9 +63,9 @@ public interface CustomerService {
 
   public List<Location> getAllLocation(Long companyId);
 
-  public void deleteLocation(String id);
+  public void deleteLocation(String id) throws LocationDeletionException;
 
-  public Bin addBin(BinDTO bin);
+  public Bin addBin(BinDTO bin) throws BinAlreadyPresentException;
 
   public Bin updateBin(BinDTO bin);
 
@@ -73,7 +73,7 @@ public interface CustomerService {
 
   public List<LocationWithBinsDTO> getLocationsWithBins(Long companyId);
 
-  public void deleteBin(String id);
+  public void deleteBin(String id) throws LocationDeletionException;
 
   public ImportHistory addImportHistory(ImportHistory importHistory);
 

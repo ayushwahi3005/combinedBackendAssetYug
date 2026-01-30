@@ -15,7 +15,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface SubscriptionRepository extends MongoRepository<Subscription, String>, SubscriptionRepositoryCustom {
+public interface SubscriptionRepository extends MongoRepository<Subscription, String>, SubscriptionRepositoryCustom, CompanyScopedRepository {
   List<Subscription> findAll();
 
   List<Subscription> findByCompanyId(Long companyId);
@@ -32,4 +32,6 @@ public interface SubscriptionRepository extends MongoRepository<Subscription, St
    * @return A list of SubscriptionGrowthDTO containing growth metrics
    */
   List<SubscriptionGrowthDTO> getSubscriptionGrowth(LocalDate start, LocalDate end);
+
+  public void deleteByCompanyId(Long companyId);
 }

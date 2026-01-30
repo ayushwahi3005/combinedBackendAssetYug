@@ -9,7 +9,7 @@ import org.springframework.data.mongodb.repository.Query;
 import java.time.LocalDateTime;
 import java.util.List;
 
-public interface UserNotificationRepository  extends MongoRepository<UserNotification, String> {
+public interface UserNotificationRepository  extends MongoRepository<UserNotification, String> , CompanyScopedRepository{
 
     List<UserNotification> findByUserIdAndIsReadFalseAndDeliveredAtAfter(String userId, LocalDateTime cutoff);
     List<UserNotification> findByUserIdAndNotificationId(String userId, String notificationId);
@@ -38,4 +38,6 @@ public interface UserNotificationRepository  extends MongoRepository<UserNotific
             LocalDateTime thirtyDaysAgo
     );
 
+
+    public void deleteByCompanyId(Long companyId);
 }

@@ -38,6 +38,8 @@ public class PaymentService {
 
   @Autowired private PaymentRepository paymentRepository;
 
+  @Autowired private InvoiceService invoiceService;
+
   public PaymentService(StripeService stripeService) {
     this.stripeService = stripeService;
   }
@@ -319,6 +321,8 @@ public class PaymentService {
 
       Payment payment = new Payment();
       payment.setPaymentStatus(PaymentStatus.PENDING);
+      Long invoiceSeq = invoiceService.getNextInvoiceSequence();
+      payment.setPaymentId("INV-"+invoiceSeq);
       payment.setPaymentType(PaymentType.CREDIT_CARD);
       payment.setDescription("Subscription Payment");
       payment.setCompanyId(companyId);
@@ -608,6 +612,8 @@ public class PaymentService {
 
               Payment payment = new Payment();
               payment.setPaymentStatus(PaymentStatus.PENDING);
+              Long invoiceSeq = invoiceService.getNextInvoiceSequence();
+              payment.setPaymentId("INV-"+invoiceSeq);
               payment.setPaymentType(PaymentType.CREDIT_CARD);
               payment.setDescription("Subscription Payment");
               payment.setCompanyId(companyId);
@@ -686,6 +692,8 @@ public class PaymentService {
 
               Payment payment = new Payment();
               payment.setPaymentStatus(PaymentStatus.PENDING);
+              Long invoiceSeq = invoiceService.getNextInvoiceSequence();
+              payment.setPaymentId("INV-"+invoiceSeq);
               payment.setPaymentType(PaymentType.CREDIT_CARD);
               payment.setDescription("Subscription Payment");
               payment.setCompanyId(companyId);

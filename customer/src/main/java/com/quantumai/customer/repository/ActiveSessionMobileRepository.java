@@ -12,4 +12,6 @@ public interface ActiveSessionMobileRepository
   void deleteBySessionId(String sessionId);
 
   void deleteByUserId(String userId);
+
+//  public void deleteByCompanyId(Long companyId);
 }

@@ -8,7 +8,7 @@ import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 
-public interface UsersRepository extends MongoRepository<Users, String> {
+public interface UsersRepository extends MongoRepository<Users, String>, CompanyScopedRepository {
   public List<Users> findByCompanyId(Long id);
 
   public Optional<Users> findByCompanyIdAndEmail(Long companyId, String email);
@@ -29,4 +29,8 @@ public interface UsersRepository extends MongoRepository<Users, String> {
   long countByCompanyIdAndStatus(Long companyId, StatusEnum status);
   
   Optional<Customer> findByIdAndCompanyId(String id, Long companyId);
+
+
+  public void deleteByCompanyId(Long companyId);
+
 }

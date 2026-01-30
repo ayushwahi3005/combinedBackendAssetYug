@@ -5,6 +5,8 @@ import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface CompanyCustomerIdTableRepository
-    extends MongoRepository<CompanyCustomerIdTable, String> {
+    extends MongoRepository<CompanyCustomerIdTable, String>, CompanyScopedRepository {
   public Optional<CompanyCustomerIdTable> findByCompanyId(Long id);
+
+  public void deleteByCompanyId(Long companyId);
 }

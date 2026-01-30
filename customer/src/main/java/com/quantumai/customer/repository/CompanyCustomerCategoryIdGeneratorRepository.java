@@ -6,6 +6,8 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.Optional;
 
-public interface CompanyCustomerCategoryIdGeneratorRepository extends MongoRepository<CompanyCustomerCategoryIdGenerator,String> {
+public interface CompanyCustomerCategoryIdGeneratorRepository extends MongoRepository<CompanyCustomerCategoryIdGenerator,String> , CompanyScopedRepository{
     Optional<CompanyCustomerCategoryIdGenerator> findByCompanyId(Long companyId);
+
+    public void deleteByCompanyId(Long companyId);
 }

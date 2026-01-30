@@ -14,13 +14,18 @@ import com.quantumai.customer.service.*;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.json.JSONObject;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
@@ -81,6 +86,10 @@ public class AssetAPI {
   @Autowired private AssetMandatoryFieldsRepository assetMandatoryFieldsRepository;
 
   @Autowired private UsersRepository usersRepository;
+
+  @Autowired private CustomerRepository customerRepository;
+
+  @Autowired private AssetCheckInOutRepository assetCheckInOutRepository;
 
   private void checkUserDetailsPermissionFromSpringContext(CustomRoleType customRoleType) throws UserAccessException {
     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -1110,17 +1119,43 @@ public void importFile(
     }
     workbook.close();
 
+    String subjectName = "User";
+    Optional<Customer> customerOptional=
+            customerRepository.findByEmail(email);
+    if(customerOptional.isPresent()){
+      Customer customer=customerOptional.get();
+      String fullName=customer.getFirstName() + " " + customer.getLastName();
+      if(customer.getFirstName()!=null&&customer.getLastName()!=null){
+        subjectName=fullName;
+      }
+      else {
+        subjectName="User";
+      }
+    }
     MimeMessage message = emailSender.createMimeMessage();
     MimeMessageHelper helper = new MimeMessageHelper(message, true);
     helper.setTo(email);
-    helper.setSubject("Import Report from AssetYug");
+    helper.setSubject("Asset Import Results - AssetYug");
     if (excelIndex > 1) {
       importHistoryDTO.setMessage("We have sent import result via email");
-      helper.setText("Hey, We have attached import result below");
+      helper.setText("Hi "+subjectName+",\n" +
+              "\n" +
+              "Your import has been completed. Please check the attached file for the errors that need correction. Once fixed, please reupload only the data listed in the file.\n" +
+              "\n" +
+              "If you need any help or additional information, feel free to reach out.\n" +
+              "\n" +
+              "Best regards,\n" +
+              "Asset Yug Team");
+
       helper.addAttachment("AssetAttachment.xlsx", new File("Report.xlsx"));
     } else {
       importHistoryDTO.setMessage("Import was Successfully Done");
-      helper.setText("Hey, Your Import was Successfully Done");
+      helper.setText("Hi "+subjectName+",\n" +
+              "\n" +
+              "Your import has been completed successfully. All data has been processed and is now available in the system.\n" +
+              "\n" +
+              "Best regards,\n" +
+              "AssetYug Team");
     }
     emailSender.send(message);
 
@@ -1651,13 +1686,37 @@ public void importFile(
       MimeMessage message = emailSender.createMimeMessage();
       MimeMessageHelper helper = new MimeMessageHelper(message, true);
       helper.setTo(email);
-      helper.setSubject("Import Report from AssetYug");
-
+      helper.setSubject("Customer Import Results - AssetYug");
+      String subjectName = "User";
+      Optional<Customer> customerOptional=
+              customerRepository.findByEmail(email);
+      if(customerOptional.isPresent()){
+        Customer customer=customerOptional.get();
+        String fullName=customer.getFirstName() + " " + customer.getLastName();
+        if(customer.getFirstName()!=null&&customer.getLastName()!=null){
+          subjectName=fullName;
+        }
+        else {
+          subjectName="User";
+        }
+      }
       if (errorSheet.getLastRowNum() > 0) {
-        helper.setText("Hey, We have attached the error report below");
+        helper.setText("Hi "+subjectName+",\n" +
+                "\n" +
+                "Your import has been completed. Please check the attached file for the errors that need correction. Once fixed, please reupload only the data listed in the file.\n" +
+                "\n" +
+                "If you need any help or additional information, feel free to reach out.\n" +
+                "\n" +
+                "Best regards,\n" +
+                "Asset Yug Team");
         helper.addAttachment("AssetAttachment.xlsx", new File("Report.xlsx"));
       } else {
-        helper.setText("Hey, Your Update was Successfully Done");
+        helper.setText("Hi "+subjectName+",\n" +
+                "\n" +
+                "Your import has been completed successfully. All data has been processed and is now available in the system.\n" +
+                "\n" +
+                "Best regards,\n" +
+                "AssetYug Team");
       }
 
       emailSender.send(message);
@@ -1779,7 +1838,7 @@ public void importFile(
   }
 
   @DeleteMapping("/deleteExtraFieldName/{id}")
-  public void deleteExtraFieldName(@PathVariable String id) throws NoSubscriptionError, UserAccessException {
+  public void deleteExtraFieldName(@PathVariable String id) throws Exception {
     // System.out.println("-----------------------api------------------------>"+id);
     checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
     Optional<AssetExtraFieldName> extraFieldNameOptional = extraFieldNameRepository.findById(id);
@@ -1818,10 +1877,11 @@ public void importFile(
     return new ResponseEntity<>(checkInOutList, HttpStatus.ACCEPTED);
   }
 
-  @PostMapping("/addFile/{assetId}")
+  @PostMapping("/addFile/{assetId}/{username}")
   public ResponseEntity<ResponseMessageDTO> addAssetFile(
           @RequestParam("file") MultipartFile file,
-          @PathVariable String assetId) throws NoSubscriptionError {
+          @PathVariable String assetId,
+          @PathVariable String username) throws NoSubscriptionError {
 
     Optional<Assets> assetsOptional = assetsRepository.findById(assetId);
     if (assetsOptional.isEmpty()) {
@@ -1831,7 +1891,7 @@ public void importFile(
     }
 
     try {
-      assetsService.addAssetFile(file, assetId);
+      assetsService.addAssetFile(file, assetId,username);
 
       ResponseMessageDTO response = new ResponseMessageDTO();
       response.setResponseMessage("Uploaded the file successfully: " + file.getOriginalFilename());
@@ -1927,7 +1987,7 @@ public void importFile(
   }
 
   @DeleteMapping("/deleteShowAndMandatoryField/{name}/{companyId}")
-  public void showFields(@PathVariable String name, @PathVariable Long companyId) throws UserAccessException {
+  public void showFields(@PathVariable String name, @PathVariable Long companyId) throws Exception {
     checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
     assetsService.deleteShowAndMandatoryFields(companyId, name);
   }
@@ -2007,6 +2067,12 @@ public void importFile(
 
     //    System.out.println("CompanyId--------AssetAPI-------->" + filter.toString());
 
+//    try {
+//      Thread.sleep(5_000); // 10 seconds (milliseconds)
+//    } catch (InterruptedException e) {
+//      Thread.currentThread().interrupt();
+//    }
+
     if (asc == null) {
       asc = true;
     }
@@ -2043,12 +2109,26 @@ public void importFile(
 
     return assetsService.filterByCheckedInOut(companyId, checkedIn);
   }
+//  @GetMapping("/checkInOutAssetData/{companyId}")
+//  public List<AssetCheckInOutData> getCheckInOutData(
+//          @PathVariable Long companyId) {
+//
+//    return assetsService.getAssetCheckInOutData(companyId);
+//  }
   @GetMapping("/checkInOutAssetData/{companyId}")
-  public List<AssetCheckInOutData> getCheckInOutData(
-          @PathVariable Long companyId) {
+  public PaginatedResultCheckInOutDTO<AssetCheckInOutData> getCheckInOutData(
+          @PathVariable Long companyId,
+          @RequestParam Long pageNumber,
+          @RequestParam Long pageSize) {
 
-    return assetsService.getAssetCheckInOutData(companyId);
+    return assetsService.getAssetCheckInOutData(companyId, pageNumber, pageSize);
   }
+//  @GetMapping("/latestCheckInOutAssetData/{companyId}")
+//  public Objects getLatestCheckInOutAssetData(
+//          @PathVariable Long companyId) {
+//
+//    return assetsService.getAssetCheckInOutData(companyId);
+//  }
 
   @PostMapping(value = "/addCategory")
   public void addCategory(@RequestBody CategoryDTO categoryDTO)
@@ -2278,74 +2358,74 @@ public void importFile(
         .body(excelBytes);
   }
 
-  @GetMapping(value = "/export-asset/{companyId}")
-  public ResponseEntity<byte[]> downloadAllAssetData(@PathVariable Long companyId)
-      throws IOException {
-
-    //    PaginatedResultDTO result=assetsService.getAllAssetDetails(companyId);
-    PaginatedResultDTO result = assetsService.getAllAssetDetails(companyId);
-    //    System.out.println(result.getData().toString());
-    ObjectMapper objectMapper = new ObjectMapper();
-    JsonNode jsonNode = objectMapper.readTree(result.getData().toString());
-    Workbook workbook = new XSSFWorkbook();
-    Sheet sheet = workbook.createSheet("Data");
-
-    // Add header row
-    Row headerRow = sheet.createRow(0);
-    if (jsonNode.isArray() && jsonNode.size() > 0) {
-      JsonNode firstObject = jsonNode.get(0);
-      Iterator<String> fieldNames = firstObject.fieldNames();
-      int headerCol = 0;
-      while (fieldNames.hasNext()) {
-        String fieldName = fieldNames.next();
-        if ("id".equalsIgnoreCase(fieldName)) {
-          continue;
-        }
-        Cell cell = headerRow.createCell(headerCol++);
-        cell.setCellValue(fieldName);
-        cell.setCellStyle(getHeaderCellStyle(workbook));
-      }
-    }
-
-    // Add data rows
-    int rowIndex = 1;
-    for (JsonNode node : jsonNode) {
-      Row dataRow = sheet.createRow(rowIndex++);
-      Iterator<String> fieldNames = node.fieldNames();
-      int colIndex = 0;
-      while (fieldNames.hasNext()) {
-        String fieldName = fieldNames.next();
-        if ("id".equalsIgnoreCase(fieldName)) {
-          continue;
-        }
-        String cellValue = node.get(fieldName).asText();
-        Cell cell = dataRow.createCell(colIndex++);
-        cell.setCellValue(cellValue);
-      }
-    }
-
-    // Auto-size columns
-    if (jsonNode.isArray() && jsonNode.size() > 0) {
-      JsonNode firstObject = jsonNode.get(0);
-      int columnCount = firstObject.size();
-      for (int i = 0; i < columnCount; i++) {
-        sheet.autoSizeColumn(i);
-      }
-    }
-
-    // Write workbook to a byte array
-    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    workbook.write(outputStream);
-    workbook.close();
-
-    // Return as an Excel file
-    byte[] excelBytes = outputStream.toByteArray();
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-    headers.setContentDispositionFormData("attachment", "data.xlsx");
-
-    return ResponseEntity.ok().headers(headers).body(excelBytes);
-  }
+//  @GetMapping(value = "/export-asset/{companyId}")
+//  public ResponseEntity<byte[]> downloadAllAssetData(@PathVariable Long companyId)
+//      throws IOException {
+//
+//    //    PaginatedResultDTO result=assetsService.getAllAssetDetails(companyId);
+//    PaginatedResultDTO result = assetsService.getAllAssetDetails(companyId);
+//    //    System.out.println(result.getData().toString());
+//    ObjectMapper objectMapper = new ObjectMapper();
+//    JsonNode jsonNode = objectMapper.readTree(result.getData().toString());
+//    Workbook workbook = new XSSFWorkbook();
+//    Sheet sheet = workbook.createSheet("Data");
+//
+//    // Add header row
+//    Row headerRow = sheet.createRow(0);
+//    if (jsonNode.isArray() && jsonNode.size() > 0) {
+//      JsonNode firstObject = jsonNode.get(0);
+//      Iterator<String> fieldNames = firstObject.fieldNames();
+//      int headerCol = 0;
+//      while (fieldNames.hasNext()) {
+//        String fieldName = fieldNames.next();
+//        if ("id".equalsIgnoreCase(fieldName)) {
+//          continue;
+//        }
+//        Cell cell = headerRow.createCell(headerCol++);
+//        cell.setCellValue(fieldName);
+//        cell.setCellStyle(getHeaderCellStyle(workbook));
+//      }
+//    }
+//
+//    // Add data rows
+//    int rowIndex = 1;
+//    for (JsonNode node : jsonNode) {
+//      Row dataRow = sheet.createRow(rowIndex++);
+//      Iterator<String> fieldNames = node.fieldNames();
+//      int colIndex = 0;
+//      while (fieldNames.hasNext()) {
+//        String fieldName = fieldNames.next();
+//        if ("id".equalsIgnoreCase(fieldName)) {
+//          continue;
+//        }
+//        String cellValue = node.get(fieldName).asText();
+//        Cell cell = dataRow.createCell(colIndex++);
+//        cell.setCellValue(cellValue);
+//      }
+//    }
+//
+//    // Auto-size columns
+//    if (jsonNode.isArray() && jsonNode.size() > 0) {
+//      JsonNode firstObject = jsonNode.get(0);
+//      int columnCount = firstObject.size();
+//      for (int i = 0; i < columnCount; i++) {
+//        sheet.autoSizeColumn(i);
+//      }
+//    }
+//
+//    // Write workbook to a byte array
+//    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+//    workbook.write(outputStream);
+//    workbook.close();
+//
+//    // Return as an Excel file
+//    byte[] excelBytes = outputStream.toByteArray();
+//    HttpHeaders headers = new HttpHeaders();
+//    headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+//    headers.setContentDispositionFormData("attachment", "data.xlsx");
+//
+//    return ResponseEntity.ok().headers(headers).body(excelBytes);
+//  }
 
 
 //  @GetMapping(value = "/getAssetByCompanyCategory/{companyId}")
@@ -2371,4 +2451,242 @@ public void importFile(
 
 
   }
+  @GetMapping("/export-checkinout-xlsx/{companyId}/{assetId}")
+  public ResponseEntity<byte[]> exportCheckInOut(@PathVariable Long companyId,@PathVariable String assetId,  HttpServletRequest request) throws UserAccessException {
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.view);
+
+    Optional<AssetCheckInOut> optionalAssetCheckInOut = assetCheckInOutRepository.findByCompanyIdAndAssetId(companyId,assetId);
+    Optional<Assets> assetDetails=assetsRepository.findById(assetId);
+
+    Workbook workbook = new XSSFWorkbook();
+    Sheet sheet = workbook.createSheet("Check In-Out Report");
+    if(optionalAssetCheckInOut.isPresent()){
+      Row headerRow = sheet.createRow(0);
+      String[] headers = {
+              "Asset ID",
+              "Asset Name",
+              "Customer ID",
+              "Customer Name",
+              "Action",
+              "Action Date",
+              "Action Time",
+              "Location",
+              "Username",
+              "Notes",
+              "IP Address",
+              "GeoLocation"
+      };
+      for (int i = 0; i < headers.length; i++) {
+        Cell cell = headerRow.createCell(i);
+        cell.setCellValue(headers[i]);
+        cell.setCellStyle(getHeaderCellStyle(workbook));
+      }
+
+      DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+      DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss");
+      // Add data rows
+      int rowIdx = 1;
+      for (AssetCheckInOutDetails checkInOut : optionalAssetCheckInOut.get().getDetailsList()) {
+        Row row = sheet.createRow(rowIdx++);
+        row.createCell(0).setCellValue(assetDetails.get().getAssetId());
+        row.createCell(1).setCellValue(assetDetails.get().getName());
+        row.createCell(2).setCellValue(assetDetails.get().getCustomerId());
+        row.createCell(3).setCellValue(assetDetails.get().getCustomer());
+        row.createCell(4).setCellValue(checkInOut.getStatus() != null ? checkInOut.getStatus() : "");
+        row.createCell(5).setCellValue(
+                checkInOut.getDate() != null
+                        ? checkInOut.getDate().format(dateFormatter)
+                        : ""
+        );
+
+        row.createCell(6).setCellValue(
+                checkInOut.getDate() != null
+                        ? checkInOut.getDate().format(dateFormatter)
+                        : ""
+        );
+        row.createCell(7).setCellValue(checkInOut.getLocation() != null ? checkInOut.getLocation() : "");
+        row.createCell(8).setCellValue(checkInOut.getEmployee() != null ? checkInOut.getEmployee() : "");
+        row.createCell(9).setCellValue(checkInOut.getNotes() != null ? checkInOut.getNotes() : "");
+
+
+        row.createCell(10).setCellValue(checkInOut.getIpAddress());
+        row.createCell(11).setCellValue(checkInOut.getUserLocation());
+
+
+
+
+      }
+
+      // Auto-size columns
+      for (int i = 0; i < headers.length; i++) {
+        sheet.autoSizeColumn(i);
+      }
+
+      // Write to byte array
+      ByteArrayOutputStream bos = new ByteArrayOutputStream();
+      try {
+        workbook.write(bos);
+        workbook.close();
+      } catch (IOException e) {
+        throw new RuntimeException("Error generating Excel file", e);
+      }
+
+      byte[] excelBytes = bos.toByteArray();
+      return ResponseEntity.ok()
+              .header("Content-Disposition", "attachment; filename=CheckInOut_Report_"+assetId+".xlsx")
+              .contentType(MediaType.APPLICATION_OCTET_STREAM)
+              .body(excelBytes);
+    }
+    else{
+      return ResponseEntity.status(HttpStatus.NO_CONTENT).body(null);
+    }
+    // Create header row
+
+  }
+  public String getGeoLocation(String lat, String lng) {
+    try {
+      double latitude = Double.parseDouble(lat);
+      double longitude = Double.parseDouble(lng);
+
+      // Using OpenStreetMap Nominatim API (free, no API key needed)
+      String url = "https://nominatim.openstreetmap.org/reverse?format=json&lat="
+              + latitude + "&lon=" + longitude;
+
+      URL urlObj = new URL(url);
+      HttpURLConnection connection = (HttpURLConnection) urlObj.openConnection();
+      connection.setRequestMethod("GET");
+      connection.setRequestProperty("User-Agent", "Mozilla/5.0");
+
+      int responseCode = connection.getResponseCode();
+
+      if (responseCode == 200) {
+        BufferedReader reader = new BufferedReader(
+                new InputStreamReader(connection.getInputStream())
+        );
+
+        StringBuilder response = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+          response.append(line);
+        }
+        reader.close();
+
+        // Parse JSON response
+        JSONObject jsonResponse = new JSONObject(response.toString());
+
+        // Extract address information
+        String address = jsonResponse.optString("address", "");
+        String city = jsonResponse.optString("city", "");
+        String country = jsonResponse.optString("country", "");
+        String postcode = jsonResponse.optString("postcode", "");
+
+        // Format the location string
+        String location = "";
+        if (!address.isEmpty()) location += address + ", ";
+        if (!city.isEmpty()) location += city + ", ";
+        if (!postcode.isEmpty()) location += postcode + ", ";
+        if (!country.isEmpty()) location += country;
+
+        // Clean up trailing commas and spaces
+        location = location.replaceAll(", $", "");
+
+        return location.isEmpty() ? "Location not found" : location;
+
+      } else {
+        return "Error: " + responseCode;
+      }
+
+    } catch (Exception e) {
+      e.printStackTrace();
+      return "Error: " + e.getMessage();
+    }
+  }
+//  public static String getClientIp(HttpServletRequest request) {
+//    String ip = request.getHeader("X-Forwarded-For");
+//    if (ip != null && !ip.isBlank() && !"unknown".equalsIgnoreCase(ip)) {
+//      return ip.split(",")[0].trim();
+//    }
+//    return request.getRemoteAddr();
+//  }
+  @GetMapping("/export-asset/{companyId}")
+  public ResponseEntity<byte[]> exportCompanyCustomers(@PathVariable Long companyId) throws IOException {
+    List<Assets> assets = assetsRepository.findByCompanyId(companyId);
+    List<AssetExtraFieldName> extraFieldNames = extraFieldNameRepository.findByCompanyId(companyId);
+
+    Workbook workbook = new XSSFWorkbook();
+    Sheet sheet = workbook.createSheet("Assets");
+    Row header = sheet.createRow(0);
+    int col = 0;
+    // Add default headers
+    String[] defaultHeaders = {"ID", "Serial Number","Customer","Category", "Location", "Status"};
+    for (String h : defaultHeaders) {
+      header.createCell(col++).setCellValue(h);
+    }
+    // Add extra field headers
+    for (AssetExtraFieldName extraField : extraFieldNames) {
+      header.createCell(col++).setCellValue(extraField.getName());
+    }
+    int rowIdx = 1;
+    for (Assets asset : assets) {
+      Row row = sheet.createRow(rowIdx++);
+      int c = 0;
+      row.createCell(c++).setCellValue(asset.getAssetId());
+      row.createCell(c++).setCellValue(asset.getSerialNumber());
+      row.createCell(c++).setCellValue(asset.getCustomer());
+      row.createCell(c++).setCellValue(asset.getCategory());
+//      row.createCell(c++).setCellValue(asset.getLocation());
+      String locationValue = asset.getLocation();
+      String name = "";
+
+      if (locationValue != null && !locationValue.isBlank()) {
+
+        String[] parts = locationValue.split(":", 2);
+
+        if (parts.length == 2) {
+          String type = parts[0];
+          String id = parts[1];
+
+          if ("location".equalsIgnoreCase(type)) {
+            name = locationRepository.findById(id)
+                    .map(Location::getName)
+                    .orElse("");
+          }
+          else if ("bin".equalsIgnoreCase(type)) {
+            name = binRepository.findById(id)
+                    .map(Bin::getBinNumber)
+                    .orElse("");
+          }
+        }
+      }
+
+      row.createCell(c++).setCellValue(name);
+
+      String status = asset.getStatus();
+
+      if (status != null && !status.isEmpty()) {
+        status = status.substring(0, 1).toUpperCase() + status.substring(1).toLowerCase();
+      } else {
+        status = "";
+      }
+      row.createCell(c++).setCellValue(status);
+      // Fetch custom fields
+      List<AssetExtraFields> extras = extraFieldsRepository.findByAssetId(asset.getId());
+      Map<String, String> extraMap = new HashMap<>();
+      for (AssetExtraFields ef : extras) {
+        extraMap.put(ef.getName(), ef.getValue());
+      }
+      for (AssetExtraFieldName extraField : extraFieldNames) {
+        row.createCell(c++).setCellValue(extraMap.getOrDefault(extraField.getName(), ""));
+      }
+    }
+    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+    workbook.write(bos);
+    workbook.close();
+    byte[] excelBytes = bos.toByteArray();
+    return ResponseEntity.ok()
+            .header("Content-Disposition", "attachment; filename=AssetExport.xlsx")
+            .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+            .body(excelBytes);
+  }
+
 }

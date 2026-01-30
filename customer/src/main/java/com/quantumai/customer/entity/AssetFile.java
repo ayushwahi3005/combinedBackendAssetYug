@@ -16,4 +16,6 @@ public class AssetFile {
   private String fileName;
   private LocalDateTime uploadDateTime;
   private byte[] file;
+  private Long companyId;
+  private String uploadedBy;
 }

@@ -5,8 +5,14 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
-public interface AssetCheckInOutRepository extends MongoRepository<AssetCheckInOut, String> {
+public interface AssetCheckInOutRepository extends MongoRepository<AssetCheckInOut, String>, CompanyScopedRepository {
   public Optional<AssetCheckInOut> findByAssetId(String assetid);
 
   public List<AssetCheckInOut> findByCompanyId(Long companyId);
+
+  public Optional<AssetCheckInOut> findByCompanyIdAndAssetId(Long companyId,String assetId);
+
+  public void deleteByCompanyId(Long companyId);
+
+  public Long countByCompanyIdAndStatus(Long companyId,String status);
 }

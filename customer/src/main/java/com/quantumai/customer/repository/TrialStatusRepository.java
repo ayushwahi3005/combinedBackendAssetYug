@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface TrialStatusRepository extends MongoRepository<TrialStatus, String> {
+public interface TrialStatusRepository extends MongoRepository<TrialStatus, String> , CompanyScopedRepository{
     Optional<TrialStatus> findByCustomerEmail(String customerEmail);
     Optional<TrialStatus> findByCompanyId(Long companyId);
     List<TrialStatus> findByIsTrialActiveTrue();
@@ -18,4 +18,14 @@ public interface TrialStatusRepository extends MongoRepository<TrialStatus, Stri
             LocalDateTime startTime, LocalDateTime endTime);
     List<TrialStatus> findByTrialEndDateBetweenAndIsTrialActiveTrueAndFinalWarningNotificationSentFalse(
             LocalDateTime startTime, LocalDateTime endTime);
+
+    List<TrialStatus> findByTrialEndDateBefore(LocalDateTime endTime);
+
+    List<TrialStatus> findByTrialEndDateBetween(
+            LocalDateTime startDate,
+            LocalDateTime endDate
+    );
+
+
+    public void deleteByCompanyId(Long companyId);
 }

@@ -179,4 +179,46 @@ public class ExceptionControllerAdvice {
     return new ResponseEntity<>(errorInfo, HttpStatus.PAYLOAD_TOO_LARGE);
   }
 
+  @ExceptionHandler(LocationDeletionException.class)
+  public ResponseEntity<ErrorInfo> LocationDeletionException(LocationDeletionException exception) {
+    ErrorInfo errorInfo = new ErrorInfo();
+    errorInfo.setErrorMessage("Location/Bin is assigned to assets, cannot delete. Remove it from all assets first.");
+    errorInfo.setErrorCode(HttpStatus.BAD_REQUEST.value());
+    return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
+  }
+
+
+  @ExceptionHandler(ExtraFieldDeletionException.class)
+  public ResponseEntity<ErrorInfo> ExtraFieldDeletionException(ExtraFieldDeletionException exception) {
+    ErrorInfo errorInfo = new ErrorInfo();
+    errorInfo.setErrorMessage(
+            "Custom field can't be deleted as data exists for " +
+                    exception.getCount() +
+                    " customers, please make the field Inactive"
+    );
+    errorInfo.setErrorCode(HttpStatus.BAD_REQUEST.value());
+    return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
+  }
+
+
+  @ExceptionHandler(AssetExtraFieldDeletionException.class)
+  public ResponseEntity<ErrorInfo> AssetExtraFieldDeletionException(AssetExtraFieldDeletionException exception) {
+    ErrorInfo errorInfo = new ErrorInfo();
+    errorInfo.setErrorMessage(
+            "Custom field can't be deleted as data exists for " +
+                    exception.getCount() +
+                    " assets, please make the field Inactive");
+    errorInfo.setErrorCode(HttpStatus.BAD_REQUEST.value());
+    return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
+  }
+
+  @ExceptionHandler(BinAlreadyPresentException.class)
+  public ResponseEntity<ErrorInfo> BinAlreadyPresentException(BinAlreadyPresentException exception) {
+    ErrorInfo errorInfo = new ErrorInfo();
+    errorInfo.setErrorMessage("Bin Number Already Present in this Location");
+    errorInfo.setErrorCode(HttpStatus.BAD_REQUEST.value());
+    return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
+  }
+
+
 }

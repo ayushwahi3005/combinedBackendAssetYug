@@ -11,4 +11,5 @@ public class AssetFileDTO {
   private byte[] file;
   private String fileName;
   private LocalDateTime uploadDateTime;
+  private String uploadedBy;
 }

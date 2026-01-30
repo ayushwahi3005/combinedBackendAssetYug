@@ -11,6 +11,8 @@ public class Payment {
 
   @Id private String id;
 
+  private String paymentId;
+
   private Double amount;
 
   private String currency;

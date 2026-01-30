@@ -2,11 +2,14 @@ package com.quantumai.customer.service;
 
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
+import com.quantumai.customer.exception.AssetExtraFieldDeletionException;
 import com.quantumai.customer.exception.CategoryException;
 import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+
+import com.quantumai.customer.exception.ExtraFieldDeletionException;
 import org.springframework.web.multipart.MultipartFile;
 
 public interface AssetsService {
@@ -38,7 +41,7 @@ public interface AssetsService {
   public void addAssetExtraField(AssetExtraFieldNameDTO extraFieldNameDTO)
       throws ExtraFieldAlreadyPresentException;
 
-  public void deleteAssetExtraField(String id);
+  public void deleteAssetExtraField(String id) throws Exception;
 
   public Map<String, Map<String, String>> getextraFieldList(Long companyId);
 
@@ -46,7 +49,7 @@ public interface AssetsService {
 
   public List<AssetCheckInOutDTO> getCheckOutInList(String assetId);
 
-  public AssetFile addAssetFile(MultipartFile file, String assetId) throws IOException;
+  public AssetFile addAssetFile(MultipartFile file, String assetId,String username) throws IOException;
 
   public List<AssetFileDTO> getAssetFile(String assetId);
 
@@ -66,7 +69,7 @@ public interface AssetsService {
 
   public List<AssetMandatoryFields> getAllMandatoryFields(Long companyId);
 
-  public void deleteShowAndMandatoryFields(Long companyId, String name);
+  public void deleteShowAndMandatoryFields(Long companyId, String name) throws Exception;
 
   public void updateAssetWithFile(List<AssetsDTO> assetsDTOList, Long companyId);
 
@@ -131,7 +134,8 @@ public interface AssetsService {
 
   public AssetExtraFieldName updateExtraFieldName(ExtraFieldNameUpdateDTO extraFieldNameUpdateDTO);
 
-  public List<AssetCheckInOutData> getAssetCheckInOutData(Long companyId);
+  public PaginatedResultCheckInOutDTO<AssetCheckInOutData> getAssetCheckInOutData(Long companyId,Long pageNumber,Long pageSize);
+
 
 //  public List<Map<String,>> getAssetByCompanyCategory(Long companyId);
 }

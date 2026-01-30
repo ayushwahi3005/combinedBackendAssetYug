@@ -6,7 +6,7 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 
 public interface CompanyCustomerExtraFieldsRepository
-    extends MongoRepository<CompanyCustomerExtraFields, String> {
+    extends MongoRepository<CompanyCustomerExtraFields, String> , CompanyScopedRepository{
   public List<CompanyCustomerExtraFields> findByCompanyCustomerId(String workorderId);
 
   public List<CompanyCustomerExtraFields> findByCompanyId(Long companyId);
@@ -18,6 +18,8 @@ public interface CompanyCustomerExtraFieldsRepository
 
   public List<CompanyCustomerExtraFields> findByNameIgnoreCaseAndCompanyId(
       String companyCustomerName, Long companyId);
+
+  public void deleteByCompanyId(Long companyId);
 
 
 

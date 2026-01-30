@@ -176,8 +176,24 @@ public class CustomerServiceImpl implements CustomerService {
       customerOtpStorage.put(email, otpEntry);
       SimpleMailMessage message = new SimpleMailMessage();
       message.setTo(email);
-      message.setSubject("OTP for Password Reset");
-      message.setText("Your OTP for password reset is: " + otp);
+      message.setSubject("Your OTP for Password Reset - AssetYug");
+      message.setText("Hi  "+customer.get().getFirstName()+",\n" +
+              "\n" +
+              "We received a request to reset the password for your AssetYug account.\n" +
+              "\n" +
+              "Please use the following One-Time Password (OTP) to proceed with resetting your password:\n" +
+              "\n" +
+              "OTP: ["+otp+"]\n" +
+              "\n" +
+              "This OTP is valid for [5] minutes. Please do not share this code with anyone for security reasons.\n" +
+              "\n" +
+              "If you did not request a password reset, please ignore this email—no changes will be made to your account.\n" +
+              "\n" +
+              "If you need any help or additional information, feel free to reach out.\n" +
+              "\n" +
+              "\n" +
+              "Best regards,\n" +
+              "AssetYug Team");
       mailSender.send(message);
     } else {
       throw new NoEmailFoundException("No Such Email");
@@ -339,10 +355,10 @@ public class CustomerServiceImpl implements CustomerService {
     companyCustomer.setPhone("+1-555-123-4567");
     companyCustomer.setEmail("johndoe@example.com");
     companyCustomer.setAddress("123 Main Street");
-    companyCustomer.setApartment("Apt 4B");
+//    companyCustomer.setApartment("Apt 4B");
     companyCustomer.setCity("Buffalo");
     companyCustomer.setState("New York");
-    companyCustomer.setZipCode(14201);
+    companyCustomer.setZipCode("14201");
     companyCustomer.setUpdatedAt(LocalDateTime.now().toString());
 
     if (companyCustomerIdTableOptional.isEmpty()) {
@@ -553,9 +569,9 @@ public class CustomerServiceImpl implements CustomerService {
     // TODO Auto-generated method stub
     Optional<CustomRole> customRoleOptional = customRoleRepository.findById(customRoleId);
     if (customRoleOptional.isPresent()) {
-      Long count =
-          countByRoleName(
-              customRoleOptional.get().getName(), customRoleOptional.get().getCompanyId());
+      Long count =customerRepository.countByRoleAndCompanyId(customRoleOptional.get().getName(), customRoleOptional.get().getCompanyId());
+//          countByRoleName(
+//              customRoleOptional.get().getName(), customRoleOptional.get().getCompanyId());
       if (count == 0) {
         customRoleRepository.delete(customRoleOptional.get());
       } else {
@@ -579,10 +595,22 @@ public class CustomerServiceImpl implements CustomerService {
   }
 
   @Override
-  public Long countByRoleName(String name, Long companyId) {
+  public CountNameByRole countByRoleName(String name, Long companyId) {
     // TODO Auto-generated method stub
     Long count = customerRepository.countByRoleAndCompanyId(name, companyId);
-    return count;
+    List<UserNameEmail> userList=new ArrayList<>();
+    customerRepository.findByRoleAndCompanyId(name, companyId).forEach((data)->{
+
+      UserNameEmail userDataRecord=new UserNameEmail(data.getFirstName()+" "+data.getLastName(),data.getEmail());
+        userList.add(userDataRecord);
+
+    });
+    CountNameByRole countNameByRole=new CountNameByRole();
+    countNameByRole.setTotalCount(count);
+    countNameByRole.setUsers(userList);
+    return countNameByRole;
+
+
   }
 
   @Override
@@ -607,6 +635,8 @@ public class CustomerServiceImpl implements CustomerService {
       throw new LocationAlreadyPresentException("Location With Given Name Already Present");
     }
     // location.setStatus(StatusEnum.active);
+    Optional<Location> optionalParentLoc=locationRepository.findByCompanyIdAndId(location.getCompanyId(), location.getParentLocation());
+      optionalParentLoc.ifPresent(value -> location.setParentLocationName(value.getName()));
     return locationRepository.save(location);
   }
   @Override
@@ -615,6 +645,8 @@ public class CustomerServiceImpl implements CustomerService {
     System.out.println(location);
     
     // location.setStatus(StatusEnum.active);
+    Optional<Location> optionalParentLoc=locationRepository.findByCompanyIdAndId(location.getCompanyId(), location.getParentLocation());
+      optionalParentLoc.ifPresent(value -> location.setParentLocationName(value.getName()));
     return locationRepository.save(location);
   }
   @Override
@@ -623,19 +655,32 @@ public class CustomerServiceImpl implements CustomerService {
     
     myLocations = locationRepository.findByCompanyId(companyId);
 
+
     return myLocations;
   }
 
   @Override
-  public void deleteLocation(String id) {
-    locationRepository.deleteById(id);
+  public void deleteLocation(String id) throws LocationDeletionException {
+    Optional<Location> locOptinal=locationRepository.findById(id);
+    if(locOptinal.isPresent()){
+        Location location=locOptinal.get();
+      List<Assets> assetList=assetsRepository.findByCompanyIdAndLocation(location.getCompanyId(),"location:"+id);
+      if(assetList.size()>0){
+        throw new LocationDeletionException("Location is assigned to assets, cannot delete");
+      }
+      locationRepository.deleteById(id);
+    }
+
   }
 
   @Override
-  public Bin addBin(BinDTO binDTO) {
+  public Bin addBin(BinDTO binDTO) throws BinAlreadyPresentException {
       Optional<Location> location = locationRepository.findById(binDTO.getLocationId());
       if (location.isEmpty()) {
           throw new RuntimeException("Location not found with id: " + binDTO.getLocationId());
+      }
+      if(!binRepository.findByCompanyIdAndBinNumberIgnoreCaseAndLocationId(binDTO.getCompanyId(), binDTO.getBinNumber(), location.get()).isEmpty()){
+        throw new BinAlreadyPresentException("Bin with given number already exists in this location");
       }
       
       Bin bin = new Bin();
@@ -723,8 +768,17 @@ public class CustomerServiceImpl implements CustomerService {
   }
 
   @Override
-  public void deleteBin(String id) {
-    binRepository.deleteById(id);
+  public void deleteBin(String id) throws LocationDeletionException {
+    Optional<Bin> binOptinal=binRepository.findById(id);
+    if(binOptinal.isPresent()){
+      Bin bin=binOptinal.get();
+      List<Assets> assetList=assetsRepository.findByCompanyIdAndLocation(bin.getCompanyId(),"bin:"+id);
+      if(assetList.size()>0){
+        throw new LocationDeletionException("Bin is assigned to assets, cannot delete");
+      }
+      binRepository.deleteById(id);
+    }
+
   }
 
   @Override

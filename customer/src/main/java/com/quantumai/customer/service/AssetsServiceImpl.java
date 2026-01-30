@@ -8,7 +8,7 @@ import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
 import com.quantumai.customer.entity.IdGenerator.AssetCategoryIdGenerator;
 import com.quantumai.customer.entity.IdGenerator.AssetIdTable;
-import com.quantumai.customer.entity.IdGenerator.CompanyPrimaryKeyTable;
+import com.quantumai.customer.exception.AssetExtraFieldDeletionException;
 import com.quantumai.customer.exception.CategoryException;
 import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
 import com.quantumai.customer.repository.*;
@@ -20,6 +20,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -66,7 +67,13 @@ public class AssetsServiceImpl implements AssetsService {
   @Autowired private AssetCategoryIdGeneratorRepository assetCategoryIdGeneratorRepository;
 
   @Autowired
+  private AssetShowFieldsRepository assetShowFieldsRepository;
+
+  @Autowired
   private MongoTemplate mongoTemplate;
+
+  @Autowired
+  private AssetRepositoryCustom assetRepositoryCustom;
 
   private static final String SEQ_ID = "asset_category_sequence";
   LocalDateTime localDateTime;
@@ -273,20 +280,41 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
-  public void deleteAssetExtraField(String id) {
+  public void deleteAssetExtraField(String id) throws Exception {
     // TODO Auto-generated method stub
 
     Optional<AssetExtraFieldName> extraFieldNameOptional = extraFieldNameRepository.findById(id);
-    extraFieldNameRepository.deleteById(id);
-    AssetExtraFieldName extraFieldName = extraFieldNameOptional.get();
-    List<AssetExtraFields> extraFieldsList =
-        extraFieldsRepository.findByName(extraFieldName.getName());
-    extraFieldsList.stream()
-        .forEach(
-            (x) -> {
-              // System.out.println("-------------------------------------->"+x.getName());
-              extraFieldsRepository.delete(x);
-            });
+//      List<CompanyCustomerExtraFields> allDataFields=extraFieldsRepository.findByNameIgnoreCaseAndCompanyId(extraFieldNameOptional.get().getName(),extraFieldNameOptional.get().getCompanyId());
+//      allDataFields=allDataFields.stream().filter((data)->!(data.getValue().isEmpty()||data.getValue().isBlank())).toList();
+      log.info(extraFieldNameOptional.get().getName()+" "+extraFieldNameOptional.get().getCompanyId());
+      Optional<AssetShowFields> assetShowFieldsOptional=assetShowFieldsRepository.findByNameAndCompanyId(extraFieldNameOptional.get().getName(),
+              extraFieldNameOptional.get().getCompanyId());
+      if(assetShowFieldsOptional.isPresent()){
+          AssetShowFields showFields=assetShowFieldsOptional.get();
+          long count=assetRepositoryCustom.countActiveAssetsWithExtraField(extraFieldNameOptional.get().getName(),extraFieldNameOptional.get().getCompanyId());
+          log.info("Count of assets using the extra field: "+count);
+          if(count==0||!showFields.isShow()){
+              extraFieldNameRepository.deleteById(id);
+
+              AssetExtraFieldName extraFieldName = extraFieldNameOptional.get();
+              List<AssetExtraFields> extraFieldsList =
+                      extraFieldsRepository.findByName(extraFieldName.getName());
+              extraFieldsList.stream()
+                      .forEach(
+                              (x) -> {
+                                  // System.out.println("-------------------------------------->"+x.getName());
+                                  extraFieldsRepository.delete(x);
+                              });
+          }
+          else{
+              throw new AssetExtraFieldDeletionException("Cannot delete extra field as it is in use",count );
+          }
+      }
+      else{
+          throw new Exception("Cannot delete extra field");
+      }
+
+
   }
 
   @Override
@@ -336,6 +364,10 @@ public class AssetsServiceImpl implements AssetsService {
       checkInOutDetails.setLocation(checkInDTO.getLocation());
       checkInOutDetails.setNotes(checkInDTO.getNotes());
       checkInOutDetails.setUpdateTime(LocalDateTime.now());
+      checkInOutDetails.setUserLatitude(checkInDTO.getUserLatitude());
+      checkInOutDetails.setUserLongitude(checkInDTO.getUserLongitude());
+      checkInOutDetails.setIpAddress(checkInDTO.getIpAddress());
+        checkInOutDetails.setUserLocation(checkInDTO.getUserLocation());
       List<AssetCheckInOutDetails> checkInOutDetailsList = new ArrayList<>();
       checkInOutDetailsList.add(checkInOutDetails);
       checkInOut.setDetailsList(checkInOutDetailsList);
@@ -356,6 +388,10 @@ public class AssetsServiceImpl implements AssetsService {
                 checkInOutDetails.setEmployee(checkInDTO.getEmployee());
                 checkInOutDetails.setLocation(checkInDTO.getLocation());
                 checkInOutDetails.setNotes(checkInDTO.getNotes());
+                checkInOutDetails.setUserLatitude(checkInDTO.getUserLatitude());
+                checkInOutDetails.setUserLongitude(checkInDTO.getUserLongitude());
+                  checkInOutDetails.setIpAddress(checkInDTO.getIpAddress());
+                  checkInOutDetails.setUserLocation(checkInDTO.getUserLocation());
                 checkInOutDetails.setUpdateTime(LocalDateTime.now());
                 checkInOutDetailsList.add(checkInOutDetails);
                 x.setDetailsList(checkInOutDetailsList);
@@ -389,13 +425,14 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
-  public AssetFile addAssetFile(MultipartFile file, String assetId) throws IOException {
+  public AssetFile addAssetFile(MultipartFile file, String assetId,String username) throws IOException {
     // TODO Auto-generated method stub
     String fileName = StringUtils.cleanPath(file.getOriginalFilename());
     AssetFile assetFile = new AssetFile();
     assetFile.setAssetId(assetId);
     assetFile.setFile(file.getBytes());
     assetFile.setFileName(fileName);
+    assetFile.setUploadedBy(username);
     assetFile.setUploadDateTime(LocalDateTime.now());
 
     return assetFileRepository.save(assetFile);
@@ -507,16 +544,26 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
-  public void deleteShowAndMandatoryFields(Long companyId, String name) {
+  public void deleteShowAndMandatoryFields(Long companyId, String name) throws Exception {
     // TODO Auto-generated method stub
     Optional<AssetShowFields> showFieldsOptional =
         showFieldsRepository.findByNameAndCompanyId(name, companyId);
-    showFieldsRepository.delete(showFieldsOptional.get());
-    Optional<AssetMandatoryFields> mandatoryFieldsOptional =
-        mandatoryFieldsRepository.findByNameAndCompanyId(name, companyId);
-    if (mandatoryFieldsOptional.isPresent()) {
-      mandatoryFieldsRepository.delete(mandatoryFieldsOptional.get());
-    }
+
+      List<CompanyCustomerExtraFields> allDataFields=extraFieldsRepository.findByNameIgnoreCaseAndCompanyId(name,companyId);
+      allDataFields=allDataFields.stream().filter((data)->!(data.getValue().isEmpty()||data.getValue().isBlank())).toList();
+      Long count=assetRepositoryCustom.countActiveAssetsWithExtraField(name,companyId);
+      if(count==0){
+          showFieldsRepository.delete(showFieldsOptional.get());
+          Optional<AssetMandatoryFields> mandatoryFieldsOptional =
+                  mandatoryFieldsRepository.findByNameAndCompanyId(name, companyId);
+          if (mandatoryFieldsOptional.isPresent()) {
+              mandatoryFieldsRepository.delete(mandatoryFieldsOptional.get());
+          }
+      }
+      else{
+          throw new Exception("Cannot delete extra field as it is in use" );
+      }
+
   }
 
   @Override
@@ -654,6 +701,8 @@ public class AssetsServiceImpl implements AssetsService {
     List<AssetExtraFieldName> extraFieldNameList =
         extraFieldNameRepository.findByCompanyId(companyId);
 
+
+
     List<Assets> assetList = assetsRepository.findByCompanyId(companyId);
     Map<String, String> binIdToNameMap =
         binRepository.findByCompanyId(companyId).stream()
@@ -661,6 +710,10 @@ public class AssetsServiceImpl implements AssetsService {
     Map<String, String> locationIdToNameMap =
         locationRepository.findByCompanyId(companyId).stream()
             .collect(Collectors.toMap(Location::getId, Location::getName));
+
+
+      List<AssetExtraFields> allExtraFieldsList =
+              extraFieldsRepository.findByCompanyId(companyId);
 
     List<String> mapList = new ArrayList<>();
     // System.out.println("++++++++++++++++++++++++++>"+location);
@@ -932,17 +985,9 @@ public class AssetsServiceImpl implements AssetsService {
     // TODO Auto-generated method stub
     List<String> filteredAssetsWithAllFields = new ArrayList<>();
     long totalPage = 0;
-    // System.out.println("----searchData--->" + searchData + "---" + searchData.length());
     log.info("Search Data: {}",searchData);
-    //		 if(searchData=="null"){
-    //			 searchData="";
-    //		 }
-//      if (filter instanceof Map) {
-//          Map<?, ?> filterMap = (Map<?, ?>) filter;
-//          for (Map.Entry<?, ?> entry : filterMap.entrySet()) {
-//              System.out.println(entry.getKey() + " : " + entry.getValue());
-//          }
-//      }
+      log.info("Filter Data: {}",filter.toString());
+
 
     if (filter instanceof Map) {
       // Cast the filter to a Map
@@ -1425,29 +1470,44 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
     @Override
-    public List<AssetCheckInOutData> getAssetCheckInOutData(Long companyId) {
+    public PaginatedResultCheckInOutDTO<AssetCheckInOutData> getAssetCheckInOutData(Long companyId,Long pageNumber,Long pageSize) {
         List<Assets> assetsList = assetsRepository.findByCompanyId(companyId);
         List<AssetCheckInOutData> assetCheckInOutDataList = new ArrayList<>();
+        AtomicLong totalCheckedIn = new AtomicLong();
+        AtomicLong totalCheckedOut = new AtomicLong();
         assetsList.stream().forEach((asset) -> {
-            AssetCheckInOutData assetCheckInOutData = new AssetCheckInOutData();
-            assetCheckInOutData.setAssetId(asset.getAssetId());
-            assetCheckInOutData.setAssetName(asset.getName());
+//            AssetCheckInOutData assetCheckInOutData = new AssetCheckInOutData();
+//            assetCheckInOutData.setAssetId(asset.getAssetId());
+//            assetCheckInOutData.setAssetName(asset.getName());
             Optional<AssetCheckInOut> assetCheckInOutOptional = checkInOutRepository.findByAssetId(asset.getId());
             if(assetCheckInOutOptional.isPresent()){
                 AssetCheckInOut assetCheckInOut = assetCheckInOutOptional.get();
+                if(assetCheckInOut.getStatus().equalsIgnoreCase("Checked In")){
+                    totalCheckedIn.getAndIncrement();
+                }
+                else if(assetCheckInOut.getStatus().equalsIgnoreCase("Checked Out")){
+                    totalCheckedOut.getAndIncrement();
+                }
                 assetCheckInOut.getDetailsList().stream()
                         .sorted(Comparator.comparing(AssetCheckInOutDetails::getDate).reversed())
-                        .findFirst()
-                        .ifPresent(latest -> {
-                            // use latest
-                            assetCheckInOutData.setAction(latest.getStatus());
-                            assetCheckInOutData.setDate(latest.getDate());
-                            assetCheckInOutData.setTime(latest.getUpdateTime().toLocalTime().withNano(0));
-                            assetCheckInOutData.setLocation(latest.getLocation());
-                            assetCheckInOutData.setUsername(latest.getEmployee());
+                        .forEach(detail -> {
+                            // process each detail
+                            AssetCheckInOutData assetCheckInOutData = new AssetCheckInOutData();
+                            assetCheckInOutData.setAssetId(asset.getAssetId());
+                            assetCheckInOutData.setAssetName(asset.getName());
+                            assetCheckInOutData.setAction(detail.getStatus());
+                            assetCheckInOutData.setDate(detail.getDate());
+                            assetCheckInOutData.setTime(detail.getUpdateTime().toLocalTime().withNano(0));
+                            assetCheckInOutData.setLocation(detail.getLocation());
+                            assetCheckInOutData.setUsername(detail.getEmployee());
+                            assetCheckInOutDataList.add(assetCheckInOutData);
                         });
             }
             else{
+                totalCheckedIn.getAndIncrement();
+                AssetCheckInOutData assetCheckInOutData = new AssetCheckInOutData();
+                assetCheckInOutData.setAssetId(asset.getAssetId());
+                assetCheckInOutData.setAssetName(asset.getName());
                 assetCheckInOutData.setAction("Checked In");
                 LocalDate date = LocalDateTime.parse(asset.getUpdatedAt())
                         .toLocalDate();
@@ -1458,11 +1518,45 @@ public class AssetsServiceImpl implements AssetsService {
 //                assetCheckInOutData.setTime(dateTime);
                 assetCheckInOutData.setLocation("NA");
                 assetCheckInOutData.setUsername("NA");
+                assetCheckInOutDataList.add(assetCheckInOutData);
             }
 
 
-            assetCheckInOutDataList.add(assetCheckInOutData);
+
         });
-        return assetCheckInOutDataList;
+
+
+        // Sort by date (descending) and then by time (descending)
+        assetCheckInOutDataList.sort(
+                Comparator.comparing(AssetCheckInOutData::getDate, Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(AssetCheckInOutData::getTime, Comparator.nullsLast(Comparator.reverseOrder()))
+        );
+
+
+
+
+//        for (AssetCheckInOutData data : assetCheckInOutDataList) {
+//            if (data.getAction().equalsIgnoreCase("Checked In")) {
+//                totalCheckedIn++;
+//            } else if (data.getAction().equalsIgnoreCase("Checked Out")) {
+//                totalCheckedOut++;
+//            }
+//        }
+
+        // Pagination logic
+
+        int totalRecords = assetCheckInOutDataList.size();
+        int startIndex = (int) (pageNumber * pageSize);
+        int endIndex = (int) Math.min(startIndex + pageSize, totalRecords);
+
+        // Handle edge cases
+
+        if (startIndex >= totalRecords) {
+            return new PaginatedResultCheckInOutDTO<>(new ArrayList<>(),totalRecords, totalCheckedIn.get(), totalCheckedOut.get()); // Return empty list if pageNumber is out of bounds
+        }
+        return new PaginatedResultCheckInOutDTO<>(assetCheckInOutDataList.subList(startIndex, endIndex),totalRecords, totalCheckedIn.get(), totalCheckedOut.get());
+//        return assetCheckInOutDataList;
     }
+
+
 }

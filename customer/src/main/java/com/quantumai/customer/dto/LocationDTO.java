@@ -8,10 +8,12 @@ public class LocationDTO {
   private Long companyId;
   private String name;
   private String parentLocation;
+  private String parentLocationName;
   private String address;
   private String apartment;
   private String city;
+  private String country;
   private String state;
   private String status;
-  private Integer zipCode;
+  private String zipCode;
 }

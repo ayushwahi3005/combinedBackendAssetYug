@@ -6,7 +6,7 @@ import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface AssetCategoryInspectionInstanceRepository
-    extends MongoRepository<AssetCategoryInspectionInstance, String> {
+    extends MongoRepository<AssetCategoryInspectionInstance, String> , CompanyScopedRepository{
 
   public List<AssetCategoryInspectionInstance> findByAssetId(String assetId);
 
@@ -14,4 +14,6 @@ public interface AssetCategoryInspectionInstanceRepository
       String assetCategoryInspectionId);
 
   public List<AssetCategoryInspectionInstance> findByCompanyId(Long companyId);
+
+  public void deleteByCompanyId(Long companyId);
 }

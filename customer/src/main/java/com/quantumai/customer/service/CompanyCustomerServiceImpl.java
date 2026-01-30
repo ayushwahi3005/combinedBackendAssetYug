@@ -14,6 +14,7 @@ import com.quantumai.customer.entity.IdGenerator.CompanyCustomerIdTable;
 import com.quantumai.customer.exception.CategoryException;
 import com.quantumai.customer.exception.EmailAlreadyExistsException;
 import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
+import com.quantumai.customer.exception.ExtraFieldDeletionException;
 import com.quantumai.customer.repository.*;
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -60,10 +61,16 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   CompanyCustomerFileRepository companyCustomerFileRepository;
 
   @Autowired
+  private CompanyCustomerShowFieldsRepository companyCustomerShowFieldsRepository;;
+
+  @Autowired
   private CompanyCustomerCategoryIdGeneratorRepository companyCustomerCategoryIdGeneratorRepository;
 
     @Autowired
     private MongoTemplate mongoTemplate;
+
+   @Autowired
+   private CompanyCustomerRepositoryCustom companyCustomerRepositoryCustom;
 
   private static final String SEQ_ID = "company_customer_category_sequence";
 
@@ -114,6 +121,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
         throw new EmailAlreadyExistsException("User With Email Already Present");
       }
       else{
+          log.info(companyCustomer.toString());
         CompanyCustomer saved = companyCustomerRepository.save(companyCustomer);
         return modelMapper.map(saved, CompanyCustomerDTO.class);
       }
@@ -162,13 +170,14 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
 
     // Always update timestamp
     companyCustomer.setUpdatedAt(LocalDateTime.now().toString());
+    if(!companyCustomer.getEmail().isEmpty()){
     Optional<CompanyCustomer> customer=companyCustomerRepository.findByEmailAndCompanyId(companyCustomer.getEmail(),companyCustomer.getCompanyId());
-    if(customer.isPresent()&&!customer.get().getId().equals(companyCustomer.getId())){
-      throw new EmailAlreadyExistsException("User With Email Aready Present");
+        if(customer.isPresent()&&!customer.get().getId().equals(companyCustomer.getId())){
+          throw new EmailAlreadyExistsException("User With Email Aready Present");
+        }
+
     }
-    else{
       companyCustomerRepository.save(companyCustomer);
-    }
    
   }
 
@@ -290,24 +299,42 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   public void deleteCompanyCustomerExtraField(String id) throws Exception {
     // TODO Auto-generated method stub
     Optional<CompanyCustomerExtraFieldName> extraFieldNameOptional = extraFieldNameRepository.findById(id);
+
       if(extraFieldNameOptional.isPresent()){
-          List<CompanyCustomerExtraFields> allDataFields=extraFieldsRepository.findByNameIgnoreCaseAndCompanyId(extraFieldNameOptional.get().getName(),extraFieldNameOptional.get().getCompanyId());
-          allDataFields=allDataFields.stream().filter((data)->!(data.getValue().isEmpty()||data.getValue().isBlank())).toList();
-          if(allDataFields.isEmpty()){
-              extraFieldNameRepository.deleteById(id);
-              CompanyCustomerExtraFieldName extraFieldName = extraFieldNameOptional.get();
-              List<CompanyCustomerExtraFields> extraFieldsList = extraFieldsRepository
-                      .findByName(extraFieldName.getName().toLowerCase());
-              extraFieldsList.stream()
-                      .forEach(
-                              (x) -> {
-                                  log.info("Extra Field {} Deleted Successfully", x.getName());
-                                  extraFieldsRepository.delete(x);
-                              });
+//          List<CompanyCustomerExtraFields> allDataFields=extraFieldsRepository.findByNameIgnoreCaseAndCompanyId(extraFieldNameOptional.get().getName(),extraFieldNameOptional.get().getCompanyId());
+//          allDataFields=allDataFields.stream().filter((data)->!(data.getValue().isEmpty()||data.getValue().isBlank())).toList();
+          Optional<CompanyCustomerShowFields> companyShowFieldsOptional=companyCustomerShowFieldsRepository.findByNameAndCompanyId(extraFieldNameOptional.get().getName(),
+                          extraFieldNameOptional.get().getCompanyId());
+
+          if(companyShowFieldsOptional.isPresent()){
+              CompanyCustomerShowFields showFields=companyShowFieldsOptional.get();
+
+
+                  long count = companyCustomerRepositoryCustom.countActiveAssetsWithExtraField(extraFieldNameOptional.get().getName(), extraFieldNameOptional.get().getCompanyId());
+                  if (count == 0||!showFields.isShow()) {
+                      extraFieldNameRepository.deleteById(id);
+                      CompanyCustomerExtraFieldName extraFieldName = extraFieldNameOptional.get();
+                      List<CompanyCustomerExtraFields> extraFieldsList = extraFieldsRepository
+                              .findByName(extraFieldName.getName().toLowerCase());
+                      extraFieldsRepository.deleteAll(extraFieldsList);
+                      extraFieldsList
+                              .forEach(
+                                      (x) -> {
+                                          log.info("Extra Field {} Deleted Successfully", x.getName());
+//                                          extraFieldsRepository.delete(x);
+                                      });
+                  } else {
+                      throw new ExtraFieldDeletionException("Cannot delete extra field as it is in use", count);
+                  }
+
+
+
           }
           else{
-              throw new Exception("Cannot delete Extra Field as some customers are using this field");
+              throw new Exception("Cannot delete extra field");
           }
+
+
       }
 
   }

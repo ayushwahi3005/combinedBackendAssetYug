@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
-public interface CustomerRepository extends MongoRepository<Customer, String> {
+public interface CustomerRepository extends MongoRepository<Customer, String> , CompanyScopedRepository{
 
   Boolean existsByEmail(String email);
 
@@ -17,6 +17,9 @@ public interface CustomerRepository extends MongoRepository<Customer, String> {
   Optional<Customer> findByEmailAndCompanyId(String email, Long companyId);
 
   Long countByRoleAndCompanyId(String role, Long id);
+  List<Customer> findByRoleAndCompanyId(String role, Long id);
+
+  public void deleteByCompanyId(Long companyId);
   
 
 }

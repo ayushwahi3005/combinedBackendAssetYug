@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
-public interface UserExtraFieldsRepository extends MongoRepository<UserExtraFields, String> {
+public interface UserExtraFieldsRepository extends MongoRepository<UserExtraFields, String> , CompanyScopedRepository{
   public List<UserExtraFields> findByUserId(String userId);
 
   public List<UserExtraFields> findByCompanyId(Long companyId);
@@ -13,4 +13,6 @@ public interface UserExtraFieldsRepository extends MongoRepository<UserExtraFiel
   public List<UserExtraFields> findByNameIgnoreCase(String name);
 
   public Optional<UserExtraFields> findByNameIgnoreCaseAndUserId(String name, String userId);
+
+  public void deleteByCompanyId(Long companyId);
 }

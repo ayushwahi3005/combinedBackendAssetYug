@@ -13,4 +13,8 @@ public class AssetCheckInOutDetails {
   private String location;
   private Long companyId;
   private LocalDateTime updateTime;
+  private String userLongitude;
+  private String userLatitude;
+  private String ipAddress;
+  private String userLocation;
 }
