@@ -1,6 +1,7 @@
 package com.quantumai.customer.controller;
 
 
+import com.quantumai.customer.dto.InspectionCompletedCountPerDayDTO;
 import com.quantumai.customer.dto.UserInspectionAnalyticsDTO;
 import com.quantumai.customer.entity.CompanyCustomer;
 import com.quantumai.customer.entity.CompanyCustomerExtraFieldName;
@@ -57,6 +58,25 @@ public class AssetInspectionAPI {
         @GetMapping("/inspection-details/{companyId}")
         public Map<String,Long> inspectionDetails(@PathVariable Long companyId) {
                 return assetInspectionService.getAssetInspectionDetails(companyId);
+
+        }
+        @GetMapping("/inspection-complete-per-day/{companyId}")
+        public List<InspectionCompletedCountPerDayDTO> inspectionCompletePerDay(@PathVariable Long companyId, @RequestParam LocalDate startDate, @RequestParam LocalDate endDate) {
+                return assetInspectionService.getInspectionCompletionPerDay(companyId, startDate, endDate);
+
+        }
+        @GetMapping("/inspection-detailed-export/{companyId}/{assetId}")
+        public ResponseEntity<byte[]> inspectionDetailedExport(@PathVariable Long companyId,@PathVariable String assetId) throws Exception {
+//                return assetInspectionService.getInspectionCompletionPerDay(companyId, startDate, endDate);
+                return ResponseEntity.ok(assetInspectionService.exportInspectionDetailedExcel(companyId,assetId));
+
+
+        }
+        @GetMapping("/inspection-overview-export/{companyId}/{assetId}")
+        public ResponseEntity<byte[]> inspectionOverviewExport(@PathVariable Long companyId,@PathVariable String assetId) throws Exception {
+//                return assetInspectionService.getInspectionCompletionPerDay(companyId, startDate, endDate);
+                return ResponseEntity.ok(assetInspectionService.exportInspectionOverviewExcel(companyId,assetId));
+
 
         }
 

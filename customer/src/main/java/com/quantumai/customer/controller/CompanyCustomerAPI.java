@@ -590,7 +590,7 @@ public class CompanyCustomerAPI {
       importHistoryDTO.setFileName(file.getOriginalFilename());
       importHistoryDTO.setRecordType("Customer Record");
       importHistoryDTO.setExecutedBy(email);
-      importHistoryDTO.setDate(LocalDateTime.now().toString());
+      importHistoryDTO.setDate(LocalDateTime.now());
       importHistoryDTO.setStatus("In-Progress");
       importHistoryDTO.setCompanyId(companyId);
       System.out.println("===========>");
@@ -983,7 +983,7 @@ public class CompanyCustomerAPI {
 
         ind++;
         currCount++;
-        importHistoryDTO.setDate(LocalDateTime.now().toString());
+        importHistoryDTO.setDate(LocalDateTime.now());
         long complete = (currCount * 100L) / (totalCount);
         importHistoryDTO.setComplete(complete);
         importHistoryDTO = customerService.addImportHistory(importHistoryDTO);
@@ -1202,7 +1202,7 @@ public class CompanyCustomerAPI {
       importHistoryDTO.setFileName(file.getOriginalFilename());
       importHistoryDTO.setRecordType("Update Customer Record");
       importHistoryDTO.setExecutedBy(email);
-      importHistoryDTO.setDate(LocalDateTime.now().toString());
+      importHistoryDTO.setDate(LocalDateTime.now());
       importHistoryDTO.setStatus("In-Progress");
       importHistoryDTO.setCompanyId(companyId);
       // Create a Sheet
@@ -1523,7 +1523,7 @@ public class CompanyCustomerAPI {
         }
         ind++;
         currCount++;
-        importHistoryDTO.setDate(LocalDateTime.now().toString());
+        importHistoryDTO.setDate(LocalDateTime.now());
         long complete = (currCount * 100L) / (totalCount);
         importHistoryDTO.setComplete(complete);
         importHistoryDTO = customerService.addImportHistory(importHistoryDTO);
@@ -1689,6 +1689,12 @@ public class CompanyCustomerAPI {
     Sheet sheet = workbook.createSheet("Customers");
     Row header = sheet.createRow(0);
     int col = 0;
+
+    // Create text format style
+    CellStyle textStyle = workbook.createCellStyle();
+    DataFormat format = workbook.createDataFormat();
+    textStyle.setDataFormat(format.getFormat("@")); // @ = text format
+
     // Add default headers
     String[] defaultHeaders = {"ID", "Name","Address", "Email","Category", "Phone", "Status"};
     for (String h : defaultHeaders) {
@@ -1698,49 +1704,59 @@ public class CompanyCustomerAPI {
     for (CompanyCustomerExtraFieldName extraField : extraFieldNames) {
       header.createCell(col++).setCellValue(extraField.getName());
     }
+
     int rowIdx = 1;
     for (CompanyCustomer customer : customers) {
       Row row = sheet.createRow(rowIdx++);
       int c = 0;
-      row.createCell(c++).setCellValue(customer.getCompanyCustomerId());
-      row.createCell(c++).setCellValue(customer.getName());
-      StringBuilder sb = new StringBuilder();
 
+      // ID - apply text style
+      Cell idCell = row.createCell(c++);
+      idCell.setCellValue(String.valueOf(customer.getCompanyCustomerId()));
+      idCell.setCellStyle(textStyle);
+
+      // Name
+      row.createCell(c++).setCellValue(customer.getName());
+
+      // Address
+      StringBuilder sb = new StringBuilder();
       if (customer.getAddress() != null && !customer.getAddress().isEmpty())
         sb.append(customer.getAddress());
-
       if (customer.getCity() != null && !customer.getCity().isEmpty()) {
         if (!sb.isEmpty()) sb.append(", ");
         sb.append(customer.getCity());
       }
-
       if (customer.getState() != null && !customer.getState().isEmpty()) {
         if (!sb.isEmpty()) sb.append(", ");
         sb.append(customer.getState());
       }
-
       if (customer.getCountry() != null && !customer.getCountry().isEmpty()) {
         if (!sb.isEmpty()) sb.append(", ");
         sb.append(customer.getCountry());
       }
-
       if (customer.getZipCode() != null && !customer.getZipCode().isEmpty()) {
         sb.append(" ").append(customer.getZipCode());
       }
-
       row.createCell(c++).setCellValue(sb.toString());
 
+      // Email
       row.createCell(c++).setCellValue(customer.getEmail());
-      row.createCell(c++).setCellValue(customer.getCategory());
-      row.createCell(c++).setCellValue(customer.getPhone());
-      String status = customer.getStatus();
 
+      // Category
+      row.createCell(c++).setCellValue(customer.getCategory());
+
+      // Phone - apply text style to preserve leading zeros
+      Cell phoneCell = row.createCell(c++);
+      phoneCell.setCellValue(customer.getPhone());
+      phoneCell.setCellStyle(textStyle);
+
+      // Status
+      String status = customer.getStatus();
       if (status != null && !status.isEmpty()) {
         status = status.substring(0, 1).toUpperCase() + status.substring(1).toLowerCase();
       } else {
         status = "";
       }
-
       row.createCell(c++).setCellValue(status);
 
       // Fetch custom fields
@@ -1750,9 +1766,12 @@ public class CompanyCustomerAPI {
         extraMap.put(ef.getName(), ef.getValue());
       }
       for (CompanyCustomerExtraFieldName extraField : extraFieldNames) {
-        row.createCell(c++).setCellValue(extraMap.getOrDefault(extraField.getName(), ""));
+        Cell extraCell = row.createCell(c++);
+        extraCell.setCellValue(extraMap.getOrDefault(extraField.getName(), ""));
+        extraCell.setCellStyle(textStyle); // Apply text style to all extra fields
       }
     }
+
     ByteArrayOutputStream bos = new ByteArrayOutputStream();
     workbook.write(bos);
     workbook.close();

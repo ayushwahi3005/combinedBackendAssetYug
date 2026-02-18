@@ -8,7 +8,7 @@ import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 
-public interface AssetsRepository extends MongoRepository<Assets, String> , CompanyScopedRepository{
+public interface AssetsRepository extends MongoRepository<Assets, String>, CompanyScopedRepository, AssetRepositoryCustomAdvanced{
   List<Assets> findByCompanyId(Long companyId);
 
   List<Assets> findByCustomerId(String customerId);

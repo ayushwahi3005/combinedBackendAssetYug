@@ -10,6 +10,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 public class AssetCategoryInspection {
 
   @Id private String id;
+  private Long assetCategoryInspectionId;
   private String name;
   private String categoryName;
   private String categoryId;

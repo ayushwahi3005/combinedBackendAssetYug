@@ -5,6 +5,7 @@ import com.quantumai.customer.repository.AdminRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.context.ApplicationContext;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import lombok.extern.slf4j.Slf4j;
@@ -21,10 +22,13 @@ public class AdminInitializer implements ApplicationRunner {
     private AdminRepository adminRepository;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    private ApplicationContext applicationContext;
 
     @Override
     public void run(ApplicationArguments args) {
+        // Lazy fetch PasswordEncoder from application context
+        PasswordEncoder passwordEncoder = applicationContext.getBean(PasswordEncoder.class);
+
         if (adminRepository.count() == 0) {
             Admin admin = new Admin();
             admin.setEmail(DEFAULT_ADMIN_EMAIL);

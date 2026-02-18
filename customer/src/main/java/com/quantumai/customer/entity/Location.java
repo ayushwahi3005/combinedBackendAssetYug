@@ -10,6 +10,7 @@ public class Location {
 
   @Id
   private String id;
+  private Long locationId;
   private Long companyId;
   private String name;
   private String parentLocation;

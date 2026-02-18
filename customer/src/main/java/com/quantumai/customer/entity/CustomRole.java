@@ -9,6 +9,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 public class CustomRole {
 
   @Id private String id;
+  private Long customRoleId;
   private String name;
   private String status;
   private RoleType type;

@@ -1,6 +1,7 @@
 package com.quantumai.customer.dto;
 
 import com.quantumai.customer.entity.StatusEnum;
+import com.quantumai.customer.entity.UserStatusEnum;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -8,6 +9,7 @@ import java.time.LocalDateTime;
 @Data
 public class UsersDTO {
   private String id;
+  private Long userId;
   private LocalDateTime lastLogin;
   private String firstName;
   private String lastName;
@@ -15,7 +17,7 @@ public class UsersDTO {
   private Long companyId;
   private String mobileNumber;
   private String password;
-  private StatusEnum status;
+  private UserStatusEnum status;
   private String title;
   private CustomRoleDTO role;
 }

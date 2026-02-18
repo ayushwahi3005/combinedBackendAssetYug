@@ -48,6 +48,7 @@ public class TrialExpirationFilter extends OncePerRequestFilter {
             "/customer/checkUserName",
             "/customer/sentResetOTP",
             "/customer/updatePassword",
+            "/assets/advancedFilter/optimized",
             "/payment",
             "/customer/working",
             "/notification");

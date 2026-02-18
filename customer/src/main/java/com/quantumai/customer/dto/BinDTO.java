@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 public class BinDTO {
 
   String id;
+  private Long binId;
   String locationId;
   String locationName;
   String binNumber;

@@ -10,6 +10,7 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 public interface PaymentRepository extends MongoRepository<Payment, String>, CompanyScopedRepository {
   List<Payment> findByCompanyId(Long id);
   Optional<Payment> findByPaymentIntentId(String id);
+  Optional<Payment> findByPaymentId(String id);
   List<Payment> findByCompanyIdAndPaymentStatusOrderByTransactionDateDesc(Long id, PaymentStatus status);
 
   public void deleteByCompanyId(Long companyId);

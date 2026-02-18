@@ -1,9 +1,11 @@
 package com.quantumai.customer.service;
 
 import com.quantumai.customer.entity.CustomerStripeDetails;
+import com.quantumai.customer.entity.Payment;
 import com.quantumai.customer.entity.SubscriptionEnum;
 import com.quantumai.customer.entity.SubscriptionPlan;
 import com.quantumai.customer.repository.CustomerStripeDetailsRepository;
+import com.quantumai.customer.repository.PaymentRepository;
 import com.quantumai.customer.repository.SubscriptionRepository;
 import com.stripe.Stripe;
 import com.stripe.exception.StripeException;
@@ -20,6 +22,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -29,12 +34,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class StripeService {
 
+  private static final Logger log = LoggerFactory.getLogger(StripeService.class);
   @Value("${stripe.secret.key}")
   private String secretKey;
 
   @Autowired private CustomerStripeDetailsRepository customerStripeDetailsRepository;
 
   @Autowired private SubscriptionRepository subscriptionRepository;
+
+  @Autowired private PaymentRepository paymentRepository;
 
   @PostConstruct
   public void init() {
@@ -287,5 +295,45 @@ public class StripeService {
       return Subscription.create(params);
     }
     return null;
+  }
+  public Map<String, Object> getCardLast4Digits(String paymentId) throws Exception {
+    Map<String, Object> response = new HashMap<>();
+
+    Optional<Payment> optionalPayment=paymentRepository.findByPaymentId(paymentId);
+
+    if(optionalPayment.isPresent()) {
+      log.info(optionalPayment.toString());
+      try {
+        // Retrieve the payment intent
+        PaymentIntent paymentIntent = PaymentIntent.retrieve(optionalPayment.get().getPaymentIntentId());
+        log.info(paymentIntent.getPaymentMethod().toString());
+        if (paymentIntent.getPaymentMethod() != null) {
+          // Retrieve the payment method details
+          PaymentMethod paymentMethod = PaymentMethod.retrieve(
+                  paymentIntent.getPaymentMethod().toString()
+          );
+
+          if (paymentMethod.getCard() != null) {
+            PaymentMethod.Card card = paymentMethod.getCard();
+
+            Map<String, Object> paymentMethodMap = new HashMap<>();
+            Map<String, Object> cardMap = new HashMap<>();
+            cardMap.put("last4", card.getLast4());
+            cardMap.put("brand", card.getBrand());
+            cardMap.put("expMonth", card.getExpMonth());
+            cardMap.put("expYear", card.getExpYear());
+
+            paymentMethodMap.put("card", cardMap);
+            response.put("payment_method", paymentMethodMap);
+          }
+        } else {
+          response.put("payment_method", null);
+        }
+      } catch (Exception e) {
+        throw new Exception("Failed to retrieve payment intent: " + e.getMessage());
+      }
+    }
+
+    return response;
   }
 }

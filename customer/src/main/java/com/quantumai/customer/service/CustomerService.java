@@ -86,4 +86,6 @@ public interface CustomerService {
   public CustomerStripeDetails getCardDetails(Long companyId);
 
   public void deleteCardDetails(String id);
+
+  Page<ImportHistoryDTO> getImportHistoryListWithDateFilter(Long companyId, int pageNumber, int pageSize, String startDate, String endDate);
 }

@@ -12,7 +12,11 @@ public interface AssetCheckInOutRepository extends MongoRepository<AssetCheckInO
 
   public Optional<AssetCheckInOut> findByCompanyIdAndAssetId(Long companyId,String assetId);
 
+
+
   public void deleteByCompanyId(Long companyId);
 
   public Long countByCompanyIdAndStatus(Long companyId,String status);
+
+
 }

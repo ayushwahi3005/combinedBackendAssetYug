@@ -5,6 +5,7 @@ import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.UserRecord;
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
+import com.quantumai.customer.entity.IdGenerator.UserIdGenerator;
 import com.quantumai.customer.exception.*;
 import com.quantumai.customer.repository.*;
 import com.quantumai.customer.security.JwtService;
@@ -36,6 +37,36 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     private UserActivationService userActivationService;
+
+
+    @Autowired private JavaMailSender emailSender;
+    @Autowired JwtService jwtService;
+
+    @Autowired private PasswordEncoder passwordEncoder;
+
+    RestTemplate restTemplate = new RestTemplate();
+
+    String workOrderAPI = "http://localhost:8083/workorder/getWorkOrderByTechnicianId/";
+
+    private HttpHeaders headers = new HttpHeaders();
+
+    private ModelMapper modelMapper = new ModelMapper();
+
+    @Autowired private UsersRepository usersRepository;
+
+    @Autowired private CustomerRepository customerRepository;
+
+    @Autowired private UserExtraFieldsRepository extraFieldsRepository;
+
+    @Autowired private UserExtraFieldNameRepository extraFieldNameRepository;
+
+    @Autowired private UserMandatoryFieldsRepository mandatoryFieldsRepository;
+    @Autowired private UserShowFieldsRepository showFieldsRepository;
+
+    @Autowired private UserIdGeneratorRepository userIdGeneratorRepository;
+
+    @Value("${application.security.jwt.secret-key}")
+    private String secretKey;
 
     @Override
     public void resendFirebaseVerificationEmail(String email, Long companyId) throws UserException, TheMailException, FirebaseAuthException, UserEmailAlreadyVerifiedException {
@@ -90,7 +121,7 @@ public class UserServiceImpl implements UserService {
             throw new UserException("User not found");
         }
         Users user = userOpt.get();
-        if (user.getStatus() != StatusEnum.inActive) {
+        if (user.getStatus() != UserStatusEnum.inActive) {
             throw new UserException("User is already verified or active");
         }
         // Trigger Firebase to send the verification email
@@ -105,32 +136,6 @@ public class UserServiceImpl implements UserService {
         }
     }
 
-  @Autowired private JavaMailSender emailSender;
-  @Autowired JwtService jwtService;
-
-  @Autowired private PasswordEncoder passwordEncoder;
-
-  RestTemplate restTemplate = new RestTemplate();
-
-  String workOrderAPI = "http://localhost:8083/workorder/getWorkOrderByTechnicianId/";
-
-  private HttpHeaders headers = new HttpHeaders();
-
-  private ModelMapper modelMapper = new ModelMapper();
-
-  @Autowired private UsersRepository usersRepository;
-
-  @Autowired private CustomerRepository customerRepository;
-
-  @Autowired private UserExtraFieldsRepository extraFieldsRepository;
-
-  @Autowired private UserExtraFieldNameRepository extraFieldNameRepository;
-
-  @Autowired private UserMandatoryFieldsRepository mandatoryFieldsRepository;
-  @Autowired private UserShowFieldsRepository showFieldsRepository;
-
-  @Value("${application.security.jwt.secret-key}")
-  private String secretKey;
 
   @Override
   public void sendSimpleMessage(String to, String subject, String text) throws TheMailException {
@@ -189,12 +194,24 @@ public class UserServiceImpl implements UserService {
   public Users registerUser(Users user) throws UserException {
     // Check if user exists and is not already active
     Optional<Users> OptionalUser = usersRepository.findByCompanyIdAndEmail(user.getCompanyId(), user.getEmail());
-    if (OptionalUser.isPresent() && OptionalUser.get().getStatus() == StatusEnum.active) {
+    if (OptionalUser.isPresent() && OptionalUser.get().getStatus() == UserStatusEnum.active) {
       throw new UserException("User with this email is already registered and active");
     }
     Boolean exists = customerRepository.existsByEmail(user.getEmail());
 
     if ((!exists) && OptionalUser.isEmpty()) {
+        userIdGeneratorRepository.findByCompanyId(user.getCompanyId()).ifPresentOrElse((data)->{
+            Long seq= data.getSeq();
+            user.setUserId(seq);
+            data.setSeq(seq+1);
+            userIdGeneratorRepository.save(data);
+        }, ()->{
+            user.setUserId(1L);
+            UserIdGenerator userIdGenerator=new UserIdGenerator();
+            userIdGenerator.setSeq(2L);
+            userIdGenerator.setCompanyId(user.getCompanyId());
+            userIdGeneratorRepository.save(userIdGenerator);
+                });
       return usersRepository.save(user);
     } else {
       throw new UserException("User already Invited");
@@ -225,7 +242,7 @@ public class UserServiceImpl implements UserService {
     }
     Users user = Optionaluser.get();
     // If user is already active, the token should be considered used
-    if (user.getStatus() == StatusEnum.active) {
+    if (user.getStatus() == UserStatusEnum.active) {
       throw new UserException("This invitation link has already been used");
     }
     UsersDTO usersDTO = modelMapper.map(user, UsersDTO.class);
@@ -243,18 +260,21 @@ public class UserServiceImpl implements UserService {
     }
     
     Users existingUser = optionaluser.get();
+    Long userId=existingUser.getUserId();
     
     // If this is a password update (activating the account)
     if (usersDTO.getPassword() != null && !usersDTO.getPassword().isEmpty()) {
       // Encode the new password
       usersDTO.setPassword(passwordEncoder.encode(usersDTO.getPassword()));
       // Set status to active when password is set
-      usersDTO.setStatus(StatusEnum.active);
+      usersDTO.setStatus(UserStatusEnum.active);
       // The token used for signup is now invalidated by the status change
     }
-    
+
     // Map non-null fields from DTO to existing user
+
     modelMapper.map(usersDTO, existingUser);
+    existingUser.setUserId(userId);
     usersRepository.save(existingUser);
   }
 
@@ -268,6 +288,7 @@ public class UserServiceImpl implements UserService {
         }
 
         Users existingUser = optionaluser.get();
+        Long userId=existingUser.getUserId();
         log.info("Existing user details {},New Details {}",existingUser.toString(),usersDTO.toString());
         // If this is a password update (activating the account)
         if ((( usersDTO.getStatus().equals(StatusEnum.inActive)))||(existingUser.getStatus() .equals( StatusEnum.inActive) && usersDTO.getStatus().equals(StatusEnum.active)&& userActivationService.canActivateNewUser(existingUser.getCompanyId()))) {
@@ -276,6 +297,7 @@ public class UserServiceImpl implements UserService {
             // Set status to active when password is set
 //            usersDTO.setStatus(StatusEnum.active);
             modelMapper.map(usersDTO, existingUser);
+            existingUser.setUserId(userId);
             usersRepository.save(existingUser);
             // The token used for signup is now invalidated by the status change
         }
@@ -292,7 +314,7 @@ public class UserServiceImpl implements UserService {
     // TODO Auto-generated method stub
     List<Users> usersList = usersRepository.findByCompanyId(companyId);
     List<UsersDTO> usersListDTO = new ArrayList<>();
-    usersList.stream()
+    usersList.stream().filter((user)->user.getStatus()==UserStatusEnum.active)
         .forEach(
             (user) -> {
               UsersDTO usersDTO = modelMapper.map(user, UsersDTO.class);

@@ -10,6 +10,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 public class Bin {
   @Id 
   String id;
+  private Long binId;
   
   @DBRef
   private Location locationId;  // Changed from ObjectId to Location

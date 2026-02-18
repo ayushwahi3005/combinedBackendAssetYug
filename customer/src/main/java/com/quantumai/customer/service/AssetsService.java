@@ -127,6 +127,7 @@ public interface AssetsService {
 
   public void addAssetInspectionInstance(
       AssetCategoryInspectionInstance assetCategoryInspectionInstance);
+  public  void updateAssetInspectionInstance(AssetCategoryInspectionInstance assetCategoryInspection);
 
   public List<AssetCategoryInspectionInstance> getAllAssetCategoryInspectionValues(Long companyId);
 
@@ -135,6 +136,9 @@ public interface AssetsService {
   public AssetExtraFieldName updateExtraFieldName(ExtraFieldNameUpdateDTO extraFieldNameUpdateDTO);
 
   public PaginatedResultCheckInOutDTO<AssetCheckInOutData> getAssetCheckInOutData(Long companyId,Long pageNumber,Long pageSize);
+
+  public PaginatedAssetResponseDTO getAssetsWithAdvancedFilter(AssetAdvancedFilterDTO filter);
+
 
 
 //  public List<Map<String,>> getAssetByCompanyCategory(Long companyId);

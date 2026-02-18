@@ -117,7 +117,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
 
     companyCustomer.setUpdatedAt(LocalDateTime.now().toString());
 
-      if(!companyCustomer.getEmail().trim().isEmpty()&&companyCustomerRepository.findByEmailAndCompanyId(companyCustomer.getEmail(),companyCustomer.getCompanyId()).isPresent()){
+      if(companyCustomer.getEmail()!=null&&!companyCustomer.getEmail().trim().isEmpty()&&companyCustomerRepository.findByEmailAndCompanyId(companyCustomer.getEmail(),companyCustomer.getCompanyId()).isPresent()){
         throw new EmailAlreadyExistsException("User With Email Already Present");
       }
       else{
@@ -170,7 +170,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
 
     // Always update timestamp
     companyCustomer.setUpdatedAt(LocalDateTime.now().toString());
-    if(!companyCustomer.getEmail().isEmpty()){
+    if(companyCustomer.getEmail()!=null&&!companyCustomer.getEmail().isEmpty()){
     Optional<CompanyCustomer> customer=companyCustomerRepository.findByEmailAndCompanyId(companyCustomer.getEmail(),companyCustomer.getCompanyId());
         if(customer.isPresent()&&!customer.get().getId().equals(companyCustomer.getId())){
           throw new EmailAlreadyExistsException("User With Email Aready Present");

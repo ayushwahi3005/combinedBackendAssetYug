@@ -152,4 +152,16 @@ public class PaymentAPI {
 
     stripeService.removeCard(paymentMethodId);
   }
+  @GetMapping("/payment-intent/{paymentIntentId}")
+  public ResponseEntity<Map<String, Object>> getPaymentIntentDetails(
+          @PathVariable String paymentIntentId) {
+    try {
+      Map<String, Object> response = stripeService.getCardLast4Digits(paymentIntentId);
+      return ResponseEntity.ok(response);
+    } catch (Exception e) {
+      Map<String, Object> errorResponse = new HashMap<>();
+      errorResponse.put("error", e.getMessage());
+      return ResponseEntity.status(500).body(errorResponse);
+    }
+  }
 }

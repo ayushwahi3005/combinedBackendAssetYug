@@ -12,6 +12,7 @@ import org.springframework.data.mongodb.core.mapping.DBRef;
 public class Users {
 
   @Id private String id;
+  private Long userId;
   private LocalDateTime lastLogin;
   private String firstName;
   private String lastName;
@@ -20,6 +21,6 @@ public class Users {
   private Long companyId;
   private String mobileNumber;
   private String password;
-  private StatusEnum status;
+  private UserStatusEnum status;
   @DBRef private CustomRole role;
 }

@@ -1,8 +1,6 @@
 package com.quantumai.customer.controller;
 
 import com.fasterxml.jackson.core.*;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
 import com.quantumai.customer.dto.*;
@@ -20,6 +18,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +27,9 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.json.JSONObject;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.http.*;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -35,7 +37,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartFile;
 
 @CrossOrigin(
@@ -90,6 +91,12 @@ public class AssetAPI {
   @Autowired private CustomerRepository customerRepository;
 
   @Autowired private AssetCheckInOutRepository assetCheckInOutRepository;
+
+  @Autowired private CompanyCustomerRepository companyCustomerRepository;
+
+
+  @Autowired
+  private MongoTemplate mongoTemplate;
 
   private void checkUserDetailsPermissionFromSpringContext(CustomRoleType customRoleType) throws UserAccessException {
     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -150,6 +157,7 @@ public class AssetAPI {
   //  if (subscriptionOptional.isEmpty()) {
  //     throw new NoSubscriptionError("No Active Subscription");
 //    }
+    log.info("NEW ASSET DATA :{}",assestsDTO.toString());
     checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     AssetsDTO assetsDTO = assetsService.addAssets(assestsDTO);
     return ResponseEntity.ok(assetsDTO);
@@ -974,7 +982,7 @@ public void importFile(
     importHistoryDTO.setFileName(file.getOriginalFilename());
     importHistoryDTO.setRecordType("Add Asset Record");
     importHistoryDTO.setExecutedBy(email);
-    importHistoryDTO.setDate(LocalDateTime.now().toString());
+    importHistoryDTO.setDate(LocalDateTime.now());
     importHistoryDTO.setStatus("In-Progress");
     importHistoryDTO.setCompanyId(companyId);
 
@@ -1107,7 +1115,7 @@ public void importFile(
       }
 
       currCount++;
-      importHistoryDTO.setDate(LocalDateTime.now().toString());
+      importHistoryDTO.setDate(LocalDateTime.now());
       long complete = (currCount * 100L) / (totalCount - 1);
       importHistoryDTO.setComplete(complete);
       importHistoryDTO = customerService.addImportHistory(importHistoryDTO);
@@ -1423,7 +1431,7 @@ public void importFile(
     importHistoryDTO.setFileName(file.getOriginalFilename());
     importHistoryDTO.setRecordType("Updated Asset Record");
     importHistoryDTO.setExecutedBy(email);
-    importHistoryDTO.setDate(LocalDateTime.now().toString());
+    importHistoryDTO.setDate(LocalDateTime.now());
     importHistoryDTO.setStatus("In-Progress");
     importHistoryDTO.setCompanyId(companyId);
 
@@ -1666,7 +1674,7 @@ public void importFile(
         }
 
         currCount++;
-        importHistoryDTO.setDate(LocalDateTime.now().toString());
+        importHistoryDTO.setDate(LocalDateTime.now());
         long complete = (currCount * 100L) / (totalCount - 1);
         importHistoryDTO.setComplete(complete);
         importHistoryDTO = customerService.addImportHistory(importHistoryDTO);
@@ -2130,7 +2138,43 @@ public void importFile(
 //    return assetsService.getAssetCheckInOutData(companyId);
 //  }
 
+  /**
+   * Optimized advanced filter endpoint for assets with pagination and custom field support
+   * POST endpoint that accepts filter criteria including predefined and custom fields
+   *
+   * @param filter AssetAdvancedFilterDTO containing filter criteria
+   * @return PaginatedAssetResponseDTO with stitched asset and custom field data
+   */
+  @PostMapping("/advancedFilter/optimized")
+  public PaginatedAssetResponseDTO getAssetsWithAdvancedFilter(
+      @RequestBody AssetAdvancedFilterDTO filter)
+          throws NoSubscriptionError, UserAccessException {
+    log.info("Checking user permissions for advanced filter");
+    checkUserDetailsPermissionFromSpringContext(CustomRoleType.view);
+
+    log.info("Optimized advanced filter called - CompanyId: {}, SortField: {}, PageNumber: {}, PageSize: {}",
+        filter.getCompanyId(), filter.getSortField(), filter.getPageNumber(), filter.getPageSize());
+
+    // If no pageNumber, default to 0
+    if (filter.getPageNumber() == null) {
+      filter.setPageNumber(0);
+    }
+
+    // If no pageSize, default to 10
+    if (filter.getPageSize() == null) {
+      filter.setPageSize(10);
+    }
+
+    // If no sortDirection provided, default to DESC
+    if (filter.getSortDirection() == null || filter.getSortDirection().isEmpty()) {
+      filter.setSortDirection("DESC");
+    }
+
+    return assetsService.getAssetsWithAdvancedFilter(filter);
+  }
+
   @PostMapping(value = "/addCategory")
+
   public void addCategory(@RequestBody CategoryDTO categoryDTO)
           throws Exception {
     // Optional<Subscription> subscriptionOptional =
@@ -2261,7 +2305,7 @@ public void importFile(
     //   throw new NoSubscriptionError("No Active Subscription");
     // }
     checkUserDetailsPermissionFromSpringContext(CustomRoleType.edit);
-    assetsService.addAssetInspectionInstance(assetCategoryInspection);
+    assetsService.updateAssetInspectionInstance(assetCategoryInspection);
   }
 
   @GetMapping(value = "/getAllAssetInspectionInstance/{companyId}")
@@ -2457,6 +2501,9 @@ public void importFile(
 
     Optional<AssetCheckInOut> optionalAssetCheckInOut = assetCheckInOutRepository.findByCompanyIdAndAssetId(companyId,assetId);
     Optional<Assets> assetDetails=assetsRepository.findById(assetId);
+    Optional<CompanyCustomer> companyCustomer=companyCustomerRepository.findById(assetDetails.get().getCustomerId());
+
+
 
     Workbook workbook = new XSSFWorkbook();
     Sheet sheet = workbook.createSheet("Check In-Out Report");
@@ -2490,7 +2537,7 @@ public void importFile(
         Row row = sheet.createRow(rowIdx++);
         row.createCell(0).setCellValue(assetDetails.get().getAssetId());
         row.createCell(1).setCellValue(assetDetails.get().getName());
-        row.createCell(2).setCellValue(assetDetails.get().getCustomerId());
+        row.createCell(2).setCellValue(companyCustomer.get().getCompanyCustomerId());
         row.createCell(3).setCellValue(assetDetails.get().getCustomer());
         row.createCell(4).setCellValue(checkInOut.getStatus() != null ? checkInOut.getStatus() : "");
         row.createCell(5).setCellValue(
@@ -2608,85 +2655,128 @@ public void importFile(
 //    }
 //    return request.getRemoteAddr();
 //  }
-  @GetMapping("/export-asset/{companyId}")
-  public ResponseEntity<byte[]> exportCompanyCustomers(@PathVariable Long companyId) throws IOException {
-    List<Assets> assets = assetsRepository.findByCompanyId(companyId);
-    List<AssetExtraFieldName> extraFieldNames = extraFieldNameRepository.findByCompanyId(companyId);
+@GetMapping("/export-asset/{companyId}")
+public ResponseEntity<byte[]> exportCompanyCustomers(@PathVariable Long companyId) throws IOException {
+  List<Assets> assets = assetsRepository.findByCompanyId(companyId);
+  List<AssetExtraFieldName> extraFieldNames = extraFieldNameRepository.findByCompanyId(companyId);
+  Query checkInOutQuery=new Query(Criteria.where("assetId").in(assets.stream().map(Assets::getId).collect(Collectors.toList())));
+  List<AssetCheckInOut> assetCheckInOutDataList=mongoTemplate.find(checkInOutQuery,AssetCheckInOut.class);
 
-    Workbook workbook = new XSSFWorkbook();
-    Sheet sheet = workbook.createSheet("Assets");
-    Row header = sheet.createRow(0);
-    int col = 0;
-    // Add default headers
-    String[] defaultHeaders = {"ID", "Serial Number","Customer","Category", "Location", "Status"};
-    for (String h : defaultHeaders) {
-      header.createCell(col++).setCellValue(h);
-    }
-    // Add extra field headers
-    for (AssetExtraFieldName extraField : extraFieldNames) {
-      header.createCell(col++).setCellValue(extraField.getName());
-    }
-    int rowIdx = 1;
-    for (Assets asset : assets) {
-      Row row = sheet.createRow(rowIdx++);
-      int c = 0;
-      row.createCell(c++).setCellValue(asset.getAssetId());
-      row.createCell(c++).setCellValue(asset.getSerialNumber());
-      row.createCell(c++).setCellValue(asset.getCustomer());
-      row.createCell(c++).setCellValue(asset.getCategory());
-//      row.createCell(c++).setCellValue(asset.getLocation());
-      String locationValue = asset.getLocation();
-      String name = "";
+  Workbook workbook = new XSSFWorkbook();
+  Sheet sheet = workbook.createSheet("Assets");
+  Row header = sheet.createRow(0);
+  int col = 0;
 
-      if (locationValue != null && !locationValue.isBlank()) {
+  // Create text format style
+  CellStyle textStyle = workbook.createCellStyle();
+  DataFormat format = workbook.createDataFormat();
+  textStyle.setDataFormat(format.getFormat("@")); // @ = text format
 
-        String[] parts = locationValue.split(":", 2);
+  // Add default headers
+  String[] defaultHeaders = {"ID", "Serial Number","Customer","Category", "Location", "Status","Last Handled By","Last Known Location"};
+  for (String h : defaultHeaders) {
+    header.createCell(col++).setCellValue(h);
+  }
+  // Add extra field headers
+  for (AssetExtraFieldName extraField : extraFieldNames) {
+    header.createCell(col++).setCellValue(extraField.getName());
+  }
 
-        if (parts.length == 2) {
-          String type = parts[0];
-          String id = parts[1];
+  int rowIdx = 1;
+  for (Assets asset : assets) {
+    Row row = sheet.createRow(rowIdx++);
+    int c = 0;
 
-          if ("location".equalsIgnoreCase(type)) {
-            name = locationRepository.findById(id)
-                    .map(Location::getName)
-                    .orElse("");
-          }
-          else if ("bin".equalsIgnoreCase(type)) {
-            name = binRepository.findById(id)
-                    .map(Bin::getBinNumber)
-                    .orElse("");
-          }
+    // ID - apply text style
+    Cell idCell = row.createCell(c++);
+    idCell.setCellValue(String.valueOf(asset.getAssetId()));
+    idCell.setCellStyle(textStyle);
+
+    // Serial Number - apply text style to preserve leading zeros
+    Cell serialCell = row.createCell(c++);
+    serialCell.setCellValue(asset.getSerialNumber());
+    serialCell.setCellStyle(textStyle);
+
+    // Customer
+    row.createCell(c++).setCellValue(asset.getCustomer());
+
+    // Category
+    row.createCell(c++).setCellValue(asset.getCategory());
+
+    // Location
+    String locationValue = asset.getLocation();
+    String name = "";
+
+    if (locationValue != null && !locationValue.isBlank()) {
+      String[] parts = locationValue.split(":", 2);
+
+      if (parts.length == 2) {
+        String type = parts[0];
+        String id = parts[1];
+
+        if ("location".equalsIgnoreCase(type)) {
+          name = locationRepository.findById(id)
+                  .map(Location::getName)
+                  .orElse("");
+        }
+        else if ("bin".equalsIgnoreCase(type)) {
+          name = binRepository.findById(id)
+                  .map(Bin::getBinNumber)
+                  .orElse("");
         }
       }
-
-      row.createCell(c++).setCellValue(name);
-
-      String status = asset.getStatus();
-
-      if (status != null && !status.isEmpty()) {
-        status = status.substring(0, 1).toUpperCase() + status.substring(1).toLowerCase();
-      } else {
-        status = "";
-      }
-      row.createCell(c++).setCellValue(status);
-      // Fetch custom fields
-      List<AssetExtraFields> extras = extraFieldsRepository.findByAssetId(asset.getId());
-      Map<String, String> extraMap = new HashMap<>();
-      for (AssetExtraFields ef : extras) {
-        extraMap.put(ef.getName(), ef.getValue());
-      }
-      for (AssetExtraFieldName extraField : extraFieldNames) {
-        row.createCell(c++).setCellValue(extraMap.getOrDefault(extraField.getName(), ""));
-      }
     }
-    ByteArrayOutputStream bos = new ByteArrayOutputStream();
-    workbook.write(bos);
-    workbook.close();
-    byte[] excelBytes = bos.toByteArray();
-    return ResponseEntity.ok()
-            .header("Content-Disposition", "attachment; filename=AssetExport.xlsx")
-            .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-            .body(excelBytes);
+
+    row.createCell(c++).setCellValue(name);
+
+    // Status
+    String status = asset.getStatus();
+
+    if (status != null && !status.isEmpty()) {
+      status = status.substring(0, 1).toUpperCase() + status.substring(1).toLowerCase();
+    } else {
+      status = "";
+    }
+    row.createCell(c++).setCellValue(status);
+    List<AssetCheckInOut> listAssetCheckInOut=assetCheckInOutDataList.stream().filter((assetCheckInOut)->assetCheckInOut.getAssetId().equals(asset.getId())).toList();
+    if(!listAssetCheckInOut.isEmpty()){
+      int len=listAssetCheckInOut.get(0).getDetailsList().size();
+      String employee=listAssetCheckInOut.get(0).getDetailsList().get(len-1).getEmployee();
+      row.createCell(c++).setCellValue(employee);
+      String userLocation=listAssetCheckInOut.get(0).getDetailsList().get(len-1).getUserLocation();
+      row.createCell(c++).setCellValue(userLocation);
+
+    }
+    else{
+      row.createCell(c++).setCellValue("");
+      row.createCell(c++).setCellValue("");
+    }
+
+
+
+
+
+    // Fetch custom fields
+    List<AssetExtraFields> extras = extraFieldsRepository.findByAssetId(asset.getId());
+    Map<String, String> extraMap = new HashMap<>();
+    for (AssetExtraFields ef : extras) {
+      extraMap.put(ef.getName(), ef.getValue());
+    }
+    for (AssetExtraFieldName extraField : extraFieldNames) {
+      Cell extraCell = row.createCell(c++);
+      extraCell.setCellValue(extraMap.getOrDefault(extraField.getName(), ""));
+      extraCell.setCellStyle(textStyle); // Apply text style to all extra fields
+    }
   }
+
+  ByteArrayOutputStream bos = new ByteArrayOutputStream();
+  workbook.write(bos);
+  workbook.close();
+  byte[] excelBytes = bos.toByteArray();
+  return ResponseEntity.ok()
+          .header("Content-Disposition", "attachment; filename=AssetExport.xlsx")
+          .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+          .body(excelBytes);
+}
 
 }

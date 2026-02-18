@@ -8,6 +8,7 @@ import lombok.Data;
 public class CustomRoleDTO {
 
   private String id;
+  private Long customRoleId;
   private String name;
   private String status;
   private RoleType type;

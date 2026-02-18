@@ -1,6 +1,7 @@
 package com.quantumai.customer.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
@@ -308,20 +309,28 @@ public class CustomerAPI {
     customerService.addImportHistory(importHistory);
   }
 
-  @GetMapping(value = "/getAllImportHistory/{companyId}")
+  @PostMapping(value = "/getAllImportHistory/{companyId}")
   public Page<ImportHistoryDTO> getImportHistory(
       @PathVariable Long companyId,
       @RequestParam(defaultValue = "0", required = false) int pageNumber,
-      @RequestParam(defaultValue = "10", required = false) int pageSize) {
+      @RequestParam(defaultValue = "10", required = false) int pageSize,
+      @RequestBody(required = false) JsonNode filter) {
 
     //		try {
     //			Thread.sleep(5000);
     //		} catch (InterruptedException e) {
     //			e.printStackTrace(); // Handle the exception if needed
     //		}
+   log.info("Filter received for import history: {}", filter);
+
+    if(filter!=null&&filter.has("startDate") && filter.has("endDate")) {
+      return customerService.getImportHistoryListWithDateFilter(companyId, pageNumber, pageSize,
+              filter.get("startDate").asText(), filter.get("endDate").asText());
+    }
 
     return customerService.getImportHistoryList(companyId, pageNumber, pageSize);
   }
+
 
   @PutMapping(value = "/updateImportHistory")
   public void updateImportHistory(@RequestBody ImportHistory importHistory) {

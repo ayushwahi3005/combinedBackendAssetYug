@@ -2,12 +2,14 @@ package com.quantumai.customer.dto;
 
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 @Data
 public class ImportHistoryDTO {
 
   private String id;
   private String fileName;
-  private String date;
+  private LocalDateTime date;
   private String status;
   private Long complete;
   private String recordType;

@@ -8,6 +8,8 @@ import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
 import com.quantumai.customer.entity.IdGenerator.AssetCategoryIdGenerator;
 import com.quantumai.customer.entity.IdGenerator.AssetIdTable;
+import com.quantumai.customer.entity.IdGenerator.InspectionInstanceIdGenerator;
+import com.quantumai.customer.entity.IdGenerator.InspectionTemplateIdGenerator;
 import com.quantumai.customer.exception.AssetExtraFieldDeletionException;
 import com.quantumai.customer.exception.CategoryException;
 import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
@@ -74,6 +76,11 @@ public class AssetsServiceImpl implements AssetsService {
 
   @Autowired
   private AssetRepositoryCustom assetRepositoryCustom;
+
+  @Autowired InspectionInstanceIdGeneratorRepository inspectionInstanceIdGeneratorRepository;
+
+  @Autowired
+    InspectionTemplateIdGeneratorRepository inspectionTemplateIdGeneratorRepository;
 
   private static final String SEQ_ID = "asset_category_sequence";
   LocalDateTime localDateTime;
@@ -1093,8 +1100,12 @@ public class AssetsServiceImpl implements AssetsService {
       System.out.println("Sort-" + sortField);
       System.out.println("Search-" + searchData);
 
-      if (sortField != null && (sortField.equals("") == false)) {
-        System.out.println("going inside-" + sortField);
+      // Use updatedAt as default sort field if sortField is null or empty
+      String effectiveSortField = (sortField == null || sortField.isEmpty()) ? "updatedAt" : sortField;
+      System.out.println("Effective Sort Field: " + effectiveSortField);
+
+      if (effectiveSortField != null && (effectiveSortField.equals("") == false)) {
+        System.out.println("going inside-" + effectiveSortField);
         Comparator<String> customComparator = null;
         ObjectMapper objectMapper = new ObjectMapper();
         customComparator =
@@ -1114,7 +1125,7 @@ public class AssetsServiceImpl implements AssetsService {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
                   }
-                  return myMap.get(sortField);
+                  return myMap.get(effectiveSortField);
                 },
                 String.CASE_INSENSITIVE_ORDER);
         if (asc == true) {
@@ -1375,6 +1386,18 @@ public class AssetsServiceImpl implements AssetsService {
 
   @Override
   public void addAssetInspection(AssetCategoryInspection assetCategoryInspection) {
+      inspectionTemplateIdGeneratorRepository.findByCompanyId(assetCategoryInspection.getCompanyId()).ifPresentOrElse((data)->{
+        Long seqId=data.getSeq();
+        data.setSeq(seqId+1);
+          assetCategoryInspection.setAssetCategoryInspectionId(seqId);
+          inspectionTemplateIdGeneratorRepository.save(data);
+      },()->{
+          assetCategoryInspection.setAssetCategoryInspectionId(1L);
+          InspectionTemplateIdGenerator inspectionTemplateIdGenerator=new InspectionTemplateIdGenerator();
+          inspectionTemplateIdGenerator.setSeq(2L);
+          inspectionTemplateIdGenerator.setCompanyId(assetCategoryInspection.getCompanyId());
+          inspectionTemplateIdGeneratorRepository.save(inspectionTemplateIdGenerator);
+      });
     assetCategoryInspectionRepository.save(assetCategoryInspection);
   }
 
@@ -1407,7 +1430,39 @@ public class AssetsServiceImpl implements AssetsService {
     @Override
   public void addAssetInspectionInstance(
       AssetCategoryInspectionInstance assetCategoryInspectionInstance) {
+      if(assetCategoryInspectionInstance.getId().isEmpty()) {
+        log.info("New AssetCategoryInspectionInstance : {}",assetCategoryInspectionInstance.toString());
+        inspectionInstanceIdGeneratorRepository.findByCompanyId(assetCategoryInspectionInstance.getCompanyId()).ifPresentOrElse((data) -> {
+          Long seqId = data.getSeq();
+          assetCategoryInspectionInstance.setAssetCategoryInspectionInstanceId(seqId);
+          data.setSeq(seqId + 1);
+          inspectionInstanceIdGeneratorRepository.save(data);
+
+        }, () -> {
+          InspectionInstanceIdGenerator inspectionInstanceIdGenerator = new InspectionInstanceIdGenerator();
+          assetCategoryInspectionInstance.setAssetCategoryInspectionInstanceId(1L);
+          inspectionInstanceIdGenerator.setSeq(2L);
+          inspectionInstanceIdGenerator.setCompanyId(assetCategoryInspectionInstance.getCompanyId());
+          inspectionInstanceIdGeneratorRepository.save(inspectionInstanceIdGenerator);
+        });
+      }
+      else{
+        log.info("Update AssetCategoryInspectionInstance : {}",assetCategoryInspectionInstance.toString());
+        assetCategoryInspectionInstanceRepository.findById(assetCategoryInspectionInstance.getId()).ifPresent((data)->{
+          assetCategoryInspectionInstance.setAssetCategoryInspectionInstanceId(data.getAssetCategoryInspectionInstanceId());
+        });
+      }
+
     assetCategoryInspectionInstanceRepository.save(assetCategoryInspectionInstance);
+  }
+
+  @Override
+  public void updateAssetInspectionInstance(AssetCategoryInspectionInstance assetCategoryInspection) {
+    assetCategoryInspectionInstanceRepository.findById(assetCategoryInspection.getId()).ifPresent((data)->{
+      assetCategoryInspection.setAssetCategoryInspectionInstanceId(data.getAssetCategoryInspectionInstanceId());
+    });
+
+      assetCategoryInspectionInstanceRepository.save(assetCategoryInspection);
   }
 
   @Override
@@ -1556,6 +1611,63 @@ public class AssetsServiceImpl implements AssetsService {
         }
         return new PaginatedResultCheckInOutDTO<>(assetCheckInOutDataList.subList(startIndex, endIndex),totalRecords, totalCheckedIn.get(), totalCheckedOut.get());
 //        return assetCheckInOutDataList;
+    }
+
+    /**
+     * Fetch assets with advanced filtering on predefined and custom fields with pagination
+     * Uses MongoDB aggregation for efficient querying
+     */
+    @Override
+    public PaginatedAssetResponseDTO getAssetsWithAdvancedFilter(AssetAdvancedFilterDTO filter) {
+        log.info("Fetching assets with advanced filter - PageNumber: {}, PageSize: {}, CompanyId: {}",
+                filter.getPageNumber(), filter.getPageSize(), filter.getCompanyId());
+
+        try {
+            // Delegate to custom repository for optimized MongoDB aggregation
+            PaginatedAssetResponseDTO response = assetsRepository.getAssetsWithAdvancedFilter(filter);
+
+            // Enrich location information if needed
+            enrichLocationNames(response.getAssets());
+
+            log.info("Successfully fetched {} assets", response.getAssets().size());
+            return response;
+
+        } catch (Exception e) {
+            log.error("Error fetching assets with advanced filter", e);
+            return new PaginatedAssetResponseDTO(
+                    new ArrayList<>(),
+                    0,
+                    0,
+                    filter.getPageNumber(),
+                    filter.getPageSize(),
+                    false,
+                    false
+            );
+        }
+    }
+
+    /**
+     * Enrich location information by resolving location/bin IDs to names
+     */
+    private void enrichLocationNames(List<AssetWithCustomFieldsDTO> assets) {
+        Map<String, String> binIdToNameMap = new HashMap<>();
+        Map<String, String> locationIdToNameMap = new HashMap<>();
+
+        // Cache location and bin names
+        binRepository.findAll().forEach(bin -> binIdToNameMap.put(bin.getId(), bin.getBinNumber()));
+        locationRepository.findAll().forEach(loc -> locationIdToNameMap.put(loc.getId(), loc.getName()));
+
+        assets.forEach(asset -> {
+            if (asset.getLocation() != null) {
+                if (asset.getLocation().startsWith("bin:")) {
+                    String binId = asset.getLocation().substring(4);
+                    asset.setLocationName(binIdToNameMap.getOrDefault(binId, asset.getLocation()));
+                } else if (asset.getLocation().startsWith("location:")) {
+                    String locationId = asset.getLocation().substring(9);
+                    asset.setLocationName(locationIdToNameMap.getOrDefault(locationId, asset.getLocation()));
+                }
+            }
+        });
     }
 
 

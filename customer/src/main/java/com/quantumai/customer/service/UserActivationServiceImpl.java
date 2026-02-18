@@ -51,7 +51,7 @@ public class UserActivationServiceImpl implements UserActivationService {
         int deactivated = 0;
         for (int i = activeLimit; i < activeUsers.size(); i++) {
             Users user = activeUsers.get(i);
-            user.setStatus(StatusEnum.inActive);
+            user.setStatus(UserStatusEnum.inActive);
             usersRepository.save(user);
             deactivated++;
             log.info("Deactivated user {} (ID: {}) due to subscription limit",
@@ -85,7 +85,7 @@ public class UserActivationServiceImpl implements UserActivationService {
         return usersRepository.findById(userId)
                 .map(user -> {
                     if (user.getStatus().equals(StatusEnum.active)) {
-                        user.setStatus(StatusEnum.inActive);
+                        user.setStatus(UserStatusEnum.inActive);
                         usersRepository.save(user);
                         log.info("Deactivated user {} (ID: {})", user.getEmail(), user.getId());
                         return true;
@@ -103,7 +103,7 @@ public class UserActivationServiceImpl implements UserActivationService {
                     if (!user.getStatus().equals(StatusEnum.active)) {
                         // Check if we can activate this user based on subscription
                         if (canActivateNewUser(user.getCompanyId())) {
-                            user.setStatus(StatusEnum.active);
+                            user.setStatus(UserStatusEnum.active);
                             usersRepository.save(user);
                             log.info("Activated user {} (ID: {})", user.getEmail(), user.getId());
                             return true;

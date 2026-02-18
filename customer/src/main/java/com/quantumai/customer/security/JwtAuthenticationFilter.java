@@ -8,6 +8,7 @@ import com.quantumai.customer.repository.ActiveSessionMobileRepository;
 import com.quantumai.customer.repository.ActiveSessionRepository;
 import com.quantumai.customer.repository.AdminRepository;
 import com.quantumai.customer.repository.CustomerRepository;
+import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -89,103 +90,109 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     jwt = authHeader.substring(7);
-    userEmail = jwtService.extractUserEmail(jwt);
+    try {
+      userEmail = jwtService.extractUserEmail(jwt);
+      if (requestURI.startsWith("/admin")) {
+        System.out.println("ADMIN HIT ====>");
 
-    if (requestURI.startsWith("/admin")) {
-      System.out.println("ADMIN HIT ====>");
+        if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+          Optional<Admin> admin = adminRepository.findByEmail(userEmail);
 
-      if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-        Optional<Admin> admin = adminRepository.findByEmail(userEmail);
-
-        if (admin.isPresent() && jwtService.isTokenValid(jwt, admin.get())) {
-          UsernamePasswordAuthenticationToken authToken =
-              new UsernamePasswordAuthenticationToken(
-                  admin.get(), null, admin.get().getAuthorities());
-          authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-          SecurityContextHolder.getContext().setAuthentication(authToken);
+          if (admin.isPresent() && jwtService.isTokenValid(jwt, admin.get())) {
+            UsernamePasswordAuthenticationToken authToken =
+                    new UsernamePasswordAuthenticationToken(
+                            admin.get(), null, admin.get().getAuthorities());
+            authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            SecurityContextHolder.getContext().setAuthentication(authToken);
+          }
         }
-      }
 
-    } else {
-      System.out.println("Customer HIT ====>");
-      log.info("User Email: {}", userEmail);
-      if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-        String deviceId = request.getHeader("device-id");
-        String mobileId = request.getHeader("mobile-id");
+      } else {
+        System.out.println("Customer HIT ====>");
+        log.info("User Email: {}", userEmail);
+        if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+          String deviceId = request.getHeader("device-id");
+          String mobileId = request.getHeader("mobile-id");
 
-        Optional<Customer> customer = customerRepository.findByEmail(userEmail);
-        Optional<ActiveSession> activeSessionOptional =
-            activeSessionRepository.findByUserId(userEmail);
-        Optional<ActiveSessionMobile> activeSessionMobileOptional =
-            activeSessionMobileRepository.findByUserId(userEmail);
+          Optional<Customer> customer = customerRepository.findByEmail(userEmail);
+          Optional<ActiveSession> activeSessionOptional =
+                  activeSessionRepository.findByUserId(userEmail);
+          Optional<ActiveSessionMobile> activeSessionMobileOptional =
+                  activeSessionMobileRepository.findByUserId(userEmail);
 
-        String currentDeviceId = activeSessionOptional.map(ActiveSession::getDeviceId).orElse(null);
-        String currentMobileId =
-            activeSessionMobileOptional.map(ActiveSessionMobile::getMobileId).orElse(null);
+          String currentDeviceId = activeSessionOptional.map(ActiveSession::getDeviceId).orElse(null);
+          String currentMobileId =
+                  activeSessionMobileOptional.map(ActiveSessionMobile::getMobileId).orElse(null);
 
 //        log.info("deviceId: " + deviceId + " " + (deviceId == null));
 //        log.info("mobileId: " + mobileId + " " + (mobileId == null));
-        // 🔒 Reject if both headers are missing
+          // 🔒 Reject if both headers are missing
 
-        if (deviceId == null && mobileId == null) {
-          response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-          response.getWriter().write("Token is invalid: missing device or mobile ID.");
+          if (deviceId == null && mobileId == null) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("Token is invalid: missing device or mobile ID.");
 
-          return;
-        }
+            return;
+          }
 
-        // 🔒 Reject if both device and mobile ID do not match stored sessions
-        boolean deviceMismatch = currentDeviceId != null && !currentDeviceId.equals(deviceId);
-        boolean mobileMismatch = currentMobileId != null && !currentMobileId.equals(mobileId);
-        boolean sessionExpiredDevice =
-            activeSessionOptional.isPresent()
-                && activeSessionOptional
-                    .get()
-                    .getLastActivityTime()
-                    .isBefore(LocalDateTime.now().minusSeconds(expirationTime));
+          // 🔒 Reject if both device and mobile ID do not match stored sessions
+          boolean deviceMismatch = currentDeviceId != null && !currentDeviceId.equals(deviceId);
+          boolean mobileMismatch = currentMobileId != null && !currentMobileId.equals(mobileId);
+          boolean sessionExpiredDevice =
+                  activeSessionOptional.isPresent()
+                          && activeSessionOptional
+                          .get()
+                          .getLastActivityTime()
+                          .isBefore(LocalDateTime.now().minusSeconds(expirationTime));
 
-        boolean sessionExpiredMobile =
-            activeSessionMobileOptional.isPresent()
-                && activeSessionMobileOptional
-                    .get()
-                    .getLastActivityTime()
-                    .isBefore(LocalDateTime.now().minusSeconds(expirationTime));
+          boolean sessionExpiredMobile =
+                  activeSessionMobileOptional.isPresent()
+                          && activeSessionMobileOptional
+                          .get()
+                          .getLastActivityTime()
+                          .isBefore(LocalDateTime.now().minusSeconds(expirationTime));
 //        log.info(
 //            "DeviceMismatch: {} MobileMismatch: {} SessionExpired: {}",
 //            deviceMismatch,
 //            mobileMismatch,
 //            sessionExpiredDevice);
-        //      if ((deviceMismatch && mobileMismatch) || sessionExpired) {
-        //        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-        //        response.getWriter().write("Token is invalid for the current device.");
-        //        return;
-        //      }
-        if ((deviceId != null && !Objects.equals(currentDeviceId, deviceId))
-            || (sessionExpiredDevice)) {
-          response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-          response.getWriter().write("Token is invalid for the current device.");
-          return;
-        }
-        if ((mobileId != null && !Objects.equals(currentMobileId, mobileId))
-            || (sessionExpiredMobile)) {
-          response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-          response.getWriter().write("Token is invalid for the current device.");
-          return;
-        }
+          //      if ((deviceMismatch && mobileMismatch) || sessionExpired) {
+          //        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+          //        response.getWriter().write("Token is invalid for the current device.");
+          //        return;
+          //      }
+          if ((deviceId != null && !Objects.equals(currentDeviceId, deviceId))
+                  || (sessionExpiredDevice)) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("Token is invalid for the current device.");
+            return;
+          }
+          if ((mobileId != null && !Objects.equals(currentMobileId, mobileId))
+                  || (sessionExpiredMobile)) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("Token is invalid for the current device.");
+            return;
+          }
 
-        if (customer.isPresent() && jwtService.isTokenValid(jwt, customer.get())) {
-          UsernamePasswordAuthenticationToken authToken =
-              new UsernamePasswordAuthenticationToken(
-                  customer.get(), null, customer.get().getAuthorities());
-          authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-          SecurityContextHolder.getContext().setAuthentication(authToken);
-        } else {
-          response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-          response.getWriter().write("Unauthorized: Invalid token or user not found");
-          return;
+          if (customer.isPresent() && jwtService.isTokenValid(jwt, customer.get())) {
+            UsernamePasswordAuthenticationToken authToken =
+                    new UsernamePasswordAuthenticationToken(
+                            customer.get(), null, customer.get().getAuthorities());
+            authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            SecurityContextHolder.getContext().setAuthentication(authToken);
+          } else {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("Unauthorized: Invalid token or user not found");
+            return;
+          }
         }
       }
     }
+    catch (ExpiredJwtException e){
+      log.info("JWT Token expired {}",e.getMessage());
+    }
+
+
 
     filterChain.doFilter(request, response);
   }

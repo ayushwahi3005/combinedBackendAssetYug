@@ -22,4 +22,6 @@ public interface AssetExtraFieldsRepository extends MongoRepository<AssetExtraFi
   List<AssetExtraFields> findByCompanyIdOrAssetId(Long companyId);
 
   public void deleteByCompanyId(Long companyId);
+
+  List<AssetExtraFields> findByAssetIdIn(List<String> assetIds);
 }

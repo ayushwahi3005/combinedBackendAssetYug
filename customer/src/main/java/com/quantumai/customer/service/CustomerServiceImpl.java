@@ -14,6 +14,9 @@ import com.quantumai.customer.repository.*;
 import com.quantumai.customer.security.JwtService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
@@ -63,6 +66,8 @@ public class CustomerServiceImpl implements CustomerService {
 
   @Autowired private BinRepository binRepository;
 
+//  @Autowired private Bin
+
   @Autowired JwtService jwtService;
 
   @Autowired private JavaMailSender mailSender;
@@ -107,6 +112,14 @@ public class CustomerServiceImpl implements CustomerService {
 
   @Autowired private TrialService trialService;
 
+  @Autowired private RolesIdGeneratorRepository rolesIdGeneratorRepository;
+
+  @Autowired private LocationIdGeneratorRepository locationIdGeneratorRepository;
+
+  @Autowired private BinIdGeneratorRepository binIdGeneratorRepository;
+
+  @Autowired private UserIdGeneratorRepository userIdGeneratorRepository;
+
 
   @Override
   public BaseResponseDTO addCustomer(CustomerDTO customerDTO) throws Exception {
@@ -127,12 +140,24 @@ public class CustomerServiceImpl implements CustomerService {
     users.setLastLogin(LocalDateTime.now());
     customRoleOptional.ifPresent(users::setRole);
     users.setEmail(customer.getEmail());
-    users.setStatus(StatusEnum.active);
+    users.setStatus(UserStatusEnum.active);
     users.setFirstName(customer.getFirstName());
     users.setLastName(customer.getLastName());
     users.setTitle("ADMIN");
     users.setCompanyId(customer.getCompanyId());
     users.setMobileNumber(customer.getMobileNumber());
+    userIdGeneratorRepository.findByCompanyId(users.getCompanyId()).ifPresentOrElse((data)->{
+      Long seq= data.getSeq();
+      users.setUserId(seq);
+      data.setSeq(seq+1);
+      userIdGeneratorRepository.save(data);
+    }, ()->{
+      users.setUserId(1L);
+      UserIdGenerator userIdGenerator=new UserIdGenerator();
+      userIdGenerator.setSeq(2L);
+      userIdGenerator.setCompanyId(users.getCompanyId());
+      userIdGeneratorRepository.save(userIdGenerator);
+    });
     usersRepository.save(users);
     
     // Initialize 15-day free trial for new customer
@@ -437,8 +462,22 @@ public class CustomerServiceImpl implements CustomerService {
       addDummyData(ci.getId());
       initAssetCategorySequenceForCompany(ci.getId());
       initCompanyCustomerCategorySequenceForCompany(ci.getId());
-
       CustomRole customRole = new CustomRole();
+      rolesIdGeneratorRepository.findByCompanyId(ci.getId()).ifPresentOrElse((data)->{
+        Long seqId=data.getSeq();
+        customRole.setCustomRoleId(seqId);
+        data.setSeq(seqId+1);
+        rolesIdGeneratorRepository.save(data);
+
+      }, ()->{
+        customRole.setCustomRoleId(1L);
+        RolesIdGenerator rolesIdGenerator=new RolesIdGenerator();
+        rolesIdGenerator.setSeq(2L);
+        rolesIdGenerator.setCompanyId(ci.getId());
+        rolesIdGeneratorRepository.save(rolesIdGenerator);
+      });
+
+
       customRole.setCompanyId(ci.getId());
       customRole.setName("ADMIN");
       customRole.setStatus("active");
@@ -501,8 +540,21 @@ public class CustomerServiceImpl implements CustomerService {
     baseResponseDTO.setMessage("User Successfully Created");
     Optional<Users> optionalUser = usersRepository.findByEmail(customerDTO.getEmail());
     if (optionalUser.isPresent()) {
-      optionalUser.get().setStatus(StatusEnum.active);
-      usersRepository.save(optionalUser.get());
+      Users myUser=optionalUser.get();
+      myUser.setStatus(UserStatusEnum.active);
+      userIdGeneratorRepository.findByCompanyId( myUser.getCompanyId()).ifPresentOrElse((data)->{
+        Long seq= data.getSeq();
+        myUser.setUserId(seq);
+        data.setSeq(seq+1);
+        userIdGeneratorRepository.save(data);
+      }, ()->{
+        myUser.setUserId(1L);
+        UserIdGenerator userIdGenerator=new UserIdGenerator();
+        userIdGenerator.setSeq(2L);
+        userIdGenerator.setCompanyId(myUser.getCompanyId());
+        userIdGeneratorRepository.save(userIdGenerator);
+      });
+      usersRepository.save(myUser);
     }
 
     return baseResponseDTO;
@@ -560,6 +612,19 @@ public class CustomerServiceImpl implements CustomerService {
     // TODO Auto-generated method stub
     //		customRoleRepository
     CustomRole customRole = modelMapper.map(customRoleDTO, CustomRole.class);
+    rolesIdGeneratorRepository.findByCompanyId(customRole.getCompanyId()).ifPresentOrElse((data)->{
+      Long seqId=data.getSeq();
+      customRole.setCustomRoleId(seqId);
+      data.setSeq(seqId+1);
+      rolesIdGeneratorRepository.save(data);
+
+    }, ()->{
+      customRole.setCustomRoleId(1L);
+      RolesIdGenerator rolesIdGenerator=new RolesIdGenerator();
+      rolesIdGenerator.setSeq(2L);
+      rolesIdGenerator.setCompanyId(customRole.getCompanyId());
+      rolesIdGeneratorRepository.save(rolesIdGenerator);
+    });
     System.out.print("-------> permission" + customRole.getAssets());
     customRoleRepository.save(customRole);
   }
@@ -637,16 +702,31 @@ public class CustomerServiceImpl implements CustomerService {
     // location.setStatus(StatusEnum.active);
     Optional<Location> optionalParentLoc=locationRepository.findByCompanyIdAndId(location.getCompanyId(), location.getParentLocation());
       optionalParentLoc.ifPresent(value -> location.setParentLocationName(value.getName()));
+    locationIdGeneratorRepository.findByCompanyId(location.getCompanyId()).ifPresentOrElse((data)->{
+      Long seq=data.getSeq();
+      data.setSeq(seq+1);
+      location.setLocationId(seq);
+      locationIdGeneratorRepository.save(data);
+    },()->{
+      LocationIdGenerator  locationIdGenerator=new LocationIdGenerator();
+      location.setLocationId(1L);
+      locationIdGenerator.setSeq(2L);
+      locationIdGenerator.setCompanyId(location.getCompanyId());
+      locationIdGeneratorRepository.save(locationIdGenerator);
+    });
     return locationRepository.save(location);
   }
   @Override
   public Location updateLocation(Location location){
     // location.setId(null);
     System.out.println(location);
-    
+
     // location.setStatus(StatusEnum.active);
     Optional<Location> optionalParentLoc=locationRepository.findByCompanyIdAndId(location.getCompanyId(), location.getParentLocation());
       optionalParentLoc.ifPresent(value -> location.setParentLocationName(value.getName()));
+    locationRepository.findById(location.getId()).ifPresent((data)->{
+      location.setLocationId(data.getLocationId());
+    });
     return locationRepository.save(location);
   }
   @Override
@@ -691,6 +771,18 @@ public class CustomerServiceImpl implements CustomerService {
       bin.setBinNumber(binDTO.getBinNumber());
       bin.setCompanyId(binDTO.getCompanyId());
       bin.setStatus(StatusEnum.active);
+    binIdGeneratorRepository.findByCompanyId(binDTO.getCompanyId()).ifPresentOrElse((data)->{
+      Long seqId=data.getSeq();
+      data.setSeq(seqId+1);
+      bin.setBinId(seqId);
+      binIdGeneratorRepository.save(data);
+    },()->{
+      bin.setBinId(1L);
+      BinIdGenerator binIdGenerator=new BinIdGenerator();
+      binIdGenerator.setSeq(2L);
+      binIdGenerator.setCompanyId(binDTO.getCompanyId());
+      binIdGeneratorRepository.save(binIdGenerator);
+    });
       // System.out.println("==========------------------------------->"+binDTO.toString());
       return binRepository.save(bin);
   }
@@ -702,7 +794,7 @@ public class CustomerServiceImpl implements CustomerService {
        myBins = binRepository.findByCompanyId(companyId);
        List<BinDTO> binDTOList=new ArrayList<>();
        myBins.forEach(ele->{
-        BinDTO myBinDTO=new BinDTO(ele.getId(),ele.getLocationId().getId(),ele.getLocationId().getName(),ele.getBinNumber(),ele.getStatus(),ele.getCompanyId());
+        BinDTO myBinDTO=new BinDTO(ele.getId(), ele.getBinId(), ele.getLocationId().getId(),ele.getLocationId().getName(),ele.getBinNumber(),ele.getStatus(),ele.getCompanyId());
         binDTOList.add(myBinDTO);
        });
        return binDTOList;
@@ -819,6 +911,27 @@ public class CustomerServiceImpl implements CustomerService {
     customerStripeDetailsRepository.deleteById(id);
   }
 
+  @Override
+  public Page<ImportHistoryDTO> getImportHistoryListWithDateFilter(Long companyId, int pageNumber, int pageSize, String startDate, String endDate) {
+    Pageable pageable = PageRequest.of(pageNumber, pageSize, Sort.by(Sort.Direction.DESC, "date"));
+
+    LocalDateTime startDateTime = LocalDate.parse(startDate).atStartOfDay();
+    LocalDateTime endDateTime = LocalDate.parse(endDate).plusDays(1).atStartOfDay();
+
+    log.info("Parsed Start DateTime: {}", startDateTime);
+    log.info("Parsed End DateTime: {}", endDateTime);
+
+    return importHistoryRepository.findByCompanyIdAndDateBetween(companyId, startDateTime, endDateTime, pageable);
+  }
+  private LocalDateTime parseToLocalDateTime(String dateString) {
+    try {
+      // Try parsing as ZonedDateTime (with timezone like '2026-02-01T16:04:58.082Z')
+      return ZonedDateTime.parse(dateString).toLocalDateTime();
+    } catch (DateTimeParseException e) {
+      // Fall back to LocalDate (just date like '2026-01-24')
+      return LocalDate.parse(dateString).atStartOfDay();
+    }
+  }
 
   public void initAssetCategorySequenceForCompany(Long companyId) {
 //    String sequenceId = companyId + "_asset_category_sequence";
@@ -856,6 +969,9 @@ public class CustomerServiceImpl implements CustomerService {
       bin.setBinNumber(binDTO.getBinNumber());
       bin.setCompanyId(binDTO.getCompanyId());
       bin.setStatus(binDTO.getStatus());
+      binRepository.findById(binDTO.getId()).ifPresent((data)->{
+        bin.setBinId(data.getBinId());
+      });
       // System.out.println("==========------------------------------->"+binDTO.toString());
       return binRepository.save(bin);
   }

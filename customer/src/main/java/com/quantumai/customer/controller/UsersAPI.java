@@ -164,7 +164,7 @@ public class UsersAPI {
     //		else if(myDetails.get("role").equals("TECHNICAL")) {
     //			user.setRole(Role.TECHNICAL);
     //		}
-    user.setStatus(StatusEnum.inActive);
+    user.setStatus(UserStatusEnum.inActive);
     userService.registerUser(user);
   }
 
@@ -226,6 +226,7 @@ public class UsersAPI {
         throw new NoSubscriptionError("No Active Subscription");
       }
     }
+
     userService.updateUser(usersDTO);
     return ResponseEntity.ok("Status Updated Successfully");
   }

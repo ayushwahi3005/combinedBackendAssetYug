@@ -1,5 +1,6 @@
 package com.quantumai.customer.entity;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import com.quantumai.customer.entity.enums.InspectionInstanceStatus;
@@ -11,10 +12,11 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @Document
 public class AssetCategoryInspectionInstance {
   @Id private String id;
+  private Long assetCategoryInspectionInstanceId;
   private String assetId;
   private Long companyId;
-  private String createdAt;
-  private String updatedAt;
+  private LocalDateTime createdAt;
+  private LocalDateTime updatedAt;
   private String actionPerformedBy;
   private String notes;
   private InspectionInstanceStatus status;

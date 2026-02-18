@@ -1,6 +1,8 @@
 package com.quantumai.customer.repository;
 
 import com.quantumai.customer.entity.AssetCategoryInspectionInstance;
+
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -14,6 +16,11 @@ public interface AssetCategoryInspectionInstanceRepository
       String assetCategoryInspectionId);
 
   public List<AssetCategoryInspectionInstance> findByCompanyId(Long companyId);
+  List<AssetCategoryInspectionInstance> findByCompanyIdAndUpdatedAtBetween(
+          Long companyId,
+          LocalDateTime startDate,
+          LocalDateTime endDate
+  );
 
   public void deleteByCompanyId(Long companyId);
 }
