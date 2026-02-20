@@ -21,6 +21,8 @@ public class Payment {
 
   private String cardholderName;
 
+  private Long last4digit;
+
   private LocalDateTime transactionDate;
 
   private PaymentType paymentType; // e.g., CREDIT_CARD, DEBIT_CARD

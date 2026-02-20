@@ -367,7 +367,7 @@ public class CustomerServiceImpl implements CustomerService {
 
   }
 
-  private void addDummyData(Long companyId) {
+  private void addDummyData(Long companyId,String email) {
 
     // Create Dummy CompanyCustomer
     Optional<CompanyCustomerIdTable> companyCustomerIdTableOptional =
@@ -424,6 +424,7 @@ public class CustomerServiceImpl implements CustomerService {
     assets.setStatus("active");
     assets.setName("Asset1");
     assets.setSerialNumber("10000");
+    assets.setEmail(email);
     assets.setLocation("Buffalo");
     assets.setUpdatedAt(LocalDateTime.now().toString());
     assets.setCompanyId(companyId);
@@ -459,7 +460,7 @@ public class CustomerServiceImpl implements CustomerService {
       companyPrimaryKeyTableRepository.save(companyPrimaryKeyTable);
 
       CompanyInformation ci = companyInformationRepository.save(companyInformation);
-      addDummyData(ci.getId());
+      addDummyData(ci.getId(),ci.getCustomerEmail());
       initAssetCategorySequenceForCompany(ci.getId());
       initCompanyCustomerCategorySequenceForCompany(ci.getId());
       CustomRole customRole = new CustomRole();

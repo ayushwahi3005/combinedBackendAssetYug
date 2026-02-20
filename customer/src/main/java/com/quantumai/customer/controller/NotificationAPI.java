@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -33,18 +34,22 @@ public class NotificationAPI {
 //    }
 
     @PostMapping("/global")
+    @PreAuthorize("@appSecurity.isAuthenticated(authentication)")
     public void globalNotification(@RequestBody Notification notification){
         notificationService.broadcastNotification(notification);
     }
     @PostMapping("/company/{companyId}")
+    @PreAuthorize("@appSecurity.isSameCompany(authentication,#companyId)")
     public void companyNotification(@RequestBody Notification notification, @PathVariable Long companyId){
         notificationService.sendNotificationToCompany(companyId,notification);
     }
     @GetMapping("/user/{email}")
+    @PreAuthorize("@appSecurity.isEmailSame(authentication,#email)")
     public List<UserNotification> userNotification(@PathVariable String email){
         return notificationService.userNotificationDTO(email);
     }
     @PostMapping("/user/{email}")
+    @PreAuthorize("@appSecurity.isEmailSame(authentication,#email)")
     public ResponseEntity<String> updateUserNotification(@RequestBody List<UserNotification> notificationList,@PathVariable String email){
          notificationService.updateUserNotificationDTO(notificationList);
          return ResponseEntity.ok("Successfully Notification Updated");

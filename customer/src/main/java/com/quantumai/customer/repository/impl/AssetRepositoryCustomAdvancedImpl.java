@@ -52,9 +52,16 @@ public class AssetRepositoryCustomAdvancedImpl implements AssetRepositoryCustomA
             // Build query for predefined fields
             Query query = buildQuery(filter);
 
+            if (!filter.getCustomFields().isEmpty()) {
+                filter.getCustomFields().entrySet().removeIf(
+                        entry -> entry.getValue() == null || entry.getValue().trim().isEmpty()
+                );
+            }
+            log.info("Custom fields after{}",filter.getCustomFields().toString());
             // Add custom field filter results (intersection)
             if (filter.hasCustomFieldFilters()) {
                 Set<String> customFieldAssetIds = searchAssetbyCustomField(filter);
+                log.info("customFieldAssetIds : {}",customFieldAssetIds.toString());
 //                Set<String> customFieldAssetIds = customFieldResults.stream()
 //                        .map(Assets::getId)
 //                        .collect(Collectors.toSet());
@@ -170,7 +177,7 @@ public class AssetRepositoryCustomAdvancedImpl implements AssetRepositoryCustomA
 
     @Override
     public Page<Assets> findByCompanyIdWithSort(Long companyId, String sortField,
-                                               String sortDirection, Pageable pageable) {
+                                                String sortDirection, Pageable pageable) {
         try {
             Query query = new Query();
             query.addCriteria(Criteria.where("companyId").is(companyId));
@@ -183,7 +190,7 @@ public class AssetRepositoryCustomAdvancedImpl implements AssetRepositoryCustomA
             query.with(sort);
 
             query.skip((long) pageable.getPageNumber() * pageable.getPageSize())
-                 .limit(pageable.getPageSize());
+                    .limit(pageable.getPageSize());
 
             List<Assets> assets = mongoTemplate.find(query, Assets.class);
             long count = mongoTemplate.count(
@@ -335,38 +342,67 @@ public class AssetRepositoryCustomAdvancedImpl implements AssetRepositoryCustomA
 
     private Set<String> searchAssetbyCustomField(AssetAdvancedFilterDTO filter) {
         try {
-            Query query = new Query();
-            query.addCriteria(Criteria.where("companyId").is(filter.getCompanyId()));
 
-            // Fetch asset IDs matching the custom field criteria
-            Query customFieldQuery = new Query();
+            Query baseQuery = new Query();
+            baseQuery.addCriteria(
+                    Criteria.where("companyId").is(filter.getCompanyId())
+            );
 
-            for (Map.Entry<String, String> entry : filter.getCustomFields().entrySet()) {
-                String key = entry.getKey();
-                String value = entry.getValue();
-                log.info("Searching custom field - key: {}, value: {}", key, value);
-                customFieldQuery.addCriteria(Criteria.where("name").is(key)
-                        .and("value").regex(".*" + escapeRegex(value) + ".*", "i"));
+            Map<String, String> customFields = filter.getCustomFields();
+
+
+
+            // If no custom fields provided → return all
+            if (customFields == null || customFields.isEmpty()) {
+                return mongoTemplate.find(baseQuery, AssetExtraFields.class)
+                        .stream()
+                        .map(AssetExtraFields::getAssetId)
+                        .collect(Collectors.toSet());
             }
 
-            List<AssetExtraFields> matchingFields = mongoTemplate.find(customFieldQuery, AssetExtraFields.class);
-            Set<String> matchingAssetIds = matchingFields.stream()
+            Query customFieldQuery = new Query();
+            customFieldQuery.addCriteria(
+                    Criteria.where("companyId").is(filter.getCompanyId())
+            );
+
+            boolean hasValidFilter = false;
+
+            for (Map.Entry<String, String> entry : customFields.entrySet()) {
+
+                String key = entry.getKey();
+                String value = entry.getValue();
+
+                // Treat null / empty / only spaces as no filter
+                if (value != null && !value.trim().isEmpty()) {
+                    hasValidFilter = true;
+
+                    customFieldQuery.addCriteria(
+                            Criteria.where("name").is(key)
+                                    .and("value")
+                                    .regex(".*" + escapeRegex(value.trim()) + ".*", "i")
+                    );
+                }
+            }
+
+            // If no valid filter values → return all AssetExtraFields
+            if (!hasValidFilter) {
+                return mongoTemplate.find(baseQuery, AssetExtraFields.class)
+                        .stream()
+                        .map(AssetExtraFields::getAssetId)
+                        .collect(Collectors.toSet());
+            }
+
+            return mongoTemplate.find(customFieldQuery, AssetExtraFields.class)
+                    .stream()
                     .map(AssetExtraFields::getAssetId)
                     .collect(Collectors.toSet());
 
-            return matchingAssetIds;
-//
-//            if (matchingAssetIds.isEmpty()) {
-//                return Collections.emptyList();
-//            }
-//
-//            query.addCriteria(Criteria.where("id").in(matchingAssetIds));
-//
-//            return mongoTemplate.find(query, Assets.class);
         } catch (Exception e) {
             log.error("Error searching assets by custom field", e);
             return Collections.emptySet();
         }
     }
+
+
 }
 

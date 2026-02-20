@@ -21,6 +21,8 @@ public interface AssetInspectionService {
 
     List<InspectionCompletedCountPerDayDTO> getInspectionCompletionPerDay(Long companyId, LocalDate startDate, LocalDate endDate);
 
+    public byte[] exportInspectionExcel(Long companyId, String assetId) throws Exception;
+
     public byte[] exportInspectionDetailedExcel(Long companyId, String assetId) throws Exception;
 
     public byte[] exportInspectionOverviewExcel(Long companyId, String assetId) throws Exception;

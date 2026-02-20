@@ -740,7 +740,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
       for (Map.Entry<?, ?> entry : filterMap.entrySet()) {
         Object key = entry.getKey();
         Object value = entry.getValue();
-        // //System.out.println("Key: " + key + ", Value: " + value);
+         System.out.println("Key: " + key + ", Value: " + value);
         if (value != null) {
           mapping.put(key.toString(), value.toString());
         }

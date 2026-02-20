@@ -35,6 +35,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -53,13 +54,8 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping(value = "/companycustomer")
 public class CompanyCustomerAPI {
 
-
-
-  // Services
   @Autowired private CompanyCustomerService companyCustomerService;
   @Autowired private CustomerService customerService;
-
-  // Repositories
   @Autowired private CompanyCustomerRepository companyCustomerRepository;
   @Autowired private CompanyCustomerExtraFieldNameRepository extraFieldNameRepository;
   @Autowired private CompanyCustomerExtraFieldsRepository extraFieldsRepository;
@@ -67,16 +63,11 @@ public class CompanyCustomerAPI {
   @Autowired private CompanyCustomerCategoryRepository companyCustomerCategoryRepository;
   @Autowired private CompanyCustomerMandatoryFieldsRepository mandatoryFieldsRepository;
   @Autowired private CustomerRepository customerRepository;
-
-  // External Services
   @Autowired private JavaMailSender emailSender;
-
   @Autowired private UsersRepository usersRepository;
 
-  // Utilities
   private final ModelMapper modelMapper = new ModelMapper();
 
-  // Constants
   private static final List<String> US_STATES = List.of(
           "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut",
           "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois",
@@ -100,36 +91,13 @@ public class CompanyCustomerAPI {
     try {
       ObjectMapper mapper = new ObjectMapper();
       InputStream is = getClass().getResourceAsStream("/Country-States.json");
-
       data = mapper.readValue(
               is,
               mapper.getTypeFactory().constructMapType(Map.class, String.class, List.class)
       );
-
     } catch (Exception e) {
       throw new RuntimeException("Failed to load country-state JSON", e);
     }
-  }
-
-  private void checkUserDetailsPermissionFromSpringContext(CustomRoleType customRoleType) throws UserAccessException {
-    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    System.out.println("Spring Security"+ authentication.getName());
-    Optional<Users> usersOptional=usersRepository.findByEmail(authentication.getName());
-    if(usersOptional.isPresent()){
-      System.out.println(customRoleType.ordinal()+" "+usersOptional.get().getRole().getCustomers().ordinal());
-      if(customRoleType.ordinal()>usersOptional.get().getRole().getCustomers().ordinal()){
-        GenricErrorMessage genricErrorMessage=new GenricErrorMessage("User Dont Have access", HttpStatus.FORBIDDEN);
-        throw new UserAccessException(genricErrorMessage.getMessage());
-      }
-    }
-    else{
-      GenricErrorMessage genricErrorMessage=new GenricErrorMessage("User Dont Have access", HttpStatus.FORBIDDEN);
-      throw new UserAccessException(genricErrorMessage.getMessage());
-    }
-
-
-
-
   }
 
   @GetMapping("/working")
@@ -138,294 +106,248 @@ public class CompanyCustomerAPI {
     return "Working!!";
   }
 
-  @DeleteMapping("/deleteCompanyCustomer/{id}")
-  public void deleteCompanyCustomer(@PathVariable String id, @RequestHeader Long companyId)
-          throws NoSubscriptionError, UserAccessException {
-    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
-    //Optional<Subscription> subscriptionOptional =
-    //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    //  if (subscriptionOptional.isEmpty()) {
-    //  throw new NoSubscriptionError("No Active Subscription");
-//    }
-    companyCustomerService.deleteCustomer(id);
-  }
+  // ─── Customer CRUD ────────────────────────────────────────────────────────
 
   @GetMapping("/allCompanyCustomer/{companyId}")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
   public List<CompanyCustomerDTO> getCompanyCustomerList(@PathVariable Long companyId) {
     return companyCustomerService.getAllCustomer(companyId);
   }
 
   @GetMapping("/getCompanyCustomer/{id}")
+  @PreAuthorize("@appSecurity.canViewAny(authentication, 'customers')")
   public CompanyCustomerDTO getCompanyCustomer(@PathVariable String id) {
-    System.out.println(id);
     return companyCustomerService.getCustomer(id);
   }
 
   @GetMapping("/getCompanyCustomerByLocalId/{id}/{companyId}")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
   public CompanyCustomerDTO getCompanyCustomerByLocalId(
           @PathVariable String id, @PathVariable Long companyId) {
-    System.out.println(id);
     return companyCustomerService.getCompanyCustomerByLocalId(Integer.valueOf(id), companyId);
   }
 
-  //	@GetMapping("/allCompanyCustomerWithExtraFields/{companyId}")
-  //	public List<CompanyCustomerDTO> getCompanyCustomerWithExtraFields(@PathVariable String
-  // companyId){
-  //		return companyCustomerService.getAllCustomer(companyId);
-  //	}
   @PostMapping("/addCompanyCustomer")
+  @PreAuthorize("@appSecurity.canCreate(authentication, #companyId, 'customers')")
   public CompanyCustomerDTO addNewFields(
-          @RequestBody CompanyCustomerDTO companyCustomerDTO, @RequestHeader Long companyId)
-          throws NoSubscriptionError, EmailAlreadyExistsException, UserAccessException {
-    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
-    System.out.println("CompanyId-->" + companyId);
-    //Optional<Subscription> subscriptionOptional =
-    //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    //  if (subscriptionOptional.isEmpty()) {
-    //  throw new NoSubscriptionError("No Active Subscription");
-//    }
+          @RequestBody CompanyCustomerDTO companyCustomerDTO,
+          @RequestHeader Long companyId)
+          throws NoSubscriptionError, EmailAlreadyExistsException {
     return companyCustomerService.addCustomer(companyCustomerDTO);
   }
 
   @PutMapping("/updateCompanyCustomer")
+  @PreAuthorize("@appSecurity.canEdit(authentication, #companyId, 'customers')")
   public void updateCompanyCustomer(
-          @RequestBody CompanyCustomerDTO companyCustomerDTO, @RequestHeader Long companyId)
-          throws NoSubscriptionError, EmailAlreadyExistsException, UserAccessException {
-    checkUserDetailsPermissionFromSpringContext(CustomRoleType.edit);
-    //Optional<Subscription> subscriptionOptional =
-    //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    //  if (subscriptionOptional.isEmpty()) {
-    //  throw new NoSubscriptionError("No Active Subscription");
-//    }
+          @RequestBody CompanyCustomerDTO companyCustomerDTO,
+          @RequestHeader Long companyId)
+          throws NoSubscriptionError, EmailAlreadyExistsException {
     companyCustomerService.updateCustomer(companyCustomerDTO);
   }
 
+  @DeleteMapping("/deleteCompanyCustomer/{id}")
+  @PreAuthorize("@appSecurity.canDelete(authentication, #companyId, 'customers')")
+  public void deleteCompanyCustomer(
+          @PathVariable String id,
+          @RequestHeader Long companyId)
+          throws NoSubscriptionError {
+    companyCustomerService.deleteCustomer(id);
+  }
+
+  // ─── Search & Sort ────────────────────────────────────────────────────────
+
   @GetMapping(value = "/searchCompanyCustomerlist/{companyId}")
-  public List<String> getCompanyCustomerFromAsset(
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
+  public List<String> searchCompanyCustomer(
           @PathVariable Long companyId,
           @RequestParam(name = "data", required = true) String search,
           @RequestParam(name = "category", required = true) String category) {
-    System.out.println("----------my CompanyCustomer search------------->" + search);
     return companyCustomerService.searchedCompanyCustomer(companyId, search, category);
   }
 
   @GetMapping(value = "/sortCompanyCustomerlist/{companyId}")
-  public List<String> getCompanyCustomerFromAsset(
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
+  public List<String> sortCompanyCustomer(
           @PathVariable Long companyId,
           @RequestParam(name = "category", required = true) String category) {
     return companyCustomerService.sortCompanyCustomer(companyId, category);
   }
 
+  // ─── Extra Fields ─────────────────────────────────────────────────────────
+
   @PostMapping("/addExtraFieldName")
+  @PreAuthorize("@appSecurity.canCreate(authentication, #companyId, 'customers')")
   public void addExtraFieldName(
           @RequestBody CompanyCustomerExtraFieldNameDTO extraFieldNameDTO,
-          @RequestHeader Long companyId)
-          throws Exception {
-    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
-    //Optional<Subscription> subscriptionOptional =
-    //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    //  if (subscriptionOptional.isEmpty()) {
-    //  throw new NoSubscriptionError("No Active Subscription");
-//    }
+          @RequestHeader Long companyId) throws Exception {
     companyCustomerService.addCompanyCustomerExtraField(extraFieldNameDTO);
   }
 
   @GetMapping("/getExtraFieldName/{companyId}")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
   public List<CompanyCustomerExtraFieldNameDTO> getExtraFieldName(@PathVariable Long companyId) {
-    //		System.out.println("----------my company------------->"+companyId);
     return companyCustomerService.getCompanyCustomerExtraField(companyId);
   }
 
   @DeleteMapping("/deleteExtraFieldName/{id}")
-  public void deleteExtraFieldName(@PathVariable String id, @RequestHeader Long companyId)
-          throws Exception {
-    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
-    //Optional<Subscription> subscriptionOptional =
-    //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    //  if (subscriptionOptional.isEmpty()) {
-    //  throw new NoSubscriptionError("No Active Subscription");
-//    }
+  @PreAuthorize("@appSecurity.canDelete(authentication, #companyId, 'customers')")
+  public void deleteExtraFieldName(
+          @PathVariable String id,
+          @RequestHeader Long companyId) throws Exception {
     companyCustomerService.deleteCompanyCustomerExtraField(id);
   }
 
-  @PostMapping("/mandatoryFields")
-  public void mandatoryFields(
-          @RequestBody CompanyCustomerMandatoryFields mandatoryFields, @RequestHeader Long companyId)
-          throws NoSubscriptionError, UserAccessException {
-    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
-    //Optional<Subscription> subscriptionOptional =
-    //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    //  if (subscriptionOptional.isEmpty()) {
-    //  throw new NoSubscriptionError("No Active Subscription");
-//    }
-    companyCustomerService.updateMandatoryFields(mandatoryFields);
-  }
-
-  @PostMapping("/showFields")
-  public void showFields(
-          @RequestBody CompanyCustomerShowFields showFields, @RequestHeader Long companyId)
-          throws NoSubscriptionError, UserAccessException {
-    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
-    //Optional<Subscription> subscriptionOptional =
-    //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    //  if (subscriptionOptional.isEmpty()) {
-    //  throw new NoSubscriptionError("No Active Subscription");
-//    }
-    companyCustomerService.updateShowFields(showFields);
-  }
-
-  @GetMapping("/getMandatoryFields/{name}/{companyId}")
-  public ResponseEntity<CompanyCustomerMandatoryFields> getMandatoryFields(
-          @PathVariable String name, @PathVariable Long companyId) {
-    System.out.println("============================>" + name + companyId);
-    CompanyCustomerMandatoryFields mandatoryFields =
-            companyCustomerService.getMandatoryFields(name, companyId);
-    return ResponseEntity.ok(mandatoryFields);
-  }
-
-  @GetMapping("/getShowFields/{name}/{companyId}")
-  public ResponseEntity<CompanyCustomerShowFields> getShowFields(
-          @PathVariable String name, @PathVariable Long companyId) {
-    CompanyCustomerShowFields showFields = companyCustomerService.getShowFields(name, companyId);
-    return ResponseEntity.ok(showFields);
-  }
-
-  @GetMapping("/getAllMandatoryFields/{companyId}")
-  public ResponseEntity<List<CompanyCustomerMandatoryFields>> getAllMandatoryFields(
-          @PathVariable Long companyId) {
-    List<CompanyCustomerMandatoryFields> mandatoryFieldsList =
-            companyCustomerService.getAllMandatoryFields(companyId);
-    return ResponseEntity.ok(mandatoryFieldsList);
-  }
-
-  @GetMapping("/getAllShowFields/{companyId}")
-  public ResponseEntity<List<CompanyCustomerShowFields>> getAllShowFields(
-          @PathVariable Long companyId) {
-    List<CompanyCustomerShowFields> showFieldsList =
-            companyCustomerService.getAllShowFields(companyId);
-    return ResponseEntity.ok(showFieldsList);
-  }
-
-  @DeleteMapping("/deleteShowAndMandatoryField/{name}/{companyId}")
-  public void showFields(@PathVariable String name, @PathVariable Long companyId)
-          throws NoSubscriptionError, UserAccessException {
-    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
-    //Optional<Subscription> subscriptionOptional =
-    //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    //  if (subscriptionOptional.isEmpty()) {
-    //  throw new NoSubscriptionError("No Active Subscription");
-//    }
-    companyCustomerService.deleteShowAndMandatoryFields(companyId, name);
-  }
-
-  @GetMapping("/getExtraFieldNameValue/{companyId}")
-  public Map<String, Map<String, String>> getExtraFieldNameValue(@PathVariable Long companyId) {
-
-    return companyCustomerService.getextraFieldList(companyId);
-  }
-
   @PostMapping("/addfields")
+  @PreAuthorize("@appSecurity.canCreate(authentication, #companyId, 'customers')")
   public void addNewFields(
-          @RequestBody CompanyCustomerExtraFieldsDTO extraFieldsDTO, @RequestHeader Long companyId)
-          throws Exception {
-    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
-    //Optional<Subscription> subscriptionOptional =
-    //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    //  if (subscriptionOptional.isEmpty()) {
-    //  throw new NoSubscriptionError("No Active Subscription");
-//    }
+          @RequestBody CompanyCustomerExtraFieldsDTO extraFieldsDTO,
+          @RequestHeader Long companyId) throws Exception {
     companyCustomerService.addExtraFields(extraFieldsDTO);
   }
 
   @GetMapping("/getExtraFields/{id}")
+  @PreAuthorize("@appSecurity.canViewAny(authentication, 'customers')")
   public List<CompanyCustomerExtraFieldsDTO> getExtraFields(@PathVariable String id) {
     return companyCustomerService.getExtraFields(id);
   }
 
   @DeleteMapping("/deleteExtraFields/{id}")
+  @PreAuthorize("@appSecurity.canDeleteAny(authentication, 'customers')")
   public void deleteExtraField(@PathVariable String id, Long companyId) throws Exception {
-    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
-    //Optional<Subscription> subscriptionOptional =
-    //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    //  if (subscriptionOptional.isEmpty()) {
-    //  throw new NoSubscriptionError("No Active Subscription");
-//    }
     companyCustomerService.deleteExtraFields(id);
   }
 
   @DeleteMapping("/deleteCompanyCustomerExtraFields/{id}")
+  @PreAuthorize("@appSecurity.canDelete(authentication, #companyId, 'customers')")
   public void deleteCompanyCustomerExtraFields(
-          @PathVariable String id, @RequestHeader Long companyId) throws Exception {
-    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
-    //Optional<Subscription> subscriptionOptional =
-    //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    //  if (subscriptionOptional.isEmpty()) {
-    //  throw new NoSubscriptionError("No Active Subscription");
-//    }
+          @PathVariable String id,
+          @RequestHeader Long companyId) throws Exception {
     companyCustomerService.deleteExtraFieldByCompanyCustomer(id);
   }
 
+  @GetMapping("/getExtraFieldNameValue/{companyId}")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
+  public Map<String, Map<String, String>> getExtraFieldNameValue(@PathVariable Long companyId) {
+    return companyCustomerService.getextraFieldList(companyId);
+  }
+
+  @PutMapping("/extraFieldName")
+  @PreAuthorize("@appSecurity.canEdit(authentication, #extraFieldNameUpdateDTO.companyId, 'customers')")
+  public ResponseEntity<CompanyCustomerExtraFieldName> updateExtraFieldName(
+          @RequestBody ExtraFieldNameUpdateDTO extraFieldNameUpdateDTO) {
+    CompanyCustomerExtraFieldName result = companyCustomerService.updateExtraFieldName(extraFieldNameUpdateDTO);
+    return ResponseEntity.ok(result);
+  }
+
+  // ─── Mandatory & Show Fields ──────────────────────────────────────────────
+
+  @PostMapping("/mandatoryFields")
+  @PreAuthorize("@appSecurity.canEdit(authentication, #companyId, 'customers')")
+  public void mandatoryFields(
+          @RequestBody CompanyCustomerMandatoryFields mandatoryFields,
+          @RequestHeader Long companyId) throws NoSubscriptionError {
+    companyCustomerService.updateMandatoryFields(mandatoryFields);
+  }
+
+  @PostMapping("/showFields")
+  @PreAuthorize("@appSecurity.canEdit(authentication, #companyId, 'customers')")
+  public void showFields(
+          @RequestBody CompanyCustomerShowFields showFields,
+          @RequestHeader Long companyId) throws NoSubscriptionError {
+    companyCustomerService.updateShowFields(showFields);
+  }
+
+  @GetMapping("/getMandatoryFields/{name}/{companyId}")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
+  public ResponseEntity<CompanyCustomerMandatoryFields> getMandatoryFields(
+          @PathVariable String name, @PathVariable Long companyId) {
+    return ResponseEntity.ok(companyCustomerService.getMandatoryFields(name, companyId));
+  }
+
+  @GetMapping("/getShowFields/{name}/{companyId}")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
+  public ResponseEntity<CompanyCustomerShowFields> getShowFields(
+          @PathVariable String name, @PathVariable Long companyId) {
+    return ResponseEntity.ok(companyCustomerService.getShowFields(name, companyId));
+  }
+
+  @GetMapping("/getAllMandatoryFields/{companyId}")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
+  public ResponseEntity<List<CompanyCustomerMandatoryFields>> getAllMandatoryFields(
+          @PathVariable Long companyId) {
+    return ResponseEntity.ok(companyCustomerService.getAllMandatoryFields(companyId));
+  }
+
+  @GetMapping("/getAllShowFields/{companyId}")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
+  public ResponseEntity<List<CompanyCustomerShowFields>> getAllShowFields(
+          @PathVariable Long companyId) {
+    return ResponseEntity.ok(companyCustomerService.getAllShowFields(companyId));
+  }
+
+  @DeleteMapping("/deleteShowAndMandatoryField/{name}/{companyId}")
+  @PreAuthorize("@appSecurity.canDelete(authentication, #companyId, 'customers')")
+  public void deleteShowAndMandatoryField(
+          @PathVariable String name,
+          @PathVariable Long companyId) throws NoSubscriptionError {
+    companyCustomerService.deleteShowAndMandatoryFields(companyId, name);
+  }
+
+  // ─── All Customers with Extra Fields ─────────────────────────────────────
+
   @GetMapping("/allCompanyCustomerWithExtraFields/{id}")
+  @PreAuthorize("@appSecurity.canView(authentication, #id, 'customers')")
   public List<String> allCompanyCustomerWithExtraFields(@PathVariable Long id) {
     return companyCustomerService.getAllCustomerWithExtraColumns(id);
   }
 
+  // ─── File Management ──────────────────────────────────────────────────────
+
   @PostMapping("/addFile/{companyCustomerId}")
+  @PreAuthorize("@appSecurity.canCreate(authentication, #companyId, 'customers')")
   public ResponseEntity<ResponseMessageDTO> addCompanyCustomerFile(
           @RequestParam("file") MultipartFile file,
           @PathVariable String companyCustomerId,
-          @RequestHeader Long companyId)
-          throws NoSubscriptionError, UserAccessException {
-    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
-    //Optional<Subscription> subscriptionOptional =
-    //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    //  if (subscriptionOptional.isEmpty()) {
-    //  throw new NoSubscriptionError("No Active Subscription");
-//    }
-    String message = "";
+          @RequestHeader Long companyId) throws NoSubscriptionError {
     try {
       companyCustomerService.addCompanyCustomerFile(file, companyCustomerId);
-      message = "Uploaded the file successfully: " + file.getOriginalFilename();
-      ResponseMessageDTO responseMessageDTO = new ResponseMessageDTO();
-      responseMessageDTO.setResponseMessage(message);
-      return new ResponseEntity<>(responseMessageDTO, HttpStatus.ACCEPTED);
+      ResponseMessageDTO response = new ResponseMessageDTO();
+      response.setResponseMessage("Uploaded the file successfully: " + file.getOriginalFilename());
+      return new ResponseEntity<>(response, HttpStatus.ACCEPTED);
     } catch (IOException e) {
-      // TODO Auto-generated catch block
-      message = "Could not upload the file: " + file.getOriginalFilename() + "!";
-      ResponseMessageDTO responseMessageDTO = new ResponseMessageDTO();
-      responseMessageDTO.setResponseMessage(message);
-      return new ResponseEntity<>(responseMessageDTO, HttpStatus.EXPECTATION_FAILED);
+      ResponseMessageDTO response = new ResponseMessageDTO();
+      response.setResponseMessage("Could not upload the file: " + file.getOriginalFilename() + "!");
+      return new ResponseEntity<>(response, HttpStatus.EXPECTATION_FAILED);
     }
   }
 
   @GetMapping("/getFile/{companyCustomerId}")
-  public List<CompanyCustomerFileDTO> getCompanyCustomerFile(
-          @PathVariable String companyCustomerId) {
+  @PreAuthorize("@appSecurity.canViewAny(authentication, 'customers')")
+  public List<CompanyCustomerFileDTO> getCompanyCustomerFile(@PathVariable String companyCustomerId) {
     return companyCustomerService.getCompanyCustomerFile(companyCustomerId);
   }
 
   @GetMapping("/getFile/download/{id}")
+  @PreAuthorize("@appSecurity.canViewAny(authentication, 'customers')")
   public ResponseEntity<?> downloadFile(@PathVariable String id) {
     CompanyCustomerFileDTO companyCustomerFileDTO = companyCustomerService.downloadFile(id);
-    //		return new ResponseEntity<>(assetFileDTO.getFile(),HttpStatus.OK);
     return ResponseEntity.status(HttpStatus.OK)
             .contentType(MediaType.valueOf("json/object"))
             .body(companyCustomerFileDTO.getFile());
   }
 
   @DeleteMapping("deleteFile/{id}")
-  public void deleteFile(@PathVariable String id, @RequestHeader Long companyId)
-          throws NoSubscriptionError, UserAccessException {
-    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
-    //Optional<Subscription> subscriptionOptional =
-    //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    //  if (subscriptionOptional.isEmpty()) {
-    //  throw new NoSubscriptionError("No Active Subscription");
-//    }
+  @PreAuthorize("@appSecurity.canDelete(authentication, #companyId, 'customers')")
+  public void deleteFile(
+          @PathVariable String id,
+          @RequestHeader Long companyId) throws NoSubscriptionError {
     companyCustomerService.deleteFile(id);
   }
 
+  // ─── Advance Filter ───────────────────────────────────────────────────────
+
   @PostMapping("/advanceFilter/{pageNumber}/{pageSize}")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
   public PaginatedResultDTO<String> advanceFilter(
           @RequestBody Object filter,
           @PathVariable(required = false) Integer pageNumber,
@@ -433,54 +355,83 @@ public class CompanyCustomerAPI {
           @RequestParam(name = "category", required = false) String category,
           @RequestParam(name = "search", required = false) String searchData,
           @RequestParam(name = "asc", required = false) Boolean asc,
-          @RequestHeader Long companyId)
-          throws NoSubscriptionError {
+          @RequestHeader Long companyId) throws NoSubscriptionError {
 
-    //    Optional<Subscription> subscriptionOptional=
-    // subscriptionRepository.findByCompanyIdAndStatus(companyId,SubscriptionEnum.ACTIVE);
-    //    if(subscriptionOptional.isEmpty()){
-    //      throw new NoSubscriptionError("No Active Subscription");
-    //    }
-
-
-    if (asc == null) {
-      asc = true;
-    }
-    System.out.println("advanceSearch");
-    if (searchData != null) {
-      //			logger.info("Search Data: {} -- Length: {}", searchData, searchData.length());
-    }
-
-    // Handle default values for pageNumber and pageSize
-    if (pageNumber == null) {
-      pageNumber = 0; // Default value for pageNumber
-    }
-
-    if (pageSize == null) {
-      pageSize = 5; // Default value for pageSize
-    }
+    if (asc == null) asc = true;
+    if (pageNumber == null) pageNumber = 0;
+    if (pageSize == null) pageSize = 5;
     if (category == null || category.equals("")) {
       category = "updatedAt";
       asc = false;
     }
-    //	return  null;
 
-    return companyCustomerService.advanceFilter(
-            filter, pageNumber, pageSize, category, searchData, asc);
+    return companyCustomerService.advanceFilter(filter, pageNumber, pageSize, category, searchData, asc);
   }
 
+  // ─── Category ─────────────────────────────────────────────────────────────
+
+  @PostMapping(value = "/addCategory")
+  @PreAuthorize("@appSecurity.canCreate(authentication, #companyId, 'customers')")
+  public void addCategory(
+          @RequestBody CategoryDTO categoryDTO,
+          @RequestHeader Long companyId) throws Exception {
+    companyCustomerService.addCategory(categoryDTO);
+  }
+
+  @GetMapping(value = "/getCategoryList/{companyId}")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
+  public List<CompanyCustomerCategory> getCategoryList(@PathVariable Long companyId) {
+    return companyCustomerService.getCategoryList(companyId);
+  }
+
+  @GetMapping(value = "/getCategoryActiveList/{companyId}")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
+  public List<CompanyCustomerCategory> getCategoryActiveList(@PathVariable Long companyId) {
+    return companyCustomerService.getActiveCategoryList(companyId);
+  }
+
+  @GetMapping(value = "/getCategoryListById/{companyId}/{id}")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
+  public CompanyCustomerCategory getCategoryById(
+          @PathVariable Long companyId, @PathVariable String id) {
+    return companyCustomerService.getCategoryListById(companyId, id);
+  }
+
+  @GetMapping(value = "/countCompanyCustomerByCategory/{category}")
+  @PreAuthorize("@appSecurity.canViewAny(authentication, 'customers')")
+  public int countCompanyCustomerByCategory(@PathVariable String category) throws CategoryException {
+    return companyCustomerService.countCompanyCustomerByCategory(category);
+  }
+
+  @DeleteMapping(value = "/deleteCategory/{id}")
+  @PreAuthorize("@appSecurity.canDelete(authentication, #companyId, 'customers')")
+  public void deleteCategory(
+          @PathVariable String id,
+          @RequestHeader Long companyId) throws NoSubscriptionError {
+    companyCustomerService.deleteCategory(id);
+  }
+
+  @PutMapping(value = "/updateCategory")
+  @PreAuthorize("@appSecurity.canEdit(authentication, #companyId, 'customers')")
+  public void updateCategory(
+          @RequestBody CategoryDTO categoryDTO,
+          @RequestHeader Long companyId) throws NoSubscriptionError {
+    companyCustomerService.updateCategory(categoryDTO);
+  }
+
+  // ─── Import ───────────────────────────────────────────────────────────────
+
   @PostMapping("/import/{companyId}/{email}")
+  @PreAuthorize("@appSecurity.canCreate(authentication, #companyId, 'customers')")
   public void importFile(
           @RequestParam("file") MultipartFile file,
           @RequestParam("columnMappings") String columnMappings,
           @PathVariable Long companyId,
           @PathVariable String email)
-          throws CsvValidationException,
-          MessagingException,
-          ImportFileRowException,
-          NoSubscriptionError, EmailAlreadyExistsException, NameColumnMissingException, UserAccessException {
+          throws CsvValidationException, MessagingException, ImportFileRowException,
+          NoSubscriptionError, EmailAlreadyExistsException, NameColumnMissingException {
 
-    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
+
     System.out.println("------||---------------------------------------/////////////////////////////////////------->"+columnMappings);
     List<CompanyCustomerMandatoryFields> mandatoryFieldsList=mandatoryFieldsRepository.findByCompanyIdAndMandatory(companyId,true);
     Map<String,Boolean> mandatoryFieldsMap=new HashMap<>();
@@ -1066,7 +1017,7 @@ public class CompanyCustomerAPI {
           workbook.write(fileOut);
         }
         workbook.close();
-   
+
         try {
           MimeMessage message = emailSender.createMimeMessage();
           MimeMessageHelper helper = new MimeMessageHelper(message, true);
@@ -1097,27 +1048,15 @@ public class CompanyCustomerAPI {
     log.info("Import History {}", importHistoryDTO);
   }
 
-  private CellStyle createErrorCellStyle(Workbook workbook) {
-    CellStyle errorStyle = workbook.createCellStyle();
-    errorStyle.setFillForegroundColor(IndexedColors.RED.getIndex());
-    errorStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-    return errorStyle;
-  }
-
-
   @PostMapping("/importUpdation/{companyId}/{email}")
+  @PreAuthorize("@appSecurity.canEdit(authentication, #companyId, 'customers')")
   public void importUpdation(
           @RequestParam("file") MultipartFile file,
           @RequestParam("columnMappings") String columnMappings,
           @PathVariable Long companyId,
           @PathVariable String email)
-          throws CsvValidationException,
-          JsonParseException,
-          IOException,
-          MessagingException,
-          ImportFileRowException,
-          NoSubscriptionError, UserAccessException {
-    checkUserDetailsPermissionFromSpringContext(CustomRoleType.edit);
+          throws CsvValidationException, JsonParseException, IOException,
+          MessagingException, ImportFileRowException, NoSubscriptionError {
     //Optional<Subscription> subscriptionOptional =
     //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
     //  if (subscriptionOptional.isEmpty()) {
@@ -1613,74 +1552,10 @@ public class CompanyCustomerAPI {
     log.info("Import History {}", importHistoryDTO);
   }
 
-  @GetMapping(value = "/statelist")
-  public ResponseEntity<List<String>> statelist() {
-    return ResponseEntity.ok(US_STATES);
-  }
+  // ─── Export ───────────────────────────────────────────────────────────────
 
-
-
-  @PostMapping(value = "/addCategory")
-  public void addCategory(@RequestBody CategoryDTO categoryDTO, @RequestHeader Long companyId)
-          throws Exception {
-    System.out.println("Category===>" + categoryDTO);
-    checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
-    //Optional<Subscription> subscriptionOptional =
-    //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    //  if (subscriptionOptional.isEmpty()) {
-    //  throw new NoSubscriptionError("No Active Subscription");
-//    }
-    companyCustomerService.addCategory(categoryDTO);
-  }
-
-  @GetMapping(value = "/countCompanyCustomerByCategory/{category}")
-  public int countCompanyCustomerByCategory(@PathVariable String category)
-          throws CategoryException {
-    System.out.println("Category===>" + category);
-    return companyCustomerService.countCompanyCustomerByCategory(category);
-  }
-
-  @GetMapping(value = "/getCategoryList/{companyId}")
-  public List<CompanyCustomerCategory> getCategoryList(@PathVariable Long companyId) {
-    return companyCustomerService.getCategoryList(companyId);
-  }
-
-  @GetMapping(value = "/getCategoryActiveList/{companyId}")
-  public List<CompanyCustomerCategory> getCategoryActiveList(@PathVariable Long companyId) {
-    return companyCustomerService.getActiveCategoryList(companyId);
-  }
-
-  @DeleteMapping(value = "/deleteCategory/{id}")
-  public void deleteCategory(@PathVariable String id, @RequestHeader Long companyId)
-          throws NoSubscriptionError, UserAccessException {
-    checkUserDetailsPermissionFromSpringContext(CustomRoleType.full);
-    companyCustomerService.deleteCategory(id);
-  }
-
-  @GetMapping(value = "/getCategoryListById/{companyId}/{id}")
-  public CompanyCustomerCategory getCategoryById(
-          @PathVariable Long companyId, @PathVariable String id) {
-    return companyCustomerService.getCategoryListById(companyId, id);
-  }
-
-  @PutMapping(value = "/updateCategory")
-  public void updateCategory(@RequestBody CategoryDTO categoryDTO, @RequestHeader Long companyId)
-          throws NoSubscriptionError, UserAccessException {
-    checkUserDetailsPermissionFromSpringContext(CustomRoleType.edit);
-    //Optional<Subscription> subscriptionOptional =
-    //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    //  if (subscriptionOptional.isEmpty()) {
-    //  throw new NoSubscriptionError("No Active Subscription");
-//    }
-    companyCustomerService.updateCategory(categoryDTO);
-  }
-
-  //  @GetMapping(value = "/CustomFieldCustomerCount/{companyId}/{id}")
-//  public Integer getCustomFieldCustomerCount(
-//          @PathVariable Long companyId, @PathVariable String id) {
-//    return companyCustomerService.getCustomFieldCustomerCount(companyId, id);
-//  }
   @GetMapping("/export-company-customer/{companyId}")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
   public ResponseEntity<byte[]> exportCompanyCustomers(@PathVariable Long companyId) throws IOException {
     List<CompanyCustomer> customers = companyCustomerRepository.findByCompanyId(companyId);
     List<CompanyCustomerExtraFieldName> extraFieldNames = extraFieldNameRepository.findByCompanyId(companyId);
@@ -1782,13 +1657,19 @@ public class CompanyCustomerAPI {
             .body(excelBytes);
   }
 
-  @PutMapping("/extraFieldName")
-  public ResponseEntity<CompanyCustomerExtraFieldName> updateExtraFieldName(@RequestBody ExtraFieldNameUpdateDTO extraFieldNameUpdateDTO) throws UserAccessException {
-    checkUserDetailsPermissionFromSpringContext(CustomRoleType.edit);
-    CompanyCustomerExtraFieldName companyCustomerExtraFieldName=companyCustomerService.updateExtraFieldName(extraFieldNameUpdateDTO);
-    return ResponseEntity.ok(companyCustomerExtraFieldName);
+  // ─── State List (public - no auth needed) ────────────────────────────────
 
+  @GetMapping(value = "/statelist")
+  public ResponseEntity<List<String>> statelist() {
+    return ResponseEntity.ok(US_STATES);
+  }
 
+  // ─── Utility ──────────────────────────────────────────────────────────────
 
+  private CellStyle createErrorCellStyle(Workbook workbook) {
+    CellStyle errorStyle = workbook.createCellStyle();
+    errorStyle.setFillForegroundColor(IndexedColors.RED.getIndex());
+    errorStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+    return errorStyle;
   }
 }

@@ -211,6 +211,146 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
     }
 
     @Override
+    public byte[] exportInspectionExcel(Long companyId, String assetId) throws Exception {
+        List<AssetCategoryInspectionInstance> inspections =
+                assetCategoryInspectionInstanceRepository.findByCompanyId(companyId)
+                        .stream()
+                        .filter(i -> assetId.equals(i.getAssetId()))
+                        .toList();
+
+        Optional<Assets> optionalAssets = assetsRepository.findById(assetId);
+        if (optionalAssets.isEmpty()) {
+            throw new Exception("No Asset Found");
+        }
+        Assets myAsset = optionalAssets.get();
+
+        try (Workbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+
+            // ─────────────────────────────────────────
+            // SHEET 1 — Overview
+            // ─────────────────────────────────────────
+            String[] overviewHeaders = {
+                    "Asset ID", "Asset Name", "Inspection ID", "Inspection Name",
+                    "Date Started", "Date Completed", "Inspector", "Geo Location"
+            };
+
+            Sheet overviewSheet = workbook.createSheet("Overview");
+            Row overviewHeaderRow = overviewSheet.createRow(0);
+            for (int i = 0; i < overviewHeaders.length; i++) {
+                overviewHeaderRow.createCell(i).setCellValue(overviewHeaders[i]);
+            }
+
+            // ─────────────────────────────────────────
+            // SHEET 2 — Detailed
+            // ─────────────────────────────────────────
+            String[] detailedHeaders = {
+                    "Asset ID", "Asset Name", "Inspection ID", "Inspection Name",
+                    "Date Started", "Date Completed", "Inspector",
+                    "Instruction Name", "Instruction Value", "Notes", "Geo Location"
+            };
+
+            Sheet detailedSheet = workbook.createSheet("Detailed");
+            Row detailedHeaderRow = detailedSheet.createRow(0);
+            for (int i = 0; i < detailedHeaders.length; i++) {
+                detailedHeaderRow.createCell(i).setCellValue(detailedHeaders[i]);
+            }
+
+            int overviewRowIndex = 1;
+            int detailedRowIndex = 1;
+
+            for (AssetCategoryInspectionInstance inspection : inspections) {
+
+                String dateStarted = "";
+                String dateCompleted = "";
+
+                if (inspection.getCreatedAt() != null) {
+                    dateStarted = java.time.LocalDateTime.parse(
+                            inspection.getCreatedAt().toString(),
+                            java.time.format.DateTimeFormatter.ISO_DATE_TIME
+                    ).toLocalDate().toString();
+                }
+
+                if (inspection.getUpdatedAt() != null) {
+                    dateCompleted = java.time.LocalDateTime.parse(
+                            inspection.getUpdatedAt().toString(),
+                            java.time.format.DateTimeFormatter.ISO_DATE_TIME
+                    ).toLocalDate().toString();
+                }
+
+                boolean hasSteps = inspection.getStepValues() != null && !inspection.getStepValues().isEmpty();
+
+                if (hasSteps) {
+                    // Overview — one row per inspection (use first step as representative, or just write once)
+                    // We write one overview row per inspection instance, not per step
+                    Row overviewRow = overviewSheet.createRow(overviewRowIndex++);
+                    overviewRow.createCell(0).setCellValue(myAsset.getAssetId());
+                    overviewRow.createCell(1).setCellValue(myAsset.getName());
+                    overviewRow.createCell(2).setCellValue(inspection.getAssetCategoryInspectionId());
+                    overviewRow.createCell(3).setCellValue(inspection.getAssetCategoryInspectionName());
+                    overviewRow.createCell(4).setCellValue(dateStarted);
+                    overviewRow.createCell(5).setCellValue(dateCompleted);
+                    overviewRow.createCell(6).setCellValue(inspection.getActionPerformedBy());
+                    overviewRow.createCell(7).setCellValue("");
+
+                    // Detailed — one row per step
+                    for (InspectionStepValues step : inspection.getStepValues()) {
+                        Row detailedRow = detailedSheet.createRow(detailedRowIndex++);
+                        detailedRow.createCell(0).setCellValue(myAsset.getAssetId());
+                        detailedRow.createCell(1).setCellValue(myAsset.getName());
+                        detailedRow.createCell(2).setCellValue(inspection.getAssetCategoryInspectionId());
+                        detailedRow.createCell(3).setCellValue(inspection.getAssetCategoryInspectionName());
+                        detailedRow.createCell(4).setCellValue(dateStarted);
+                        detailedRow.createCell(5).setCellValue(dateCompleted);
+                        detailedRow.createCell(6).setCellValue(inspection.getActionPerformedBy());
+                        detailedRow.createCell(7).setCellValue(step.getName());
+                        detailedRow.createCell(8).setCellValue(step.getValue());
+                        detailedRow.createCell(9).setCellValue(inspection.getNotes());
+                        detailedRow.createCell(10).setCellValue("");
+                    }
+
+                } else {
+                    // Overview
+                    Row overviewRow = overviewSheet.createRow(overviewRowIndex++);
+                    overviewRow.createCell(0).setCellValue(inspection.getAssetId());
+                    overviewRow.createCell(1).setCellValue("");
+                    overviewRow.createCell(2).setCellValue(inspection.getAssetCategoryInspectionId());
+                    overviewRow.createCell(3).setCellValue(inspection.getAssetCategoryInspectionName());
+                    overviewRow.createCell(4).setCellValue(inspection.getCreatedAt() != null ? inspection.getCreatedAt().toString() : "");
+                    overviewRow.createCell(5).setCellValue(inspection.getUpdatedAt() != null ? inspection.getUpdatedAt().toString() : "");
+                    overviewRow.createCell(6).setCellValue(inspection.getActionPerformedBy());
+                    overviewRow.createCell(7).setCellValue("");
+
+                    // Detailed
+                    Row detailedRow = detailedSheet.createRow(detailedRowIndex++);
+                    detailedRow.createCell(0).setCellValue(inspection.getAssetId());
+                    detailedRow.createCell(1).setCellValue("");
+                    detailedRow.createCell(2).setCellValue(inspection.getAssetCategoryInspectionId());
+                    detailedRow.createCell(3).setCellValue(inspection.getAssetCategoryInspectionName());
+                    detailedRow.createCell(4).setCellValue(inspection.getCreatedAt() != null ? inspection.getCreatedAt().toString() : "");
+                    detailedRow.createCell(5).setCellValue(inspection.getUpdatedAt() != null ? inspection.getUpdatedAt().toString() : "");
+                    detailedRow.createCell(6).setCellValue(inspection.getActionPerformedBy());
+                    detailedRow.createCell(7).setCellValue("");
+                    detailedRow.createCell(8).setCellValue("");
+                    detailedRow.createCell(9).setCellValue(inspection.getNotes());
+                    detailedRow.createCell(10).setCellValue("");
+                }
+            }
+
+            // Auto-size all columns in both sheets
+            for (int i = 0; i < overviewHeaders.length; i++) {
+                overviewSheet.autoSizeColumn(i);
+            }
+            for (int i = 0; i < detailedHeaders.length; i++) {
+                detailedSheet.autoSizeColumn(i);
+            }
+
+            workbook.write(out);
+            return out.toByteArray();
+        }
+    }
+
+    @Override
     public byte[] exportInspectionDetailedExcel(Long companyId, String assetId) throws Exception {
         List<AssetCategoryInspectionInstance> inspections =
                 assetCategoryInspectionInstanceRepository.findByCompanyId(companyId)

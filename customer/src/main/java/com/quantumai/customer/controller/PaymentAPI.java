@@ -14,6 +14,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -38,6 +39,7 @@ public class PaymentAPI {
   }
 
   @PostMapping("/create-intent")
+
   public ResponseEntity<Map<String, String>> createPaymentIntent(@RequestBody JsonNode obj) {
     System.out.println("===>Create Intent");
     System.out.println(obj.get("amount").asLong());
@@ -61,6 +63,7 @@ public class PaymentAPI {
   }
 
   @PostMapping("/create-subscription")
+
   public ResponseEntity<Map<String, String>> createSubscription(@RequestBody JsonNode obj)
       throws Exception {
     //    System.out.println("===>Create subscription"+obj.get("subscriptionPlan").toString());
@@ -101,6 +104,7 @@ public class PaymentAPI {
   }
 
   @PostMapping("/add")
+
   public void addPayment(@RequestBody Payment payment) {
     try {
       Thread.sleep(5000);
@@ -111,24 +115,28 @@ public class PaymentAPI {
   }
 
   @PutMapping("/update")
+
   public void updatePayment(@RequestBody Payment Payment) {
 
     subscriptionService.updatePayment(Payment);
   }
 
   @GetMapping("/get-invoices/{companyId}")
+
   public List<Payment> getAllInvoice(@PathVariable Long companyId) {
 
     return subscriptionService.getAllPayment(companyId);
   }
 
   @GetMapping("/checkCred")
+
   public ResponseEntity<Boolean> checkCred() {
 
     return ResponseEntity.ok(true);
   }
 
   @PostMapping("/stripe-save-card")
+
   public void saveCard(@RequestBody Map<String, String> request) throws StripeException {
     String paymentMethodId = request.get("paymentMethodId");
     String customerEmail = request.get("email");
@@ -140,12 +148,14 @@ public class PaymentAPI {
   }
 
   @GetMapping("/stripe-get-cards/{customerId}")
+
   public List<Map<String, Object>> getCustomerCards(@PathVariable Long customerId)
       throws StripeException {
     return stripeService.getCustomerCards(customerId);
   }
 
   @DeleteMapping("/stripe-delete-cards/{paymentMethodId}")
+
   public void removeCard(@PathVariable String paymentMethodId) throws StripeException {
     System.out.println(paymentMethodId);
     //    String paymentMethodId = request.get("paymentMethodId");
@@ -153,6 +163,7 @@ public class PaymentAPI {
     stripeService.removeCard(paymentMethodId);
   }
   @GetMapping("/payment-intent/{paymentIntentId}")
+
   public ResponseEntity<Map<String, Object>> getPaymentIntentDetails(
           @PathVariable String paymentIntentId) {
     try {

@@ -13,6 +13,10 @@ import com.quantumai.customer.repository.PaymentRepository;
 import com.quantumai.customer.repository.PlansRepository;
 import com.quantumai.customer.repository.SubscriptionRepository;
 import com.quantumai.customer.repository.SubscriptionRepositoryCustom;
+import com.stripe.exception.StripeException;
+import com.stripe.model.Charge;
+import com.stripe.model.PaymentIntent;
+import com.stripe.model.PaymentMethod;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -136,7 +140,39 @@ public class SubscriptionServiceImpl implements SubscriptionService {
   @Override
   public List<Payment> getAllPayment(Long companyId) {
     List<Payment> allInvoice = paymentRepository.findByCompanyId(companyId);
-    Collections.sort(allInvoice, Comparator.comparing(Payment::getTransactionDate).reversed());
+
+    allInvoice.forEach(payment -> {
+      try {
+        if (payment.getChargeId() != null) {
+          Charge charge = Charge.retrieve(payment.getChargeId());
+          Charge.PaymentMethodDetails details = charge.getPaymentMethodDetails();
+
+          if (details != null && details.getCard() != null) {
+            String last4 = details.getCard().getLast4();
+            if (last4 != null) {
+              payment.setLast4digit(Long.parseLong(last4));
+            }
+          }
+
+        } else if (payment.getPaymentIntentId() != null) {
+          PaymentIntent intent = PaymentIntent.retrieve(payment.getPaymentIntentId());
+          String pmId = intent.getPaymentMethod();
+
+          if (pmId != null) {
+            PaymentMethod pm = PaymentMethod.retrieve(pmId);
+            if (pm.getCard() != null) {
+              payment.setLast4digit(Long.parseLong(pm.getCard().getLast4()));
+            }
+          }
+        }
+      } catch (StripeException e) {
+        // Log and continue — don't fail the whole list for one bad record
+        log.warn("Failed to fetch last4 from Stripe for paymentId={}, chargeId={}: {}",
+                payment.getPaymentId(), payment.getChargeId(), e.getMessage());
+      }
+    });
+
+    allInvoice.sort(Comparator.comparing(Payment::getTransactionDate).reversed());
     return allInvoice;
   }
 
