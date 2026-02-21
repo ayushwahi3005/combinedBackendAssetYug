@@ -13,6 +13,7 @@ public interface TrialStatusRepository extends MongoRepository<TrialStatus, Stri
     Optional<TrialStatus> findByCustomerEmail(String customerEmail);
     Optional<TrialStatus> findByCompanyId(Long companyId);
     List<TrialStatus> findByIsTrialActiveTrue();
+    List<TrialStatus> findByTrialExpiredTrue();
     List<TrialStatus> findByTrialEndDateBeforeAndIsTrialActiveTrueAndTrialExpiredFalse(LocalDateTime currentTime);
     List<TrialStatus> findByTrialEndDateBetweenAndIsTrialActiveTrueAndTrialExpirationNotificationSentFalse(
             LocalDateTime startTime, LocalDateTime endTime);

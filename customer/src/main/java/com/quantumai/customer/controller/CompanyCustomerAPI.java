@@ -13,6 +13,7 @@ import com.quantumai.customer.entity.*;
 import com.quantumai.customer.exception.*;
 import com.quantumai.customer.repository.*;
 import com.quantumai.customer.service.CompanyCustomerService;
+import com.quantumai.customer.service.CompanyCustomerImportValidationService;
 import com.quantumai.customer.service.CustomerService;
 import io.micrometer.common.util.StringUtils;
 import jakarta.annotation.PostConstruct;
@@ -65,6 +66,7 @@ public class CompanyCustomerAPI {
   @Autowired private CustomerRepository customerRepository;
   @Autowired private JavaMailSender emailSender;
   @Autowired private UsersRepository usersRepository;
+  @Autowired private CompanyCustomerImportValidationService validationService;
 
   private final ModelMapper modelMapper = new ModelMapper();
 
@@ -538,6 +540,10 @@ public class CompanyCustomerAPI {
       int excelIndex = 1;
       int currCount = 0;
 
+      // Track emails in file for duplicate detection (Rule 11)
+      Set<String> emailsInFile = new HashSet<>();
+      Set<String> blankEmailCount = new HashSet<>();
+
       importHistoryDTO.setFileName(file.getOriginalFilename());
       importHistoryDTO.setRecordType("Customer Record");
       importHistoryDTO.setExecutedBy(email);
@@ -571,6 +577,7 @@ public class CompanyCustomerAPI {
         int errorFlag = 0;
         StringBuilder errorDesc = new StringBuilder();
         Map<Integer, Boolean> errorCellMap = new HashMap<>();
+        String emailForDuplicateCheck = "";
 
         for (int j = 0; j < row.length; j++) {
           String field = headerMap.get(j);
@@ -596,69 +603,125 @@ public class CompanyCustomerAPI {
                 break;
 
               case "phone":
-                companyCustomerDTO.setPhone(row[j]);
-                log.info("Phone to be set: {}", row[j]);
-                if(mandatoryFieldsMap.containsKey("phone")){
-                  log.info("Phone before inside empty: {}", row[j]);
-                  if(row[j].trim().isEmpty()){
-                    log.info("Phone inside empty: {}", row[j]);
-                    errorDesc.append("ERROR WITH PHONE MANDATORY WHILE ADDING IN CUSTOMER");
+                String phoneValue = row[j] != null ? row[j].trim() : "";
+
+                // Rule 5: Check mandatory phone field
+                if(mandatoryFieldsMap.containsKey("phone")) {
+                  log.info("Phone before inside empty: {}", phoneValue);
+                  if (phoneValue.isEmpty()) {
+                    log.info("Phone inside empty: {}", phoneValue);
+                    errorDesc.append("ERROR: Phone is mandatory and cannot be blank");
                     errorFlag = 1;
                     errorCellMap.put(j + 1, true);
+                    break;
                   }
                 }
+
+                // Rule 6: Validate phone number format (if not blank)
+                if (!phoneValue.isBlank() && !validationService.isValidPhoneFormat(phoneValue)) {
+                  errorDesc.append("ERROR: Phone number format is invalid");
+                  errorFlag = 1;
+                  errorCellMap.put(j + 1, true);
+                  break;
+                }
+
+                companyCustomerDTO.setPhone(phoneValue);
+                log.info("Phone to be set: {}", phoneValue);
                 break;
 
               case "category":
                 System.out.println("category//->" + row[j]);
-                List<CompanyCustomerCategory> categoryList=companyCustomerCategoryRepository.findByCompanyId(companyId);
-                String rowValue=row[j];
-                if(!rowValue.trim().isBlank()){
-                  List<CompanyCustomerCategory> list=categoryList.stream().filter(x-> x.getName().equalsIgnoreCase(rowValue)).toList();
-                  if(list.isEmpty()){
-                    errorDesc.append("ERROR IN CATEGORY WHILE ADDING IN CUSTOMER");
+                String categoryValue = row[j] != null ? row[j].trim() : "";
+
+                List<CompanyCustomerCategory> categoryList = companyCustomerCategoryRepository.findByCompanyId(companyId);
+                List<String> validCategories = categoryList.stream()
+                        .map(CompanyCustomerCategory::getName)
+                        .toList();
+
+                if (!categoryValue.isBlank()) {
+                  // Rule 8: Validate category dropdown field
+                  if (!validationService.isValidCategoryDropdown(categoryValue, validCategories)) {
+                    errorDesc.append("ERROR: Category value is not from the valid dropdown options");
                     errorFlag = 1;
                     errorCellMap.put(j + 1, true);
+                    break;
                   }
-                  else{
-                    if(mandatoryFieldsMap.containsKey("category")){
-                      if(row[j].trim().isEmpty()){
-                        errorDesc.append("ERROR WITH CATEGORY MANDATORY WHILE ADDING IN CUSTOMER");
-                        errorFlag = 1;
-                        errorCellMap.put(j + 1, true);
-                        break;
-                      }
+
+                  if(mandatoryFieldsMap.containsKey("category")){
+                    if(categoryValue.isEmpty()){
+                      errorDesc.append("ERROR: Category is mandatory and cannot be blank");
+                      errorFlag = 1;
+                      errorCellMap.put(j + 1, true);
+                      break;
                     }
-                    companyCustomerDTO.setCategory(list.get(0).getName());
+                  }
+
+                  // Set the category
+                  List<CompanyCustomerCategory> matchingCategories = categoryList.stream()
+                          .filter(x -> x.getName().equalsIgnoreCase(categoryValue))
+                          .toList();
+                  if (!matchingCategories.isEmpty()) {
+                    companyCustomerDTO.setCategory(matchingCategories.get(0).getName());
                   }
                 }
                 break;
 
               case "email":
                 String emailValue = row[j] != null ? row[j].trim() : "";
+                emailForDuplicateCheck = emailValue;
+
+                // Rule 13: Allow multiple blank emails if email is not mandatory
                 if (StringUtils.isBlank(emailValue)) {
-                  // Email is optional, set empty string instead of null
-                  companyCustomerDTO.setEmail("");
+                  if (!validationService.canAllowBlankEmail(emailValue, mandatoryFieldsMap.containsKey("email"))) {
+                    // Rule 12: Email is mandatory but blank
+                    errorDesc.append("ERROR: Email is mandatory and cannot be blank");
+                    errorFlag = 1;
+                    errorCellMap.put(j + 1, true);
+                  } else {
+                    // Rule 13: Blank emails allowed, mark as blank
+                    companyCustomerDTO.setEmail("");
+                    blankEmailCount.add("blank_" + ind);
+                  }
                 } else {
+                  // Rule 6: Validate email format
+                  if (!validationService.isValidEmailFormat(emailValue)) {
+                    errorDesc.append("ERROR: Email format is invalid");
+                    errorFlag = 1;
+                    errorCellMap.put(j + 1, true);
+                    break;
+                  }
+
+                  // Rule 1: Check duplicate email in system
                   Optional<CompanyCustomer> myCustomer = companyCustomerRepository
                           .findByEmailAndCompanyId(emailValue, companyCustomerDTO.getCompanyId());
                   if (myCustomer.isPresent()) {
                     errorFlag = 1;
-                    errorDesc.append("Email already exists. ");
-                    log.info("Email already: {}", emailValue);
+                    errorDesc.append("ERROR: Email already exists in the system");
                     errorCellMap.put(j + 1, true);
-                  } else {
-                    log.info("Email to be set: {}", emailValue);
-                    if(mandatoryFieldsMap.containsKey("email")){
-                      if(row[j].trim().isEmpty()){
-                        errorDesc.append("ERROR WITH EMAIL MANDATORY WHILE ADDING IN CUSTOMER");
-                        errorFlag = 1;
-                        errorCellMap.put(j + 1, true);
-                        break;
-                      }
-                    }
-                    companyCustomerDTO.setEmail(emailValue);
+                    break;
                   }
+
+                  // Rule 11: Check duplicate email within import file
+                  if (validationService.isDuplicateEmailInFile(emailValue, emailsInFile)) {
+                    errorFlag = 1;
+                    errorDesc.append("ERROR: Email is duplicated within the import file");
+                    errorCellMap.put(j + 1, true);
+                    break;
+                  }
+
+                  // Add email to tracking set for duplicate detection
+                  emailsInFile.add(emailValue.toLowerCase());
+
+                  // Rule 12: Check mandatory email field
+                  if (mandatoryFieldsMap.containsKey("email") && emailValue.isBlank()) {
+                    errorDesc.append("ERROR: Email is mandatory and cannot be blank");
+                    errorFlag = 1;
+                    errorCellMap.put(j + 1, true);
+                    break;
+                  }
+
+                  log.info("Email to be set: {}", emailValue);
+                  companyCustomerDTO.setEmail(emailValue);
                 }
                 break;
 
@@ -690,97 +753,110 @@ public class CompanyCustomerAPI {
                 break;
 
               case "state":
-                String myState=row[j];
-                if(!row[j].equals("")){
-                  List<String> selectedStateList=US_STATES.stream().filter(myState::equalsIgnoreCase).toList();
+                String stateValue = row[j] != null ? row[j].trim() : "";
+                if(!stateValue.isBlank()){
+                  // Rule 7: Validate state dropdown field
+                  if (!validationService.isValidStateDropdown(stateValue, US_STATES)) {
+                    errorDesc.append("ERROR: State value is not from the valid dropdown options");
+                    errorFlag = 1;
+                    errorCellMap.put(j + 1, true);
+                    break;
+                  }
+
+                  List<String> selectedStateList = US_STATES.stream()
+                          .filter(s -> s.equalsIgnoreCase(stateValue))
+                          .toList();
 
                   if(!selectedStateList.isEmpty()){
                     companyCustomerDTO.setState(selectedStateList.get(0));
-                    boolean isStateMatched=false;
+
                     if(mandatoryFieldsMap.containsKey("state")){
-                      if(row[j].trim().isEmpty()){
-                        errorDesc.append("ERROR WITH STATE MANDATORY WHILE ADDING IN CUSTOMER");
+                      if(stateValue.isEmpty()){
+                        errorDesc.append("ERROR: State is mandatory and cannot be blank");
                         errorFlag = 1;
                         errorCellMap.put(j + 1, true);
                         break;
                       }
                     }
                     else{
+                      // Set country based on state
+                      boolean isStateMatched = false;
                       for (Map.Entry<String, List<String>> entry : data.entrySet()) {
-                        for (String state:entry.getValue()){
-                          if(state.equalsIgnoreCase(myState)){
+                        for (String state : entry.getValue()){
+                          if(state.equalsIgnoreCase(stateValue)){
                             companyCustomerDTO.setCountry(entry.getKey());
-                            isStateMatched=true;
+                            isStateMatched = true;
                             break;
                           }
                         }
                         if (isStateMatched) break;
                       }
                     }
-
-                  }
-                  else{
-                    errorDesc.append("ERROR WHILE ADDING IN STATE");
-                    errorFlag = 1;
-                    errorCellMap.put(j + 1, true);
                   }
                 }
                 break;
 
               case "zipcode":
-                System.out.println("zipCode//->" + row[j]);
-                if(mandatoryFieldsMap.containsKey("zipcode")){
-                  if(row[j].trim().isEmpty()){
-                    errorDesc.append("ERROR WITH ZIPCODE MANDATORY WHILE ADDING IN CUSTOMER");
+              case "zip code":
+                String zipCodeValue = row[j] != null ? row[j].trim() : "";
+                System.out.println("zipCode//->" + zipCodeValue);
+
+                if(mandatoryFieldsMap.containsKey("zipcode") || mandatoryFieldsMap.containsKey("zip code")){
+                  if(zipCodeValue.isEmpty()){
+                    errorDesc.append("ERROR: ZIP code is mandatory and cannot be blank");
                     errorFlag = 1;
                     errorCellMap.put(j + 1, true);
                     break;
                   }
                 }
-                else{
-                  try {
-                    companyCustomerDTO.setZipCode(row[j]);
-                  } catch (NumberFormatException e) {
-                    errorDesc.append("ERROR IN ZIPCODE FORMAT");
+
+                if (!zipCodeValue.isEmpty()) {
+                  // Rule 9: ZIP Code minimum length validation (skip record if < 3)
+                  if (!validationService.isValidZipCodeMinLength(zipCodeValue)) {
+                    errorDesc.append("ERROR: ZIP code must be at least 3 characters");
                     errorFlag = 1;
                     errorCellMap.put(j + 1, true);
+                    break;
+                  }
+
+                  // Rule 10: ZIP Code maximum length validation (error if > 15)
+                  if (!validationService.isValidZipCodeMaxLength(zipCodeValue)) {
+                    errorDesc.append("ERROR: ZIP code cannot exceed 15 characters");
+                    errorFlag = 1;
+                    errorCellMap.put(j + 1, true);
+                    break;
                   }
                 }
 
+                companyCustomerDTO.setZipCode(zipCodeValue);
                 break;
 
               case "status":
+                String statusValue = row[j] != null ? row[j].trim() : "";
+
                 if(mandatoryFieldsMap.containsKey("status")){
-                  if(row[j].trim().isEmpty()){
-                    errorDesc.append("ERROR WITH STATUS MANDATORY WHILE ADDING IN CUSTOMER");
+                  if(statusValue.isEmpty()){
+                    errorDesc.append("ERROR: Status is mandatory and cannot be blank");
                     errorFlag = 1;
                     errorCellMap.put(j + 1, true);
                     break;
                   }
                 }
-                else {
-                  if ((row[j].equalsIgnoreCase("active"))
-                          || (row[j].equalsIgnoreCase("inactive"))) {
 
-                    if (row[j].toLowerCase().equals("active")) {
-                      companyCustomerDTO.setStatus("active");
-                    } else {
-                      companyCustomerDTO.setStatus("inActive");
-                    }
-
-                    errorFlag = 0;
-                    break;
-
-                  } else {
-                    if (errorDesc.length() > 0) {
-                      errorDesc.append(", ");
-                    }
-                    errorDesc.append("ERROR WHILE ADDING IN STATUS");
+                // Rule 2: Validate status value against allowed statuses (skip record if invalid)
+                if (!statusValue.isEmpty()) {
+                  if (!validationService.isValidStatus(statusValue)) {
+                    errorDesc.append("ERROR: Status value must be 'active' or 'inactive'");
                     errorFlag = 1;
                     errorCellMap.put(j + 1, true);
                     break;
                   }
+
+                  // Normalize status value
+                  companyCustomerDTO.setStatus(validationService.normalizeStatus(statusValue));
+                  errorFlag = 0;
                 }
+                break;
 
 
             }
@@ -877,34 +953,31 @@ public class CompanyCustomerAPI {
                     }
                   }
                   else{
+                    // Rule 3: Validate custom field number type
                     if (companyCustomerExtraFieldName.getType().equals("number")) {
-                      try {
-                        int val = Integer.parseInt(value);
-                        extraFieldsDTO.setValue(Integer.toString(val));
-                      } catch (Exception e) {
+                      if (!validationService.isValidNumberField(value, "number")) {
+                        // If number field contains text, try to import as text
+                        log.warn("Custom field {} defined as Number but input is non-numeric: {}",
+                                 companyCustomerExtraFieldName.getName(), value);
                         errorFlag = 1;
-                        if (!errorDesc.isEmpty()) {
-                          errorDesc.append(", ");
-                        }
-                        errorDesc.append("ERROR WHILE ADDING IN ").append(companyCustomerExtraFieldName.getName().toUpperCase());
+                        errorDesc.append("ERROR: Custom field ").append(companyCustomerExtraFieldName.getName())
+                                .append(" defined as Number but input is non-numeric");
+                        break;
+                      } else {
+                        extraFieldsDTO.setValue(value.trim());
                       }
                     }
-                    if (companyCustomerExtraFieldName.getType().equals("date")) {
+                    else if (companyCustomerExtraFieldName.getType().equals("date")) {
                       try {
-
                         DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
                         LocalDate date = LocalDate.parse(value, inputFormatter);
-
                         DateTimeFormatter outputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
                         String formattedDate = date.format(outputFormatter);
-
                         extraFieldsDTO.setValue(formattedDate);
                       } catch (Exception e) {
                         errorFlag = 1;
-                        if (!errorDesc.isEmpty()) {
-                          errorDesc.append(", ");
-                        }
-                        errorDesc.append("ERROR WHILE ADDING IN ").append(companyCustomerExtraFieldName.getName().toUpperCase());
+                        errorDesc.append("ERROR: Invalid date format for field ").append(companyCustomerExtraFieldName.getName());
+                        break;
                       }
                     } else {
                       extraFieldsDTO.setValue(value);
