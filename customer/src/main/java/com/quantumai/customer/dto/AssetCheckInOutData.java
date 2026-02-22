@@ -14,7 +14,7 @@ public class AssetCheckInOutData {
     private String customerId;
     private String customerName;
     private String action;
-    private LocalDate date;
+    private LocalDateTime date;
     private LocalTime time;
     private String location;
     private String username;

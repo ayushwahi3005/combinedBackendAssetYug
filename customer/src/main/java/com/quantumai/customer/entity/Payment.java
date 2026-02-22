@@ -23,6 +23,8 @@ public class Payment {
 
   private Long last4digit;
 
+  private String cardProvider;
+
   private LocalDateTime transactionDate;
 
   private PaymentType paymentType; // e.g., CREDIT_CARD, DEBIT_CARD

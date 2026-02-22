@@ -11,6 +11,7 @@ import java.util.Map;
 
 import com.quantumai.customer.exception.ExtraFieldDeletionException;
 import org.springframework.web.multipart.MultipartFile;
+import com.quantumai.customer.dto.AssetTemplateFieldsDTO;
 
 public interface AssetsService {
   public List<AssetsDTO> getAssetsDetails(Long companyId);
@@ -139,7 +140,9 @@ public interface AssetsService {
 
   public PaginatedAssetResponseDTO getAssetsWithAdvancedFilter(AssetAdvancedFilterDTO filter);
 
+  // New methods to support template generation and field listing
+  public byte[] generateAssetTemplateXlsx(Long companyId) throws IOException;
 
-
+  public AssetTemplateFieldsDTO getTemplateFields(Long companyId);
 //  public List<Map<String,>> getAssetByCompanyCategory(Long companyId);
 }

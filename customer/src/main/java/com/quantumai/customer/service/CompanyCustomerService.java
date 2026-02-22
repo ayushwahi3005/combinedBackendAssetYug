@@ -97,5 +97,10 @@ public interface CompanyCustomerService {
 
   public CompanyCustomerExtraFieldName updateExtraFieldName(ExtraFieldNameUpdateDTO extraFieldNameUpdateDTO);
 
+  // Template helpers
+  public CompanyCustomerTemplateFieldsDTO getTemplateFields(Long companyId);
+
+  public byte[] generateCompanyCustomerTemplateXlsx(Long companyId) throws IOException;
+
 //  public Integer getCustomFieldCustomerCount(Long companyId, String id);
 }

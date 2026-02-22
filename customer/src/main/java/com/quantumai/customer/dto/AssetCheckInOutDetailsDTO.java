@@ -7,7 +7,7 @@ import lombok.Data;
 @Data
 public class AssetCheckInOutDetailsDTO {
   private String status;
-  private LocalDate date;
+  private LocalDateTime date;
   private String employee;
   private String notes;
   private String location;

@@ -63,6 +63,8 @@ public interface CustomerService {
 
   public List<Location> getAllLocation(Long companyId);
 
+  public List<Location> getAllActiveLocation(Long companyId);
+
   public void deleteLocation(String id) throws LocationDeletionException;
 
   public Bin addBin(BinDTO bin) throws BinAlreadyPresentException;

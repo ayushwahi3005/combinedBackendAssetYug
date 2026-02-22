@@ -741,6 +741,16 @@ public class CustomerServiceImpl implements CustomerService {
   }
 
   @Override
+  public List<Location> getAllActiveLocation(Long companyId) {
+    List<Location> myLocations = new ArrayList<>();
+
+    myLocations = locationRepository.findByCompanyId(companyId).stream().filter((data)->data.getStatus().equals(StatusEnum.active)).collect(Collectors.toList());
+
+
+    return myLocations;
+  }
+
+  @Override
   public void deleteLocation(String id) throws LocationDeletionException {
     Optional<Location> locOptinal=locationRepository.findById(id);
     if(locOptinal.isPresent()){

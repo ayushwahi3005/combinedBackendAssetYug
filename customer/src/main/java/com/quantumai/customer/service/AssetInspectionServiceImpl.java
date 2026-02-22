@@ -232,7 +232,7 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
             // ─────────────────────────────────────────
             String[] overviewHeaders = {
                     "Asset ID", "Asset Name", "Inspection ID", "Inspection Name",
-                    "Date Started", "Date Completed", "Inspector", "Geo Location"
+                    "Date Started", "Date Completed", "Inspector", "Geo Location", "Inspection Status"
             };
 
             Sheet overviewSheet = workbook.createSheet("Overview");
@@ -247,7 +247,7 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
             String[] detailedHeaders = {
                     "Asset ID", "Asset Name", "Inspection ID", "Inspection Name",
                     "Date Started", "Date Completed", "Inspector",
-                    "Instruction Name", "Instruction Value", "Notes", "Geo Location"
+                    "Instruction Name", "Instruction Value", "Notes", "Geo Location", "Inspection Status"
             };
 
             Sheet detailedSheet = workbook.createSheet("Detailed");
@@ -263,6 +263,8 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
 
                 String dateStarted = "";
                 String dateCompleted = "";
+                String status = inspection.getStatus() != null ? inspection.getStatus().toString() : "";
+                boolean isCompleted = "COMPLETED".equalsIgnoreCase(status);
 
                 if (inspection.getCreatedAt() != null) {
                     dateStarted = java.time.LocalDateTime.parse(
@@ -271,7 +273,8 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
                     ).toLocalDate().toString();
                 }
 
-                if (inspection.getUpdatedAt() != null) {
+                // Only populate Date Completed if status is COMPLETED
+                if (isCompleted && inspection.getUpdatedAt() != null) {
                     dateCompleted = java.time.LocalDateTime.parse(
                             inspection.getUpdatedAt().toString(),
                             java.time.format.DateTimeFormatter.ISO_DATE_TIME
@@ -281,24 +284,24 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
                 boolean hasSteps = inspection.getStepValues() != null && !inspection.getStepValues().isEmpty();
 
                 if (hasSteps) {
-                    // Overview — one row per inspection (use first step as representative, or just write once)
-                    // We write one overview row per inspection instance, not per step
+                    // Overview
                     Row overviewRow = overviewSheet.createRow(overviewRowIndex++);
                     overviewRow.createCell(0).setCellValue(myAsset.getAssetId());
                     overviewRow.createCell(1).setCellValue(myAsset.getName());
-                    overviewRow.createCell(2).setCellValue(inspection.getAssetCategoryInspectionId());
+                    overviewRow.createCell(2).setCellValue(inspection.getAssetCategoryInspectionInstanceId());
                     overviewRow.createCell(3).setCellValue(inspection.getAssetCategoryInspectionName());
                     overviewRow.createCell(4).setCellValue(dateStarted);
                     overviewRow.createCell(5).setCellValue(dateCompleted);
                     overviewRow.createCell(6).setCellValue(inspection.getActionPerformedBy());
                     overviewRow.createCell(7).setCellValue("");
+                    overviewRow.createCell(8).setCellValue(status);  // Inspection Status
 
                     // Detailed — one row per step
                     for (InspectionStepValues step : inspection.getStepValues()) {
                         Row detailedRow = detailedSheet.createRow(detailedRowIndex++);
                         detailedRow.createCell(0).setCellValue(myAsset.getAssetId());
                         detailedRow.createCell(1).setCellValue(myAsset.getName());
-                        detailedRow.createCell(2).setCellValue(inspection.getAssetCategoryInspectionId());
+                        detailedRow.createCell(2).setCellValue(inspection.getAssetCategoryInspectionInstanceId());
                         detailedRow.createCell(3).setCellValue(inspection.getAssetCategoryInspectionName());
                         detailedRow.createCell(4).setCellValue(dateStarted);
                         detailedRow.createCell(5).setCellValue(dateCompleted);
@@ -307,6 +310,7 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
                         detailedRow.createCell(8).setCellValue(step.getValue());
                         detailedRow.createCell(9).setCellValue(inspection.getNotes());
                         detailedRow.createCell(10).setCellValue("");
+                        detailedRow.createCell(11).setCellValue(status);  // Inspection Status
                     }
 
                 } else {
@@ -316,10 +320,11 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
                     overviewRow.createCell(1).setCellValue("");
                     overviewRow.createCell(2).setCellValue(inspection.getAssetCategoryInspectionId());
                     overviewRow.createCell(3).setCellValue(inspection.getAssetCategoryInspectionName());
-                    overviewRow.createCell(4).setCellValue(inspection.getCreatedAt() != null ? inspection.getCreatedAt().toString() : "");
-                    overviewRow.createCell(5).setCellValue(inspection.getUpdatedAt() != null ? inspection.getUpdatedAt().toString() : "");
+                    overviewRow.createCell(4).setCellValue(dateStarted);
+                    overviewRow.createCell(5).setCellValue(dateCompleted);
                     overviewRow.createCell(6).setCellValue(inspection.getActionPerformedBy());
                     overviewRow.createCell(7).setCellValue("");
+                    overviewRow.createCell(8).setCellValue(status);  // Inspection Status
 
                     // Detailed
                     Row detailedRow = detailedSheet.createRow(detailedRowIndex++);
@@ -327,13 +332,14 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
                     detailedRow.createCell(1).setCellValue("");
                     detailedRow.createCell(2).setCellValue(inspection.getAssetCategoryInspectionId());
                     detailedRow.createCell(3).setCellValue(inspection.getAssetCategoryInspectionName());
-                    detailedRow.createCell(4).setCellValue(inspection.getCreatedAt() != null ? inspection.getCreatedAt().toString() : "");
-                    detailedRow.createCell(5).setCellValue(inspection.getUpdatedAt() != null ? inspection.getUpdatedAt().toString() : "");
+                    detailedRow.createCell(4).setCellValue(dateStarted);
+                    detailedRow.createCell(5).setCellValue(dateCompleted);
                     detailedRow.createCell(6).setCellValue(inspection.getActionPerformedBy());
                     detailedRow.createCell(7).setCellValue("");
                     detailedRow.createCell(8).setCellValue("");
                     detailedRow.createCell(9).setCellValue(inspection.getNotes());
                     detailedRow.createCell(10).setCellValue("");
+                    detailedRow.createCell(11).setCellValue(status);  // Inspection Status
                 }
             }
 

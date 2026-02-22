@@ -56,7 +56,7 @@ public class SecurityConfiguration {
                     "/customer/removeSession/*",
                     "/customer/checkUserName/*",
                     "/customer/sentResetOTP",
-                    "/customer/updatePassword",
+                    "/customer/updatePassword/**",
                     "/assetyug-notifications/**",
                      "/invitation/**",
                      "/subscription/subscription-valid/**",

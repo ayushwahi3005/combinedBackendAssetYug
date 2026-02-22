@@ -325,6 +325,7 @@ public class StripeService {
 
             paymentMethodMap.put("card", cardMap);
             response.put("payment_method", paymentMethodMap);
+            response.put("cardProvider", card.getBrand());
           }
         } else {
           response.put("payment_method", null);

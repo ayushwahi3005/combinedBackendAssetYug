@@ -7,7 +7,7 @@ import lombok.Data;
 @Data
 public class AssetCheckInOutDetails {
   private String status;
-  private LocalDate date;
+  private LocalDateTime date;
   private String employee;
   private String notes;
   private String location;
@@ -17,4 +17,13 @@ public class AssetCheckInOutDetails {
   private String userLatitude;
   private String ipAddress;
   private String userLocation;
+
+  // Overloaded setters to accept LocalDate or LocalDateTime
+  public void setDate(LocalDate localDate) {
+    this.date = localDate == null ? null : localDate.atStartOfDay();
+  }
+
+  public void setDate(LocalDateTime localDateTime) {
+    this.date = localDateTime;
+  }
 }

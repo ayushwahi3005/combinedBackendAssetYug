@@ -149,8 +149,13 @@ public class SubscriptionServiceImpl implements SubscriptionService {
 
           if (details != null && details.getCard() != null) {
             String last4 = details.getCard().getLast4();
+            String brand = details.getCard().getBrand();
+
             if (last4 != null) {
               payment.setLast4digit(Long.parseLong(last4));
+            }
+            if (brand != null) {
+              payment.setCardProvider(brand);
             }
           }
 
@@ -161,13 +166,20 @@ public class SubscriptionServiceImpl implements SubscriptionService {
           if (pmId != null) {
             PaymentMethod pm = PaymentMethod.retrieve(pmId);
             if (pm.getCard() != null) {
-              payment.setLast4digit(Long.parseLong(pm.getCard().getLast4()));
+              String last4 = pm.getCard().getLast4();
+              String brand = pm.getCard().getBrand();
+
+              if (last4 != null) {
+                payment.setLast4digit(Long.parseLong(last4));
+              }
+              if (brand != null) {
+                payment.setCardProvider(brand);
+              }
             }
           }
         }
       } catch (StripeException e) {
-        // Log and continue — don't fail the whole list for one bad record
-        log.warn("Failed to fetch last4 from Stripe for paymentId={}, chargeId={}: {}",
+        log.warn("Failed to fetch card details from Stripe for paymentId={}, chargeId={}: {}",
                 payment.getPaymentId(), payment.getChargeId(), e.getMessage());
       }
     });

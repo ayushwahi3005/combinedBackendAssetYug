@@ -26,6 +26,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import org.apache.poi.ss.usermodel.Cell;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -35,6 +37,14 @@ import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import java.io.ByteArrayOutputStream;
+
+import com.quantumai.customer.dto.AssetTemplateFieldsDTO;
 
 @Service
 @Slf4j
@@ -1430,7 +1440,7 @@ public class AssetsServiceImpl implements AssetsService {
     @Override
   public void addAssetInspectionInstance(
       AssetCategoryInspectionInstance assetCategoryInspectionInstance) {
-      if(assetCategoryInspectionInstance.getId().isEmpty()) {
+      if(assetCategoryInspectionInstance.getId()==null||assetCategoryInspectionInstance.getId().isEmpty()) {
         log.info("New AssetCategoryInspectionInstance : {}",assetCategoryInspectionInstance.toString());
         inspectionInstanceIdGeneratorRepository.findByCompanyId(assetCategoryInspectionInstance.getCompanyId()).ifPresentOrElse((data) -> {
           Long seqId = data.getSeq();
@@ -1564,8 +1574,7 @@ public class AssetsServiceImpl implements AssetsService {
                 assetCheckInOutData.setAssetId(asset.getAssetId());
                 assetCheckInOutData.setAssetName(asset.getName());
                 assetCheckInOutData.setAction("Checked In");
-                LocalDate date = LocalDateTime.parse(asset.getUpdatedAt())
-                        .toLocalDate();
+                LocalDateTime date = LocalDateTime.parse(asset.getUpdatedAt());
 
               LocalTime timeOnly = LocalDateTime.parse(asset.getUpdatedAt()).toLocalTime().withNano(0);
                 assetCheckInOutData.setTime(timeOnly);
@@ -1670,5 +1679,109 @@ public class AssetsServiceImpl implements AssetsService {
         });
     }
 
+
+    @Override
+  public byte[] generateAssetTemplateXlsx(Long companyId) throws IOException {
+    List<AssetExtraFieldName> extraFieldNames = extraFieldNameRepository.findByCompanyId(companyId);
+    Workbook workbook = new XSSFWorkbook();
+    Sheet sheet = workbook.createSheet("AssetTemplate");
+    Row header = sheet.createRow(0);
+    int col = 0;
+    // Standard fields recommended for template
+    String[] standardFields = new String[]{"Name","AssetId","SerialNumber","Category","Customer","CustomerId","Location","Status"};
+    for (String h : standardFields) header.createCell(col++).setCellValue(h);
+    if (extraFieldNames != null) {
+      for (AssetExtraFieldName ef : extraFieldNames) header.createCell(col++).setCellValue(ef.getName());
+    }
+
+    // Add mock/sample rows (3 rows) using datatype hints from extraFieldNames
+    int sampleRows = 3;
+    for (int r = 1; r <= sampleRows; r++) {
+      Row row = sheet.createRow(r);
+      int c = 0;
+      for (String field : standardFields) {
+        switch (field.toLowerCase()) {
+          case "name":
+            row.createCell(c++).setCellValue("Sample Asset " + r);
+            break;
+          case "assetid":
+            // numeric asset id
+            row.createCell(c++).setCellValue(1000 + r);
+            break;
+          case "serialnumber":
+            row.createCell(c++).setCellValue("SN" + (1000 + r));
+            break;
+          case "category":
+            row.createCell(c++).setCellValue("DefaultCategory");
+            break;
+          case "customer":
+            row.createCell(c++).setCellValue("Sample Customer");
+            break;
+          case "customerid":
+            row.createCell(c++).setCellValue("cust-" + r);
+            break;
+          case "location":
+            row.createCell(c++).setCellValue("Location " + r);
+            break;
+          case "status":
+            row.createCell(c++).setCellValue(r % 2 == 0 ? "inActive" : "active");
+            break;
+          default:
+            row.createCell(c++).setCellValue("");
+        }
+      }
+
+      // Extra fields (ordered same as header creation)
+      if (extraFieldNames != null) {
+        for (AssetExtraFieldName ef : extraFieldNames) {
+          String type = ef.getType() == null ? "string" : ef.getType().toLowerCase();
+          String cellVal = "";
+          try {
+            if (type.contains("number") || type.equals("int") || type.equals("integer") || type.equals("double") || type.equals("float")) {
+              // put numeric sample
+              Cell cell = row.createCell(c++);
+              cell.setCellValue(r * 10);
+              continue;
+            } else if (type.contains("date")) {
+              cellVal = java.time.LocalDate.now().minusDays(r).toString();
+            } else if (type.contains("email")) {
+              cellVal = "sample" + r + "@example.com";
+            } else if (type.contains("bool") || type.contains("checkbox")) {
+              cellVal = (r % 2 == 0) ? "TRUE" : "FALSE";
+            } else {
+              cellVal = "SampleValue" + r;
+            }
+          } catch (Exception ex) {
+            cellVal = "SampleValue" + r;
+          }
+          row.createCell(c++).setCellValue(cellVal);
+        }
+      }
+    }
+
+    // autosize a few columns
+    for (int i = 0; i < Math.min(col, 50); i++) sheet.autoSizeColumn(i);
+
+    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+    workbook.write(bos);
+    workbook.close();
+    return bos.toByteArray();
+  }
+
+  @Override
+  public AssetTemplateFieldsDTO getTemplateFields(Long companyId) {
+    AssetTemplateFieldsDTO dto = new AssetTemplateFieldsDTO();
+    List<String> standard = Arrays.asList(
+        "Name","AssetId","SerialNumber","Category","Customer","CustomerId","Location","Status"
+    );
+    dto.setStandardFields(standard);
+    List<AssetExtraFieldName> extraFieldNames = extraFieldNameRepository.findByCompanyId(companyId);
+    List<String> extraNames = new ArrayList<>();
+    if (extraFieldNames != null) {
+      for (AssetExtraFieldName ef : extraFieldNames) extraNames.add(ef.getName());
+    }
+    dto.setExtraFields(extraNames);
+    return dto;
+  }
 
 }

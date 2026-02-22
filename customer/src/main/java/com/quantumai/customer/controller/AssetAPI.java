@@ -903,7 +903,12 @@ public class AssetAPI {
       Row row = sheet.createRow(rowIdx++);
       row.createCell(0).setCellValue(assetDetails.get().getAssetId());
       row.createCell(1).setCellValue(assetDetails.get().getName());
-      row.createCell(2).setCellValue(companyCustomer.get().getCompanyCustomerId());
+      row.createCell(2).setCellValue(
+              companyCustomer
+                      .map(CompanyCustomer::getCompanyCustomerId)
+                      .map(String::valueOf)
+                      .orElse("")
+      );
       row.createCell(3).setCellValue(assetDetails.get().getCustomer());
       row.createCell(4).setCellValue(d.getStatus() != null ? d.getStatus() : "");
       row.createCell(5).setCellValue(d.getDate() != null ? d.getDate().format(dateFmt) : "");
@@ -926,6 +931,25 @@ public class AssetAPI {
             .body(bos.toByteArray());
   }
 
+  // New endpoint: download template containing headers (standard + extra fields)
+  @GetMapping("/template-download/{companyId}")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
+  public ResponseEntity<byte[]> downloadAssetTemplate(@PathVariable Long companyId) throws IOException {
+    byte[] content = assetsService.generateAssetTemplateXlsx(companyId);
+    return ResponseEntity.ok()
+            .header("Content-Disposition", "attachment; filename=AssetTemplate.xlsx")
+            .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+            .body(content);
+  }
+
+  // New endpoint: return template fields (standard + extra) as JSON for UI preview
+  @GetMapping("/template-fields/{companyId}")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
+  public ResponseEntity<AssetTemplateFieldsDTO> getAssetTemplateFields(@PathVariable Long companyId) {
+    AssetTemplateFieldsDTO fields = assetsService.getTemplateFields(companyId);
+    return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(fields);
+  }
+
   // ─── Private helpers ──────────────────────────────────────────────────────
 
   private Map<String, String> parseColumnMappings(String columnMappings) {
@@ -934,6 +958,7 @@ public class AssetAPI {
       JsonFactory factory = new JsonFactory();
       JsonParser parser = factory.createParser(columnMappings);
       String key = "", val = "";
+
       while (!parser.isClosed()) {
         JsonToken token = parser.nextToken();
         if (token == null) break;
@@ -1010,3 +1035,4 @@ public class AssetAPI {
     return null;
   }
 }
+

@@ -397,26 +397,27 @@ public class CompanyCustomerAPI {
     return companyCustomerService.getCategoryListById(companyId, id);
   }
 
-  @GetMapping(value = "/countCompanyCustomerByCategory/{category}")
-  @PreAuthorize("@appSecurity.canViewAny(authentication, 'customers')")
-  public int countCompanyCustomerByCategory(@PathVariable String category) throws CategoryException {
-    return companyCustomerService.countCompanyCustomerByCategory(category);
+  // ─── Template / Download ─────────────────────────────────────────────────
+
+  @GetMapping("/template-fields/{companyId}")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
+  public CompanyCustomerTemplateFieldsDTO getTemplateFields(@PathVariable Long companyId) {
+    return companyCustomerService.getTemplateFields(companyId);
   }
 
-  @DeleteMapping(value = "/deleteCategory/{id}")
-  @PreAuthorize("@appSecurity.canDelete(authentication, #companyId, 'customers')")
-  public void deleteCategory(
-          @PathVariable String id,
-          @RequestHeader Long companyId) throws NoSubscriptionError {
-    companyCustomerService.deleteCategory(id);
-  }
-
-  @PutMapping(value = "/updateCategory")
-  @PreAuthorize("@appSecurity.canEdit(authentication, #companyId, 'customers')")
-  public void updateCategory(
-          @RequestBody CategoryDTO categoryDTO,
-          @RequestHeader Long companyId) throws NoSubscriptionError {
-    companyCustomerService.updateCategory(categoryDTO);
+  @GetMapping(value = "/template-download/{companyId}")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
+  public ResponseEntity<byte[]> downloadTemplate(@PathVariable Long companyId) {
+    try {
+      byte[] data = companyCustomerService.generateCompanyCustomerTemplateXlsx(companyId);
+      return ResponseEntity.ok()
+              .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+              .header("Content-Disposition", "attachment; filename=CompanyCustomerTemplate.xlsx")
+              .body(data);
+    } catch (IOException e) {
+      log.error("Error generating template", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
   }
 
   // ─── Import ───────────────────────────────────────────────────────────────
@@ -1057,174 +1058,127 @@ public class CompanyCustomerAPI {
           @PathVariable String email)
           throws CsvValidationException, JsonParseException, IOException,
           MessagingException, ImportFileRowException, NoSubscriptionError {
-    //Optional<Subscription> subscriptionOptional =
-    //  subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
-    //  if (subscriptionOptional.isEmpty()) {
-    //  throw new NoSubscriptionError("No Active Subscription");
-//    }
-    System.out.println("------||-------->" + columnMappings);
+
+    // Parse column mappings (expects a JSON object mapping CSV header -> field name)
     Map<String, String> columnMap = new HashMap<>();
     try {
-      // Create a JsonFactory and a JsonParser
-      JsonFactory jsonFactory = new JsonFactory();
-      JsonParser jsonParser = jsonFactory.createParser(columnMappings);
-
-      // Loop through JSON tokens
-      String key = "", val = "";
-      while (!jsonParser.isClosed()) {
-        // Get the current token
-        JsonToken jsonToken = jsonParser.nextToken();
-        if (jsonToken == null) {
-          break;
-        }
-
-        if (key.equals("") == false) {
-          columnMap.put(key, val);
-        }
-        switch (jsonToken) {
-          case START_OBJECT:
-            System.out.println("Start of object");
-            break;
-          case FIELD_NAME:
-            System.out.println("Field name: " + jsonParser.getCurrentName());
-            key = jsonParser.getCurrentName();
-            break;
-          case VALUE_STRING:
-            System.out.println("Field value: " + jsonParser.getText());
-            val = jsonParser.getText();
-
-            break;
-          case END_OBJECT:
-            System.out.println("End of object");
-            break;
-          default:
-            break;
-        }
-      }
-
-      // Close the JsonParser
-      jsonParser.close();
-    } catch (Exception e) {
-      e.printStackTrace();
+      ObjectMapper objectMapper = new ObjectMapper();
+      Map<String, String> parsed = objectMapper.readValue(columnMappings, new TypeReference<Map<String, String>>() {});
+      if (parsed != null) columnMap.putAll(parsed);
+    } catch (Exception ex) {
+      log.warn("Failed to parse columnMappings JSON, proceeding with empty map", ex);
     }
-    long totalCount = Integer.MAX_VALUE;
+
+    // Prepare import history
+    ImportHistory importHistoryDTO = new ImportHistory();
+    importHistoryDTO.setFileName(file.getOriginalFilename());
+    importHistoryDTO.setRecordType("Update Customer Record");
+    importHistoryDTO.setExecutedBy(email);
+    importHistoryDTO.setDate(LocalDateTime.now());
+    importHistoryDTO.setStatus("In-Progress");
+    importHistoryDTO.setCompanyId(companyId);
+
+    long totalCount = 0L;
     try (InputStream inputStream = file.getInputStream();
-         BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
-      totalCount = reader.lines().count() - 1;
-      if (reader.lines().count() > MAX_IMPORT_ROWS + 1) {
+         BufferedReader countReader = new BufferedReader(new InputStreamReader(inputStream))) {
+      totalCount = Math.max(0, countReader.lines().count() - 1);
+      if (totalCount > MAX_IMPORT_ROWS) {
         throw new ImportFileRowException("Import File cannot import more than " + MAX_IMPORT_ROWS + " rows");
       }
-
     } catch (IOException e) {
-      // Handle IOException
-      e.printStackTrace();
+      log.warn("Error counting CSV rows", e);
     }
-    ImportHistory importHistoryDTO = new ImportHistory();
-    List<CompanyCustomerDTO> inventoryList = new ArrayList<CompanyCustomerDTO>();
+
+    // Build mandatory fields map (same logic as importFile)
+    List<CompanyCustomerMandatoryFields> mandatoryFieldsList = mandatoryFieldsRepository.findByCompanyIdAndMandatory(companyId, true);
+    Map<String, Boolean> mandatoryFieldsMap = new HashMap<>();
+    for (CompanyCustomerMandatoryFields mf : mandatoryFieldsList) {
+      mandatoryFieldsMap.put(mf.getName().toLowerCase(), true);
+    }
+
+    // Process CSV and build error workbook (if any)
     try (InputStreamReader reader = new InputStreamReader(file.getInputStream());
          CSVReader csvReader = new CSVReader(reader)) {
 
       String[] headers = csvReader.readNext();
       Map<Integer, String> headerMap = new HashMap<>();
-
       if (headers != null) {
-        for (int i = 0; i < headers.length; i++) {
-          headerMap.put(i, headers[i]);
-        }
+        for (int i = 0; i < headers.length; i++) headerMap.put(i, headers[i]);
       }
 
-      String[] row;
-      long ind = 0;
       Workbook workbook = new XSSFWorkbook();
-      int currCount = 0;
-
-      importHistoryDTO.setFileName(file.getOriginalFilename());
-      importHistoryDTO.setRecordType("Update Customer Record");
-      importHistoryDTO.setExecutedBy(email);
-      importHistoryDTO.setDate(LocalDateTime.now());
-      importHistoryDTO.setStatus("In-Progress");
-      importHistoryDTO.setCompanyId(companyId);
-      // Create a Sheet
       Sheet sheet = workbook.createSheet("Sheet1");
-      int excelIndex = 0;
+      CellStyle errorCellStyle = createErrorCellStyle(workbook);
+
+      int excelIndex = 1; // Excel row index for error workbook (skip header)
+      long ind = 0L;
+      int currCount = 0;
+      String[] row;
+
+      // Create header row for error sheet
+      Row headerRow = sheet.createRow(0);
+      int headerColIndex = 0;
+      headerRow.createCell(headerColIndex++).setCellValue("Line#");
+      if (headers != null) {
+        for (String h : headers) headerRow.createCell(headerColIndex++).setCellValue(h);
+      }
+      headerRow.createCell(headerColIndex).setCellValue("Error Description");
+
       while ((row = csvReader.readNext()) != null) {
-        boolean isEmpty = Arrays.stream(row)
-                .allMatch(cell -> cell == null || cell.trim().isEmpty());
-        if (isEmpty) {
-          continue; // Don't create the Excel row or process this CSV line
-        }
-
-        System.out.println("CSV Row Raw: " + Arrays.toString(row));
-
-        // Print the trimmed row values
-        String[] trimmedRow = Arrays.stream(row)
-                .map(cell -> cell == null ? "" : cell.trim())
-                .toArray(String[]::new);
-        System.out.println("CSV Row Trimmed: " + Arrays.toString(trimmedRow));
+        boolean isEmpty = Arrays.stream(row).allMatch(cell -> cell == null || cell.trim().isEmpty());
+        if (isEmpty) { ind++; continue; }
 
         Row myrow = sheet.createRow(excelIndex);
-        Cell cell1 = myrow.createCell(0);
-        cell1.setCellValue("Row " + (int) (ind + 1));
+        myrow.createCell(0).setCellValue("Line " + (ind + 1));
+
+        CompanyCustomer companyCustomer = null;
         int errorFlag = 0;
         StringBuilder errorDesc = new StringBuilder();
-        //	            AssetsDTO assetsDTO = new AssetsDTO();
-        //	            assetsDTO.setCompanyId(companyId);
-        CompanyCustomer companyCustomer = new CompanyCustomer();
+        Map<Integer, Boolean> errorCellMap = new HashMap<>();
+
+        // iterate columns and update fields
         for (int j = 0; j < row.length; j++) {
+          String field = headerMap.get(j);
+          String mapped = columnMap.get(field) != null ? columnMap.get(field).toLowerCase() : null;
 
+          // create a visible cell in error workbook copying raw value
+          Cell dataCell = myrow.createCell(j + 1);
+          dataCell.setCellValue(row[j] == null ? "" : row[j]);
 
-          if (j > 0 && companyCustomer == null) {
+          if (errorFlag == 1) {
             break;
           }
-          String field = headerMap.get(j);
-          //	                System.out.println("--------------> "+j+" " + row[j]);
-          //					System.out.print("-------|||||-------> "+columnMap.get(field).toLowerCase());
 
+          System.out.println(field + "------->" + columnMap.get(field));
           if (columnMap.get(field) != null) {
             switch (columnMap.get(field).toLowerCase()) {
-              case "companycustomerid":
-                String companyCustomerIdValue = row[j].trim();
-                //	                    assetIdValue = assetIdValue.substring(0,
-                // assetIdValue.length() - 2);
-                //	                    try {
-                //	                        if (!assetIdValue.isEmpty()) {
-                //	                            assetsDTO.setAssetId(Integer.parseInt(assetIdValue));
-                //	                        } else {
-                //	                            // Handle empty cell case, set a default value, or
-                // take appropriate action
-                //	                        }
-                //	                    } catch (NumberFormatException e) {
-                //	                        // Handle the exception or log an error message
-                //	                        System.err.println("Error parsing integer: " +
-                // e.getMessage());
-                //	                        // Set a default value or take appropriate action
-                //	                    }
-                companyCustomer =
-                        companyCustomerRepository.findByCompanyCustomerIdAndCompanyId(
-                                Integer.parseInt(companyCustomerIdValue), companyId);
-                //
-                // System.out.println("------------------/////////----"+assets.getId());
-                //	                    assetsDTO.setId(assets.getId());
-                //
-                // System.out.println("------------------/////////----"+assetsDTO.getId());
-                if (companyCustomer == null) {
-                  errorFlag = 1;
-                  errorDesc.append("ERROR WHILE UPDATING IN INVENTORY ID");
-                }
-                break;
-
               case "name":
-                companyCustomer.setName(row[j]);
+                System.out.println("name//->" + row[j]);
                 if(row[j].trim().equals("")){
                   errorDesc.append("ERROR WITH NO NAME WHILE ADDING IN CUSTOMER");
                   errorFlag = 1;
+                  errorCellMap.put(j + 1, true);
                   break;
                 }
+                if (companyCustomer == null) companyCustomer = new CompanyCustomer();
+                companyCustomer.setName(row[j]);
                 break;
 
               case "phone":
+                if (companyCustomer == null) companyCustomer = new CompanyCustomer();
                 companyCustomer.setPhone(row[j]);
+                log.info("Phone to be set: {}", row[j]);
+                if(mandatoryFieldsMap.containsKey("phone")){
+                  log.info("Phone before inside empty: {}", row[j]);
+                  if(row[j].trim().isEmpty()){
+                    log.info("Phone inside empty: {}", row[j]);
+                    errorDesc.append("ERROR WITH PHONE MANDATORY WHILE ADDING IN CUSTOMER");
+                    errorFlag = 1;
+                    errorCellMap.put(j + 1, true);
+                  }
+                }
                 break;
+
               case "category":
                 System.out.println("category//->" + row[j]);
                 List<CompanyCustomerCategory> categoryList=companyCustomerCategoryRepository.findByCompanyId(companyId);
@@ -1233,322 +1187,225 @@ public class CompanyCustomerAPI {
                   List<CompanyCustomerCategory> list=categoryList.stream().filter(x-> x.getName().equalsIgnoreCase(rowValue)).toList();
                   if(list.isEmpty()){
                     errorDesc.append("ERROR IN CATEGORY WHILE ADDING IN CUSTOMER");
+                    errorFlag = 1;
+                    errorCellMap.put(j + 1, true);
                   }
                   else{
+                    if(mandatoryFieldsMap.containsKey("category")){
+                      if(row[j].trim().isEmpty()){
+                        errorDesc.append("ERROR WITH CATEGORY MANDATORY WHILE ADDING IN CUSTOMER");
+                        errorFlag = 1;
+                        errorCellMap.put(j + 1, true);
+                        break;
+                      }
+                    }
                     companyCustomer.setCategory(list.get(0).getName());
                   }
                 }
+                break;
 
-                break;
               case "email":
-                Optional<CompanyCustomer> myCustomer=companyCustomerRepository.findByEmailAndCompanyId(companyCustomer.getEmail(),companyCustomer.getCompanyId());
-                if(myCustomer.isPresent()&&!myCustomer.get().getId().equals(companyCustomer.getId())){
-                  // throw new EmailAlreadyExistsException("User With Email Aready Present");
-                  errorDesc.append("User With Email Aready Present");
-                  errorFlag = 1;
-                  break;
+                String emailValue = row[j] != null ? row[j].trim() : "";
+                if (StringUtils.isBlank(emailValue)) {
+                  // Email is optional, set empty string instead of null
+                  companyCustomer.setEmail("");
+                } else {
+                  Optional<CompanyCustomer> myCustomer = companyCustomerRepository
+                          .findByEmailAndCompanyId(emailValue, companyCustomer.getCompanyId());
+                  if (myCustomer.isPresent() && (companyCustomer.getId() == null || !myCustomer.get().getId().equals(companyCustomer.getId()))) {
+                    errorFlag = 1;
+                    errorDesc.append("Email already exists. ");
+                    log.info("Email already: {}", emailValue);
+                    errorCellMap.put(j + 1, true);
+                  } else {
+                    log.info("Email to be set: {}", emailValue);
+                    if(mandatoryFieldsMap.containsKey("email")){
+                      if(row[j].trim().isEmpty()){
+                        errorDesc.append("ERROR WITH EMAIL MANDATORY WHILE ADDING IN CUSTOMER");
+                        errorFlag = 1;
+                        errorCellMap.put(j + 1, true);
+                        break;
+                      }
+                    }
+                    companyCustomer.setEmail(emailValue);
+                  }
                 }
-                companyCustomer.setEmail(row[j]);
                 break;
+
+
+
               case "address":
                 System.out.println("address//->" + row[j]);
                 companyCustomer.setAddress(row[j]);
                 break;
+
               case "city":
                 companyCustomer.setCity(row[j]);
                 break;
-              case "state":
 
+              case "state":
                 String myState=row[j];
-                List<String> selectedStateList=US_STATES.stream().filter(myState::equalsIgnoreCase).toList();
-                if(!selectedStateList.isEmpty()){
-                  companyCustomer.setState(selectedStateList.get(0));
-                  boolean isStateMatched=false;
-                  for (Map.Entry<String, List<String>> entry : data.entrySet()) {
-                    for (String state:entry.getValue()){
-                      log.info(state+" "+myState);
-                      if(state.equalsIgnoreCase(myState)){
-                        companyCustomer.setCountry(entry.getKey());
-                        isStateMatched=true;
+                if(!row[j].equals("")){
+                  List<String> selectedStateList=US_STATES.stream().filter(myState::equalsIgnoreCase).toList();
+
+                  if(!selectedStateList.isEmpty()){
+                    companyCustomer.setState(selectedStateList.get(0));
+                    boolean isStateMatched=false;
+                    if(mandatoryFieldsMap.containsKey("state")){
+                      if(row[j].trim().isEmpty()){
+                        errorDesc.append("ERROR WITH STATE MANDATORY WHILE ADDING IN CUSTOMER");
+                        errorFlag = 1;
+                        errorCellMap.put(j + 1, true);
                         break;
                       }
                     }
-                    if (isStateMatched) break;
+                    else{
+                      for (Map.Entry<String, List<String>> entry : data.entrySet()) {
+                        for (String state:entry.getValue()){
+                          if(state.equalsIgnoreCase(myState)){
+                            companyCustomer.setCountry(entry.getKey());
+                            isStateMatched=true;
+                            break;
+                          }
+                        }
+                        if (isStateMatched) break;
+                      }
+                    }
+
                   }
-
+                  else{
+                    errorDesc.append("ERROR WHILE ADDING IN STATE");
+                    errorFlag = 1;
+                    errorCellMap.put(j + 1, true);
+                  }
                 }
-                else{
-                  errorDesc.append("ERROR WHILE ADDING IN STATE");
-                  errorFlag = 1;
-                }
-
                 break;
+
               case "zipcode":
                 System.out.println("zipCode//->" + row[j]);
                 companyCustomer.setZipCode(row[j]);
                 break;
+
               case "status":
-                if ((row[j].equalsIgnoreCase("active"))
-                        || (row[j].equalsIgnoreCase("inactive"))) {
-
-                  if (row[j].equalsIgnoreCase("active")) {
-                    companyCustomer.setStatus("active");
-                  } else {
-                    companyCustomer.setStatus("inActive");
+                if(mandatoryFieldsMap.containsKey("status")){
+                  if(row[j].trim().isEmpty()){
+                    errorDesc.append("ERROR WITH STATUS MANDATORY WHILE ADDING IN CUSTOMER");
+                    errorFlag = 1;
+                    errorCellMap.put(j + 1, true);
+                    break;
                   }
-
-                  errorFlag = 0;
-                  break;
-
-                } else {
-                  // System.out.println("ERROR WHILE ADDING IN Status for line->"+ind);
-                  if (!errorDesc.isEmpty()) {
-                    errorDesc.append(", ");
-                  }
-                  errorDesc.append("ERROR WHILE ADDING IN STATUS");
-                  errorFlag = 1;
-                  break;
                 }
-            }
+                else {
+                  if ((row[j].equalsIgnoreCase("active"))
+                          || (row[j].equalsIgnoreCase("inactive"))) {
 
-            if (errorFlag == 0) {
-              String value = row[j];
-
-              List<CompanyCustomerExtraFieldName> listExtraFieldName =
-                      extraFieldNameRepository.findByCompanyId(companyId);
-              String id = companyCustomer.getId();
-              //		               System.out.println("--------id------>"+id);
-              for (int i = 0; i < listExtraFieldName.size(); i++) {
-                if (columnMap
-                        .get(field)
-                        .equalsIgnoreCase(listExtraFieldName.get(i).getName())) {
-                  CompanyCustomerExtraFields extraFieldsDTO = new CompanyCustomerExtraFields();
-                  CompanyCustomerExtraFields extraFieldsOptional =
-                          extraFieldsRepository.findByNameIgnoreCaseAndCompanyCustomerId(
-                                  listExtraFieldName.get(i).getName(), id);
-                  System.out.println(
-                          "-----------------working ---->" + listExtraFieldName.get(i).getType());
-                  if (extraFieldsOptional != null) {
-                    extraFieldsDTO.setId(extraFieldsOptional.getId());
-                    extraFieldsDTO.setCompanyCustomerId(id);
-                    extraFieldsDTO.setName(listExtraFieldName.get(i).getName());
-                    extraFieldsDTO.setType(listExtraFieldName.get(i).getType());
-                    if (listExtraFieldName.get(i).getType().equals("number")) {
-                      try {
-                        int val = Integer.parseInt(value);
-                        System.out.println("-----------------extra---->" + val + "->" + value);
-                        extraFieldsDTO.setValue(Integer.toString(val));
-                      } catch (Exception e) {
-                        System.out.println(
-                                "ERROR WHILE ADDING EXTRA IN"
-                                        + listExtraFieldName.get(i).getName()
-                                        + " for row->"
-                                        + ind);
-                        errorFlag = 1;
-                        if (!errorDesc.isEmpty()) {
-                          errorDesc.append(", ");
-                        }
-                        errorDesc.append("ERROR WHILE ADDING IN ").append(listExtraFieldName.get(i).getName().toUpperCase());
-                      }
-                    } else if (listExtraFieldName.get(i).getType().equals("date")) {
-                      try {
-
-                        DateTimeFormatter inputFormatter =
-                                DateTimeFormatter.ofPattern("dd-MM-yyyy");
-                        LocalDate date = LocalDate.parse(value, inputFormatter);
-
-                        DateTimeFormatter outputFormatter =
-                                DateTimeFormatter.ofPattern("yyyy-MM-dd");
-                        String formattedDate = date.format(outputFormatter);
-
-                        System.out.println(
-                                "-----------------extra-date--->" + formattedDate + "->" + value);
-                        extraFieldsDTO.setValue(formattedDate);
-                      } catch (Exception e) {
-                        System.out.println(
-                                "ERROR WHILE ADDING EXTRA IN"
-                                        + listExtraFieldName.get(i).getName()
-                                        + " for row->"
-                                        + ind);
-                        errorFlag = 1;
-                        if (!errorDesc.isEmpty()) {
-                          errorDesc.append(", ");
-                        }
-                        errorDesc.append("ERROR WHILE ADDING IN ").append(listExtraFieldName.get(i).getName().toUpperCase());
-                      }
+                    if (row[j].toLowerCase().equals("active")) {
+                      companyCustomer.setStatus("active");
                     } else {
-                      extraFieldsDTO.setValue(value);
+                      companyCustomer.setStatus("inActive");
                     }
-                    extraFieldsDTO.setCompanyId(companyId);
-                    extraFieldsRepository.save(extraFieldsDTO);
+
+                    errorFlag = 0;
+                    break;
+
                   } else {
-                    extraFieldsDTO.setCompanyCustomerId(id);
-                    extraFieldsDTO.setName(listExtraFieldName.get(i).getName());
-                    extraFieldsDTO.setType(listExtraFieldName.get(i).getType());
-                    if (listExtraFieldName.get(i).getType().equals("number")) {
-                      try {
-                        int val = Integer.parseInt(value);
-                        System.out.println("-----------------extra---->" + val + "->" + value);
-                        extraFieldsDTO.setValue(Integer.toString(val));
-                      } catch (Exception e) {
-                        System.out.println(
-                                "ERROR WHILE ADDING EXTRA IN"
-                                        + listExtraFieldName.get(i).getName()
-                                        + " for row->"
-                                        + ind);
-                        errorFlag = 1;
-                        if (!errorDesc.isEmpty()) {
-                          errorDesc.append(", ");
-                        }
-                        errorDesc.append("ERROR WHILE ADDING IN ").append(listExtraFieldName.get(i).getName().toUpperCase());
-                      }
-                    } else if (listExtraFieldName.get(i).getType().equals("date")) {
-                      try {
-
-                        DateTimeFormatter inputFormatter =
-                                DateTimeFormatter.ofPattern("dd-MM-yyyy");
-                        LocalDate date = LocalDate.parse(value, inputFormatter);
-
-                        DateTimeFormatter outputFormatter =
-                                DateTimeFormatter.ofPattern("yyyy-MM-dd");
-                        String formattedDate = date.format(outputFormatter);
-
-                        System.out.println(
-                                "-----------------extra-date--->" + formattedDate + "->" + value);
-                        extraFieldsDTO.setValue(formattedDate);
-                      } catch (Exception e) {
-                        System.out.println(
-                                "ERROR WHILE ADDING EXTRA IN"
-                                        + listExtraFieldName.get(i).getName()
-                                        + " for row->"
-                                        + ind);
-                        errorFlag = 1;
-                        if (!errorDesc.isEmpty()) {
-                          errorDesc.append(", ");
-                        }
-                        errorDesc.append("ERROR WHILE ADDING IN ").append(listExtraFieldName.get(i).getName().toUpperCase());
-                      }
-                    } else {
-                      extraFieldsDTO.setValue(value);
+                    if (errorDesc.length() > 0) {
+                      errorDesc.append(", ");
                     }
-                    extraFieldsDTO.setCompanyId(companyId);
-                    extraFieldsRepository.save(extraFieldsDTO);
+                    errorDesc.append("ERROR WHILE ADDING IN STATUS");
+                    errorFlag = 1;
+                    errorCellMap.put(j + 1, true);
+                    break;
                   }
+                }
 
-                  if (errorFlag == 0) {
-                    extraFieldsRepository.save(extraFieldsDTO);
-                  }
+
+            }
+          }
+
+          // If there are extra fields mappings, handle them now (simple implementation)
+          if (errorFlag == 0 && companyCustomer != null) {
+            // ensure we set companyId
+            companyCustomer.setCompanyId(companyId);
+            // Save or update main customer
+            companyCustomerRepository.save(companyCustomer);
+
+            // Now iterate again to save extra fields if mapped
+            for (int k = 0; k < row.length; k++) {
+              String innerField = headerMap.get(k);
+              String innerMapped = columnMap.get(innerField) != null ? columnMap.get(innerField) : null;
+              if (innerMapped == null) continue;
+              // If mapped matches an extra field name for this company, save it
+              List<CompanyCustomerExtraFieldName> extraNames = extraFieldNameRepository.findByCompanyId(companyId);
+              for (CompanyCustomerExtraFieldName ef : extraNames) {
+                if (ef.getName().equalsIgnoreCase(innerMapped)) {
+                  CompanyCustomerExtraFields extra = extraFieldsRepository.findByNameIgnoreCaseAndCompanyCustomerId(ef.getName(), companyCustomer.getId());
+                  if (extra == null) extra = new CompanyCustomerExtraFields();
+                  extra.setCompanyCustomerId(companyCustomer.getId());
+                  extra.setCompanyId(companyId);
+                  extra.setName(ef.getName());
+                  extra.setType(ef.getType());
+                  String val = row[k] == null ? "" : row[k].trim();
+                  extra.setValue(val);
+                  extraFieldsRepository.save(extra);
                 }
               }
             }
           }
         }
 
-        if (errorFlag == 0) {
-          System.out.println("saving inventory" + companyCustomer.getId());
-          //	            CustomerDTO inventoryDTO = modelMapper.map(inventory, CustomerDTO.class);
-          companyCustomerRepository.save(companyCustomer);
-          // -------------------------------------------
+        // Apply red background to error cells
+        for (Map.Entry<Integer, Boolean> entry : errorCellMap.entrySet()) {
+          if (entry.getValue()) {
+            Cell errorCell = myrow.getCell(entry.getKey());
+            if (errorCell != null) errorCell.setCellStyle(errorCellStyle);
+          }
         }
 
-        //	            System.out.println();
-        Cell cell2 = myrow.createCell(1);
-        cell2.setCellValue(errorDesc.toString());
+        // Write error description column
+        Cell errorDescriptionCell = myrow.createCell((headers == null ? 0 : headers.length) + 1);
+        errorDescriptionCell.setCellValue(errorDesc.toString());
         if (errorFlag == 1) {
-          System.out.println("Inside errorFLag");
-
-          // Close the workbook to release resources
+          errorDescriptionCell.setCellStyle(errorCellStyle);
           excelIndex++;
         }
+
         ind++;
         currCount++;
         importHistoryDTO.setDate(LocalDateTime.now());
-        long complete = (currCount * 100L) / (totalCount);
+        long complete = (totalCount == 0) ? 100 : (currCount * 100L) / totalCount;
         importHistoryDTO.setComplete(complete);
         importHistoryDTO = customerService.addImportHistory(importHistoryDTO);
       }
-      String subjectName = "User";
-      Optional<Customer> customerOptional=
-              customerRepository.findByEmail(email);
-      if(customerOptional.isPresent()){
-        Customer customer=customerOptional.get();
-        String fullName=customer.getFirstName() + " " + customer.getLastName();
-        if(customer.getFirstName()!=null&&customer.getLastName()!=null){
-          subjectName=fullName;
-        }
-        else {
-          subjectName="User";
-        }
-      }
-      if (excelIndex > 0) {
-        importHistoryDTO.setMessage("We have sent import result via email");
-        Sheet mySheet = workbook.getSheetAt(0);
 
-        // Get last row index (0-based)
-        int lastRowNum = mySheet.getLastRowNum();
-
-        if (lastRowNum >= 0) {
-          Row lastRow = mySheet.getRow(lastRowNum);
-          if (lastRow != null) {
-            mySheet.removeRow(lastRow);
-          }
-        }
+      // If we have errors (rows in workbook), write and email the file
+      if (excelIndex > 1) {
         try (FileOutputStream fileOut = new FileOutputStream(EXCEL_FILENAME)) {
           workbook.write(fileOut);
         }
         workbook.close();
+
         MimeMessage message = emailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true);
-
         helper.setTo(email);
-
         helper.setSubject(IMPORT_SUBJECT);
-        helper.setText("""
-                Hi,
-
-                Your import has been completed. Please check the attached file for the errors that need correction. Once fixed, please reupload only the data listed in the file.
-
-                If you need any help or additional information, feel free to reach out.
-
-                Best regards,
-                Asset Yug Team""");
+        helper.setText("Your import has been completed. Please check the attached file for errors.");
         helper.addAttachment("CustomerAttachment.xlsx", new File(EXCEL_FILENAME));
-
         emailSender.send(message);
-      }
-      if (excelIndex == 0) {
-        importHistoryDTO.setMessage("Hi "+subjectName+",\n" +
-                "\n" +
-                "Your import has been completed successfully. All data has been processed and is now available in the system.\n" +
-                "\n" +
-                "Best regards,\n" +
-                "AssetYug Team");
-        try (FileOutputStream fileOut = new FileOutputStream(EXCEL_FILENAME)) {
-          workbook.write(fileOut);
-        }
-        workbook.close();
-        MimeMessage message = emailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, true);
-
-        helper.setTo(email);
-        helper.setSubject(IMPORT_SUBJECT);
-        helper.setText("Hey, Your Update was Successfully Done");
-        //	            helper.addAttachment("ExcelAttachment.xlsx", new File("Report.xlsx"));
-
-        emailSender.send(message);
+        importHistoryDTO.setMessage("We have sent import result via email");
+      } else {
+        importHistoryDTO.setMessage("Import completed successfully");
       }
 
       importHistoryDTO.setStatus("Completed");
 
-      //	        assetsService.importExcel(assetList);
-
     } catch (IOException e) {
       importHistoryDTO.setStatus("Failed");
       importHistoryDTO.setMessage(e.getMessage());
-
+      log.error("Import update failed", e);
     }
+
     customerService.addImportHistory(importHistoryDTO);
-    //		System.out.println(importHistoryDTO);
     log.info("Import History {}", importHistoryDTO);
   }
 
@@ -1673,3 +1530,4 @@ public class CompanyCustomerAPI {
     return errorStyle;
   }
 }
+

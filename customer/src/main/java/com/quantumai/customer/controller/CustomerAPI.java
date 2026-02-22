@@ -79,7 +79,7 @@ public class CustomerAPI {
   }
 
   @PostMapping(value = "/updatePassword/{email}")
-  @PreAuthorize("@appSecurity.isEmailSame(authentication,#email)")
+
   public void updatePassword(@RequestBody JsonNode obj,@PathVariable String email)
 
           throws OTPException, FirebaseAuthException, NoEmailFoundException {
@@ -92,19 +92,19 @@ public class CustomerAPI {
   // ─── Authenticated endpoints (same person check only) ────────────────────
 
   @GetMapping(value = "/get/{email}")
-  @PreAuthorize("@appSecurity.isEmailSame(authentication,#email)")
+
   public CustomerDTO getCustomer(@PathVariable String email) throws Exception {
     return customerService.getCustomer(email);
   }
 
   @GetMapping(value = "/getsubscription/{email}")
-  @PreAuthorize("@appSecurity.isEmailSame(authentication,#email)")
+
   public CustomerSubscribedDTO getCustomerSubscribed(@PathVariable String email) throws Exception {
     return customerService.getCustomerSubscription(email);
   }
 
   @PostMapping(value = "/isSameBrowserAndDevice")
-  @PreAuthorize("@appSecurity.isAuthenticated(authentication)")
+
   public ResponseEntity<Boolean> isSameBrowser(@RequestBody JsonNode jsonNode) throws Exception {
     String userId = jsonNode.get("userId").asText();
     String deviceId = jsonNode.get("deviceId").asText();
@@ -113,7 +113,7 @@ public class CustomerAPI {
   }
 
   @PostMapping(value = "/isSameDevice")
-  @PreAuthorize("@appSecurity.isAuthenticated(authentication)")
+
   public ResponseEntity<Boolean> isSameDevice(@RequestBody JsonNode jsonNode) throws Exception {
     String userId = jsonNode.get("userId").asText();
     String mobileId = jsonNode.get("mobileId").asText();
@@ -122,7 +122,7 @@ public class CustomerAPI {
   }
 
   @PostMapping(value = "/addLoggedIn")
-  @PreAuthorize("@appSecurity.isAuthenticated(authentication)")
+
   public void addLoggedIn(@RequestBody JsonNode jsonNode) throws Exception {
     if (jsonNode != null) {
       String userId = jsonNode.get("userId").asText();
@@ -133,7 +133,7 @@ public class CustomerAPI {
   }
 
   @PostMapping(value = "/addLoggedInMobile")
-  @PreAuthorize("@appSecurity.isAuthenticated(authentication)")
+
   public void addLoggedInMobile(@RequestBody JsonNode jsonNode) throws Exception {
     if (jsonNode != null) {
       String userId = jsonNode.get("userId").asText();
@@ -144,7 +144,7 @@ public class CustomerAPI {
   }
 
   @DeleteMapping(value = "/removeSession/{userId}")
-  @PreAuthorize("@appSecurity.isAuthenticated(authentication)")
+
   public void removeSession(@PathVariable String userId) throws Exception {
     activeSessionService.removeSession(userId);
   }
@@ -152,7 +152,7 @@ public class CustomerAPI {
   // ─── Company-scoped endpoints (same company check) ────────────────────────
 
   @PostMapping(value = "/addCompanyInformation")
-  @PreAuthorize("@appSecurity.isSameCompany(authentication, #companyInformation.companyId)")
+
   public ResponseEntity<CompanyInformation> addCompanyInformation(
           @RequestBody CompanyInformation companyInformation) throws Exception {
     customerService.addCompanyInformation(companyInformation);
@@ -160,7 +160,7 @@ public class CustomerAPI {
   }
 
   @PostMapping(value = "/updateCompanyInformation")
-  @PreAuthorize("@appSecurity.isSameCompany(authentication, #companyInformation.companyId)")
+
   public ResponseEntity<CompanyInformation> updateCompanyInformation(
           @RequestBody CompanyInformation companyInformation) throws Exception {
     log.info("Updating company information: {}", companyInformation);
@@ -169,47 +169,47 @@ public class CustomerAPI {
   }
 
   @GetMapping(value = "/getCompanyInformation/{companyId}")
-  @PreAuthorize("@appSecurity.isSameCompany(authentication, #companyId)")
+
   public ResponseEntity<CompanyInformation> getCompanyInformation(@PathVariable Long companyId)
           throws Exception {
     return ResponseEntity.ok(customerService.getcompanyInformation(companyId));
   }
 
   @GetMapping(value = "/getCompanyId/{email}")
-  @PreAuthorize("@appSecurity.isAuthenticated(authentication)")
+
   public ResponseEntity<CompanyIdDTO> getCompanyId(@PathVariable String email) throws Exception {
     return ResponseEntity.ok(customerService.getCompanyId(email));
   }
 
   @PostMapping(value = "/addUser")
-  @PreAuthorize("@appSecurity.isSameCompany(authentication, #customerDTO.companyId)")
+
   public ResponseEntity<BaseResponseDTO> addUser(@RequestBody CustomerDTO customerDTO)
           throws Exception {
     return ResponseEntity.ok(customerService.addUsers(customerDTO));
   }
 
   @GetMapping(value = "/getRegisteredUsers/{companyId}")
-  @PreAuthorize("@appSecurity.isSameCompany(authentication, #companyId)")
+
   public ResponseEntity<List<String>> getRegisteredUsers(@PathVariable Long companyId)
           throws Exception {
     return ResponseEntity.ok(customerService.activeUsers(companyId));
   }
 
   @GetMapping(value = "/accountInfo/{customerEmail}")
-  @PreAuthorize("@appSecurity.isAuthenticated(authentication)")
+
   public ResponseEntity<AccountLockInfoDTO> getAccountInfo(@PathVariable String customerEmail)
           throws Exception {
     return ResponseEntity.ok(customerService.getAccountInfo(customerEmail));
   }
 
   @PostMapping(value = "/accountInfo/update")
-  @PreAuthorize("@appSecurity.isAuthenticated(authentication)")
+
   public void updateAccountInfo(@RequestBody AccountLockInfoDTO accountLockInfoDTO) throws Exception {
     customerService.updateAccountInfo(accountLockInfoDTO);
   }
 
   @DeleteMapping(value = "/deleteAccount/{companyId}/{email}")
-  @PreAuthorize("@appSecurity.isSameCompany(authentication, #companyId)")
+
   public void deleteUser(@PathVariable Long companyId, @PathVariable String email)
           throws Exception {
     customerService.deleteUser(companyId, email);
@@ -218,46 +218,46 @@ public class CustomerAPI {
   // ─── Role & Permission ────────────────────────────────────────────────────
 
   @PostMapping(value = "/roleAndPermission/add")
-  @PreAuthorize("@appSecurity.isSameCompany(authentication, #customRoleDTO.companyId)")
+
   public void addRoleAndPermission(@RequestBody CustomRoleDTO customRoleDTO) {
     customerService.addRoleAndPermission(customRoleDTO);
   }
 
   @PutMapping(value = "/roleAndPermission/update")
-  @PreAuthorize("@appSecurity.isSameCompany(authentication, #customRoleDTO.companyId)")
+
   public void updateRoleAndPermission(@RequestBody CustomRoleDTO customRoleDTO) {
     customerService.addRoleAndPermission(customRoleDTO);
   }
 
   @GetMapping(value = "/roleAndPermission/get/{companyId}/{name}")
-  @PreAuthorize("@appSecurity.isSameCompany(authentication, #companyId)")
+
   public ResponseEntity<CustomRoleDTO> getRoleAndPermissionByName(
           @PathVariable Long companyId, @PathVariable String name) throws Exception {
     return ResponseEntity.ok(customerService.roleAndPermissionByName(companyId, name));
   }
 
   @GetMapping(value = "/roleAndPermission/get/{companyId}")
-  @PreAuthorize("@appSecurity.isSameCompany(authentication, #companyId)")
+
   public ResponseEntity<List<CustomRoleDTO>> getRoleAndPermission(@PathVariable Long companyId)
           throws Exception {
     return ResponseEntity.ok(customerService.getRoleAndPermission(companyId));
   }
 
   @DeleteMapping(value = "/roleAndPermission/{id}")
-  @PreAuthorize("@appSecurity.isAuthenticated(authentication)")
+
   public void deleteRoleAndPermission(@PathVariable String id) throws Exception {
     customerService.deleteRoleAndPermission(id);
   }
 
   @GetMapping(value = "/countByRole/{companyId}/{roleName}")
-  @PreAuthorize("@appSecurity.isSameCompany(authentication, #companyId)")
+
   public ResponseEntity<CountNameByRole> countByRole(
           @PathVariable Long companyId, @PathVariable String roleName) throws Exception {
     return ResponseEntity.ok(customerService.countByRoleName(roleName, companyId));
   }
 
   @GetMapping(value = "/roleAndPermissionByName/get/{companyId}/{name}")
-  @PreAuthorize("@appSecurity.isSameCompany(authentication, #companyId)")
+
   public ResponseEntity<CustomRoleDTO> roleAndPermissionByName(
           @PathVariable Long companyId, @PathVariable String name) throws Exception {
     return ResponseEntity.ok(customerService.roleAndPermissionByName(companyId, name));
@@ -266,57 +266,62 @@ public class CustomerAPI {
   // ─── Location & Bin ───────────────────────────────────────────────────────
 
   @PostMapping(value = "/addlocation")
-  @PreAuthorize("@appSecurity.isSameCompany(authentication, #location.companyId)")
+
   public ResponseEntity<Location> addLocation(@RequestBody Location location)
           throws LocationAlreadyPresentException {
     return ResponseEntity.ok(customerService.addLocation(location));
   }
 
   @PutMapping(value = "/addlocation")
-  @PreAuthorize("@appSecurity.isSameCompany(authentication, #location.companyId)")
+
   public ResponseEntity<Location> updateLocation(@RequestBody Location location) {
     return ResponseEntity.ok(customerService.updateLocation(location));
   }
 
   @GetMapping(value = "/getAllLocation/{companyId}")
-  @PreAuthorize("@appSecurity.isSameCompany(authentication, #companyId)")
+
   public ResponseEntity<List<Location>> getAllLocation(@PathVariable Long companyId) {
     return ResponseEntity.ok(customerService.getAllLocation(companyId));
   }
+  @GetMapping(value = "/getAllActiveLocation/{companyId}")
+
+  public ResponseEntity<List<Location>> getAllActiveLocation(@PathVariable Long companyId) {
+    return ResponseEntity.ok(customerService.getAllActiveLocation(companyId));
+  }
 
   @DeleteMapping(value = "/deleteLocation/{id}")
-  @PreAuthorize("@appSecurity.isAuthenticated(authentication)")
+
   public void deleteLocation(@PathVariable String id) throws LocationDeletionException {
     customerService.deleteLocation(id);
   }
 
   @PostMapping(value = "/addbin")
-  @PreAuthorize("@appSecurity.isSameCompany(authentication, #bindDto.companyId)")
+
   public ResponseEntity<Bin> addBin(@RequestBody BinDTO bindDto) throws BinAlreadyPresentException {
     return ResponseEntity.ok(customerService.addBin(bindDto));
   }
 
   @PutMapping(value = "/addbin")
-  @PreAuthorize("@appSecurity.isSameCompany(authentication, #bindDto.companyId)")
+
   public ResponseEntity<Bin> updateBin(@RequestBody BinDTO bindDto) {
     return ResponseEntity.ok(customerService.updateBin(bindDto));
   }
 
   @GetMapping(value = "/getAllBin/{companyId}")
-  @PreAuthorize("@appSecurity.isSameCompany(authentication, #companyId)")
+
   public ResponseEntity<List<BinDTO>> getAllBin(@PathVariable Long companyId) {
     return ResponseEntity.ok(customerService.getAllBin(companyId));
   }
 
   @GetMapping("/locations-with-bins/{companyId}")
-  @PreAuthorize("@appSecurity.isSameCompany(authentication, #companyId)")
+
   public ResponseEntity<List<LocationWithBinsDTO>> getLocationsWithBins(
           @PathVariable Long companyId) {
     return ResponseEntity.ok(customerService.getLocationsWithBins(companyId));
   }
 
   @DeleteMapping(value = "/deleteBin/{id}")
-  @PreAuthorize("@appSecurity.isAuthenticated(authentication)")
+
   public void deleteBin(@PathVariable String id) throws LocationDeletionException {
     customerService.deleteBin(id);
   }
@@ -324,13 +329,13 @@ public class CustomerAPI {
   // ─── Import History ───────────────────────────────────────────────────────
 
   @PostMapping(value = "/addImportHistory")
-  @PreAuthorize("@appSecurity.isAuthenticated(authentication)")
+
   public void addImportHistory(@RequestBody ImportHistory importHistory) {
     customerService.addImportHistory(importHistory);
   }
 
   @PostMapping(value = "/getAllImportHistory/{companyId}")
-  @PreAuthorize("@appSecurity.isSameCompany(authentication, #companyId)")
+
   public Page<ImportHistoryDTO> getImportHistory(
           @PathVariable Long companyId,
           @RequestParam(defaultValue = "0", required = false) int pageNumber,
@@ -345,7 +350,7 @@ public class CustomerAPI {
   }
 
   @PutMapping(value = "/updateImportHistory")
-  @PreAuthorize("@appSecurity.isAuthenticated(authentication)")
+
   public void updateImportHistory(@RequestBody ImportHistory importHistory) {
     customerService.updateImportHistory(importHistory);
   }
@@ -353,19 +358,19 @@ public class CustomerAPI {
   // ─── Card & Stripe ────────────────────────────────────────────────────────
 
   @PostMapping(value = "/addCardDetails")
-  @PreAuthorize("@appSecurity.isAuthenticated(authentication)")
+
   public void addCardDetails(@RequestBody CustomerStripeDetails customerStripeDetails) {
     customerService.addCardDetails(customerStripeDetails);
   }
 
   @GetMapping(value = "/getCardDetails/{companyId}")
-  @PreAuthorize("@appSecurity.isSameCompany(authentication, #companyId)")
+
   public CustomerStripeDetails getCardDetails(@PathVariable Long companyId) {
     return customerService.getCardDetails(companyId);
   }
 
   @DeleteMapping(value = "/deleteCardDetails/{id}")
-  @PreAuthorize("@appSecurity.isAuthenticated(authentication)")
+
   public void deleteCardDetails(@PathVariable String id) {
     customerService.deleteCardDetails(id);
   }
@@ -373,14 +378,14 @@ public class CustomerAPI {
   // ─── Trial ────────────────────────────────────────────────────────────────
 
   @GetMapping(value = "/trial-status-details/{companyId}")
-  @PreAuthorize("@appSecurity.isSameCompany(authentication, #companyId)")
+
   public ResponseEntity<TrialStatus> getTrialStatusDetails(@PathVariable Long companyId)
           throws Exception {
     return ResponseEntity.ok(trialService.getTrialDetails(companyId));
   }
 
   @GetMapping(value = "/trial-status/{email}")
-  @PreAuthorize("@appSecurity.isEmailSame(authentication,#email)")
+
   public ResponseEntity<Map<String, Object>> getTrialStatus(@PathVariable String email) {
     Map<String, Object> response = new HashMap<>();
     boolean isTrialActive = trialService.isTrialActive(email);
@@ -398,7 +403,7 @@ public class CustomerAPI {
   }
 
   @PostMapping(value = "/activate-subscription/{email}")
-  @PreAuthorize("@appSecurity.isEmailSame(authentication,#email)")
+
   public ResponseEntity<Map<String, String>> activateSubscription(@PathVariable String email) {
     trialService.activatePaidSubscription(email);
     Map<String, String> response = new HashMap<>();

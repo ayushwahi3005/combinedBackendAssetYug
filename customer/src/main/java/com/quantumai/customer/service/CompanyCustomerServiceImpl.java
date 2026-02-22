@@ -16,6 +16,8 @@ import com.quantumai.customer.exception.EmailAlreadyExistsException;
 import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
 import com.quantumai.customer.exception.ExtraFieldDeletionException;
 import com.quantumai.customer.repository.*;
+
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -24,6 +26,11 @@ import java.util.stream.Collectors;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -65,6 +72,9 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
 
   @Autowired
   private CompanyCustomerCategoryIdGeneratorRepository companyCustomerCategoryIdGeneratorRepository;
+
+  @Autowired
+  private com.quantumai.customer.repository.CompanyInformationRepository companyInformationRepository;
 
     @Autowired
     private MongoTemplate mongoTemplate;
@@ -963,26 +973,160 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
     public CompanyCustomerExtraFieldName updateExtraFieldName(ExtraFieldNameUpdateDTO extraFieldNameUpdateDTO) {
         Optional<CompanyCustomerExtraFieldName> optionalField=extraFieldNameRepository.findById(extraFieldNameUpdateDTO.getId());
         if(optionalField.isPresent()){
-            String name=optionalField.get().getName();
-            this.updateNameForCompanyCustomerExtraFields(name,extraFieldNameUpdateDTO.getName(),optionalField.get().getCompanyId());
-            this.updateNameForMandatoryFields(name,extraFieldNameUpdateDTO.getName(),optionalField.get().getCompanyId());
-            this.updateNameForShowFields(name,extraFieldNameUpdateDTO.getName(),optionalField.get().getCompanyId());
+      String name=optionalField.get().getName();
+      this.updateNameForCompanyCustomerExtraFields(name,extraFieldNameUpdateDTO.getName(),optionalField.get().getCompanyId());
+      this.updateNameForMandatoryFields(name,extraFieldNameUpdateDTO.getName(),optionalField.get().getCompanyId());
+      this.updateNameForShowFields(name,extraFieldNameUpdateDTO.getName(),optionalField.get().getCompanyId());
 
 
-            optionalField.get().setName(extraFieldNameUpdateDTO.getName());
+      optionalField.get().setName(extraFieldNameUpdateDTO.getName());
 
 
-            return extraFieldNameRepository.save(optionalField.get());
-        }
-        else{
-            return null;
-        }
+      return extraFieldNameRepository.save(optionalField.get());
+    }
+    else{
+      return null;
+    }
+  }
+
+  @Override
+  public com.quantumai.customer.dto.CompanyCustomerTemplateFieldsDTO getTemplateFields(Long companyId) {
+    com.quantumai.customer.dto.CompanyCustomerTemplateFieldsDTO dto = new com.quantumai.customer.dto.CompanyCustomerTemplateFieldsDTO();
+    // Removed 'Apartment' from standard fields
+    List<String> standard = Arrays.asList(
+        "Name","Email","Phone","Address","City","State","Country","ZipCode","Category","Status"
+    );
+    dto.setStandardFields(standard);
+    List<CompanyCustomerExtraFieldName> extraFieldNames = extraFieldNameRepository.findByCompanyId(companyId);
+    List<String> extraNames = new ArrayList<>();
+    if (extraFieldNames != null) {
+      for (CompanyCustomerExtraFieldName ef : extraFieldNames) extraNames.add(ef.getName());
+    }
+    dto.setExtraFields(extraNames);
+    // categories
+    List<CompanyCustomerCategory> categories = companyCustomerCategoryRepository.findByCompanyId(companyId);
+    List<String> categoryNames = new ArrayList<>();
+    if (categories != null) {
+      for (CompanyCustomerCategory c : categories) categoryNames.add(c.getName());
+    }
+    dto.setCategories(categoryNames);
+    return dto;
+  }
+
+  @Override
+  public byte[] generateCompanyCustomerTemplateXlsx(Long companyId) throws IOException {
+    // Determine default state/country using CompanyInformation if available
+    String defaultCountry = "United States of America";
+    String defaultState = "Alabama";
+    try {
+      Optional<com.quantumai.customer.entity.CompanyInformation> ciOpt = companyInformationRepository.findById(companyId);
+      if (ciOpt.isPresent()) {
+        com.quantumai.customer.entity.CompanyInformation ci = ciOpt.get();
+        if (ci.getCountry() != null && !ci.getCountry().isBlank()) defaultCountry = ci.getCountry();
+        if (ci.getState() != null && !ci.getState().isBlank()) defaultState = ci.getState();
+      }
+    } catch (Exception ex) {
+      // fallback to defaults
+      log.debug("CompanyInformation lookup failed for companyId {}: {}", companyId, ex.getMessage());
+    }
+    List<CompanyCustomerExtraFieldName> extraFieldNames = extraFieldNameRepository.findByCompanyId(companyId);
+    List<CompanyCustomerCategory> categories = companyCustomerCategoryRepository.findByCompanyId(companyId);
+    Workbook workbook = new XSSFWorkbook();
+    Sheet sheet = workbook.createSheet("CustomerTemplate");
+    Row header = sheet.createRow(0);
+    int col = 0;
+    // Removed 'Apartment' column as requested
+    String[] standardFields = new String[]{"Name","Email","Phone","Address","City","State","Country","ZipCode","Category","Status"};
+    for (String h : standardFields) header.createCell(col++).setCellValue(h);
+    if (extraFieldNames != null) {
+      for (CompanyCustomerExtraFieldName ef : extraFieldNames) header.createCell(col++).setCellValue(ef.getName());
     }
 
+    // Add mock/sample rows (3 rows)
+    int sampleRows = 3;
+    for (int r = 1; r <= sampleRows; r++) {
+      Row row = sheet.createRow(r);
+      int c = 0;
+      for (String field : standardFields) {
+        switch (field.toLowerCase()) {
+          case "name":
+            row.createCell(c++).setCellValue("Sample Customer " + r);
+            break;
+          case "email":
+            row.createCell(c++).setCellValue("sample" + r + "@example.com");
+            break;
+          case "phone":
+            row.createCell(c++).setCellValue("+1-555-010" + (10 + r));
+            break;
+          case "address":
+            // Address sample without Apartment column
+            row.createCell(c++).setCellValue("123 Sample St");
+            break;
+          case "city":
+            row.createCell(c++).setCellValue("Sample City");
+            break;
+          case "state":
+            row.createCell(c++).setCellValue(defaultState);
+            break;
+          case "country":
+            row.createCell(c++).setCellValue(defaultCountry);
+            break;
+          case "zipcode":
+            row.createCell(c++).setCellValue("1000" + r);
+            break;
+          case "category":
+            if (categories != null && !categories.isEmpty()) {
+              row.createCell(c++).setCellValue(categories.get((r - 1) % categories.size()).getName());
+            } else {
+              row.createCell(c++).setCellValue("DefaultCategory");
+            }
+            break;
+          case "status":
+            row.createCell(c++).setCellValue(r % 2 == 0 ? "inactive" : "active");
+            break;
+          default:
+            row.createCell(c++).setCellValue("");
+        }
+      }
+
+      // Extra fields
+      if (extraFieldNames != null) {
+        for (CompanyCustomerExtraFieldName ef : extraFieldNames) {
+          String type = ef.getType() == null ? "string" : ef.getType().toLowerCase();
+          String cellVal = "";
+          try {
+            if (type.contains("number") || type.equals("int") || type.equals("integer") || type.equals("double") || type.equals("float")) {
+              // numeric sample
+              Cell cell = row.createCell(c++);
+              cell.setCellValue(r * 10);
+              continue;
+            } else if (type.contains("date")) {
+              cellVal = java.time.LocalDate.now().minusDays(r).toString();
+            } else if (type.contains("email")) {
+              cellVal = "sample" + r + "@example.com";
+            } else if (type.contains("bool") || type.contains("checkbox")) {
+              cellVal = (r % 2 == 0) ? "TRUE" : "FALSE";
+            } else {
+              cellVal = "SampleValue" + r;
+            }
+          } catch (Exception ex) {
+            cellVal = "SampleValue" + r;
+          }
+          row.createCell(c++).setCellValue(cellVal);
+        }
+      }
+    }
+
+    for (int i = 0; i < Math.min(col, 60); i++) sheet.autoSizeColumn(i);
+    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+    workbook.write(bos);
+    workbook.close();
+    return bos.toByteArray();
+  }
 
 //    @Override
 //    public Integer getCustomFieldCustomerCount(Long companyId, String id) {
 //        companyCustomerCategoryRepository.countByCompanyIdAndcompanyCustomerCategoryId(companyId,id);
 //        return 0;
 //    }
-}
+ }
