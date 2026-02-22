@@ -1036,7 +1036,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
     Row header = sheet.createRow(0);
     int col = 0;
     // Removed 'Apartment' column as requested
-    String[] standardFields = new String[]{"Name","Email","Phone","Address","City","State","Country","ZipCode","Category","Status"};
+    String[] standardFields = new String[]{"Name","Email","Phone","Address","City","State","Country","Zip Code","Category","Status"};
     for (String h : standardFields) header.createCell(col++).setCellValue(h);
     if (extraFieldNames != null) {
       for (CompanyCustomerExtraFieldName ef : extraFieldNames) header.createCell(col++).setCellValue(ef.getName());
@@ -1071,7 +1071,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
           case "country":
             row.createCell(c++).setCellValue(defaultCountry);
             break;
-          case "zipcode":
+          case "zip code":
             row.createCell(c++).setCellValue("1000" + r);
             break;
           case "category":
@@ -1122,6 +1122,111 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
     workbook.write(bos);
     workbook.close();
     return bos.toByteArray();
+  }
+
+  @Override
+  public byte[] generateCompanyCustomerTemplateCsv(Long companyId) throws IOException {
+    // Reuse logic used for XLSX template generation: get extra fields, categories and defaults
+    List<CompanyCustomerExtraFieldName> extraFieldNames = extraFieldNameRepository.findByCompanyId(companyId);
+    List<CompanyCustomerCategory> categories = companyCustomerCategoryRepository.findByCompanyId(companyId);
+
+    // Determine default state/country using CompanyInformation if available
+    String defaultCountry = "United States of America";
+    String defaultState = "Alabama";
+    try {
+      Optional<com.quantumai.customer.entity.CompanyInformation> ciOpt = companyInformationRepository.findById(companyId);
+      if (ciOpt.isPresent()) {
+        com.quantumai.customer.entity.CompanyInformation ci = ciOpt.get();
+        if (ci.getCountry() != null && !ci.getCountry().isBlank()) defaultCountry = ci.getCountry();
+        if (ci.getState() != null && !ci.getState().isBlank()) defaultState = ci.getState();
+      }
+    } catch (Exception ex) {
+      log.debug("CompanyInformation lookup failed for companyId {}: {}", companyId, ex.getMessage());
+    }
+
+    // Build header list (Apartment removed)
+    List<String> headers = new ArrayList<>(Arrays.asList("Name","Email","Phone","Address","City","State","Country","ZipCode","Category","Status"));
+    if (extraFieldNames != null) {
+      for (CompanyCustomerExtraFieldName ef : extraFieldNames) headers.add(ef.getName());
+    }
+
+    StringBuilder sb = new StringBuilder();
+    // Header row
+    for (int i = 0; i < headers.size(); i++) {
+      if (i > 0) sb.append(",");
+      sb.append('"').append(headers.get(i).replace("\"", "\"\"")).append('"');
+    }
+    sb.append('\n');
+
+    // Add sample/mock rows (3)
+    int sampleRows = 3;
+    for (int r = 1; r <= sampleRows; r++) {
+      List<String> row = new ArrayList<>();
+      for (String field : Arrays.asList("Name","Email","Phone","Address","City","State","Country","ZipCode","Category","Status")) {
+        switch (field.toLowerCase()) {
+          case "name":
+            row.add("Sample Customer " + r);
+            break;
+          case "email":
+            row.add("sample" + r + "@example.com");
+            break;
+          case "phone":
+            row.add("+1-555-010" + (10 + r));
+            break;
+          case "address":
+            row.add("123 Sample St");
+            break;
+          case "city":
+            row.add("Sample City");
+            break;
+          case "state":
+            row.add(defaultState);
+            break;
+          case "country":
+            row.add(defaultCountry);
+            break;
+          case "zipcode":
+            row.add("1000" + r);
+            break;
+          case "category":
+            if (categories != null && !categories.isEmpty()) row.add(categories.get((r - 1) % categories.size()).getName());
+            else row.add("DefaultCategory");
+            break;
+          case "status":
+            row.add(r % 2 == 0 ? "inactive" : "active");
+            break;
+          default:
+            row.add("");
+        }
+      }
+
+      // extra fields
+      if (extraFieldNames != null) {
+        for (CompanyCustomerExtraFieldName ef : extraFieldNames) {
+          String type = ef.getType() == null ? "string" : ef.getType().toLowerCase();
+          if (type.contains("number") || type.equals("int") || type.equals("integer") || type.equals("double") || type.equals("float")) {
+            row.add(String.valueOf(r * 10));
+          } else if (type.contains("date")) {
+            row.add(java.time.LocalDate.now().minusDays(r).toString());
+          } else if (type.contains("email")) {
+            row.add("sample" + r + "@example.com");
+          } else if (type.contains("bool") || type.contains("checkbox")) {
+            row.add((r % 2 == 0) ? "TRUE" : "FALSE");
+          } else {
+            row.add("SampleValue" + r);
+          }
+        }
+      }
+
+      // Append CSV-escaped row
+      for (int i = 0; i < row.size(); i++) {
+        if (i > 0) sb.append(',');
+        sb.append('"').append(row.get(i).replace("\"", "\"\"")).append('"');
+      }
+      sb.append('\n');
+    }
+
+    return sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
   }
 
 //    @Override

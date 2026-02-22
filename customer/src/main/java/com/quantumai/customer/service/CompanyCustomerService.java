@@ -102,5 +102,7 @@ public interface CompanyCustomerService {
 
   public byte[] generateCompanyCustomerTemplateXlsx(Long companyId) throws IOException;
 
+  public byte[] generateCompanyCustomerTemplateCsv(Long companyId) throws IOException;
+
 //  public Integer getCustomFieldCustomerCount(Long companyId, String id);
 }

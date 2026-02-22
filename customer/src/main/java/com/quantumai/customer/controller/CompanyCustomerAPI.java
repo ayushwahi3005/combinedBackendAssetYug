@@ -19,6 +19,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import java.io.*;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -409,10 +410,11 @@ public class CompanyCustomerAPI {
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
   public ResponseEntity<byte[]> downloadTemplate(@PathVariable Long companyId) {
     try {
-      byte[] data = companyCustomerService.generateCompanyCustomerTemplateXlsx(companyId);
+      // Generate CSV template
+      byte[] data = companyCustomerService.generateCompanyCustomerTemplateCsv(companyId);
       return ResponseEntity.ok()
-              .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-              .header("Content-Disposition", "attachment; filename=CompanyCustomerTemplate.xlsx")
+              .contentType(MediaType.parseMediaType("text/csv"))
+              .header("Content-Disposition", "attachment; filename=CompanyCustomerTemplate.csv")
               .body(data);
     } catch (IOException e) {
       log.error("Error generating template", e);
@@ -728,23 +730,51 @@ public class CompanyCustomerAPI {
                 }
                 break;
 
-              case "zipcode":
-                System.out.println("zipCode//->" + row[j]);
-                if(mandatoryFieldsMap.containsKey("zipcode")){
-                  if(row[j].trim().isEmpty()){
-                    errorDesc.append("ERROR WITH ZIPCODE MANDATORY WHILE ADDING IN CUSTOMER");
-                    errorFlag = 1;
-                    errorCellMap.put(j + 1, true);
-                    break;
+              case "zip code":
+                System.out.println("zipCode//->" + row[j]+" "+row[j].trim().length());
+                String rawZip = row[j].trim();
+
+// Convert scientific notation to plain number string if needed
+                String zipValue;
+                try {
+                  if (rawZip.contains("E") || rawZip.contains("e")) {
+                    BigDecimal bd = new BigDecimal(rawZip);
+                    zipValue = bd.toPlainString();
+                    // Remove decimal part if it's a whole number (e.g., 12345.0 → 12345)
+                    if (zipValue.contains(".")) {
+                      zipValue = zipValue.replaceAll("\\.0+$", "");
+                    }
+                  } else {
+                    zipValue = rawZip;
                   }
+                } catch (NumberFormatException ex) {
+                  zipValue = rawZip;
                 }
-                else{
-                  try {
-                    companyCustomerDTO.setZipCode(row[j]);
-                  } catch (NumberFormatException e) {
-                    errorDesc.append("ERROR IN ZIPCODE FORMAT");
-                    errorFlag = 1;
-                    errorCellMap.put(j + 1, true);
+
+                System.out.println("zipCode//-> " + zipValue + " " + zipValue.length());
+
+                if (zipValue.length() < 3 || zipValue.length() > 15) {
+                  log.info("ERROR IN ZIPCODE FORMAT {}", zipValue);
+                  errorDesc.append("ERROR IN ZIPCODE FORMAT");
+                  errorFlag = 1;
+                  errorCellMap.put(j + 1, true);
+                }
+                else {
+                  if (mandatoryFieldsMap.containsKey("zipcode")) {
+                    if (row[j].trim().isEmpty()) {
+                      errorDesc.append("ERROR WITH ZIPCODE MANDATORY WHILE ADDING IN CUSTOMER");
+                      errorFlag = 1;
+                      errorCellMap.put(j + 1, true);
+                      break;
+                    }
+                  } else {
+                    try {
+                      companyCustomerDTO.setZipCode(row[j]);
+                    } catch (NumberFormatException e) {
+                      errorDesc.append("ERROR IN ZIPCODE FORMAT");
+                      errorFlag = 1;
+                      errorCellMap.put(j + 1, true);
+                    }
                   }
                 }
 
