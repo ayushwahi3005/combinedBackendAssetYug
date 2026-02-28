@@ -132,7 +132,11 @@ public interface AssetsService {
 
   public List<AssetCategoryInspectionInstance> getAllAssetCategoryInspectionValues(Long companyId);
 
+  public PaginatedResultDTO<AssetCategoryInspectionInstance> getAllAssetCategoryInspectionValuesPaginated(Long companyId, int pageNumber, int pageSize);
+
   public List<AssetCategoryInspectionInstance> getAllAssetCategoryInspectionInstanceByAsset(String assetId);
+
+  public PaginatedResultDTO<AssetCategoryInspectionInstance> getAllAssetCategoryInspectionInstanceByAssetPaginated(String assetId, int pageNumber, int pageSize);
 
   public AssetExtraFieldName updateExtraFieldName(ExtraFieldNameUpdateDTO extraFieldNameUpdateDTO);
 

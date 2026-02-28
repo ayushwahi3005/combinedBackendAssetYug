@@ -28,6 +28,10 @@ import java.util.stream.Collectors;
 import org.apache.poi.ss.usermodel.Cell;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -1551,10 +1555,25 @@ public class AssetsServiceImpl implements AssetsService {
     return assetCategoryInspectionInstanceRepository.findByCompanyId(companyId);
   }
 
+  @Override
+  public PaginatedResultDTO<AssetCategoryInspectionInstance> getAllAssetCategoryInspectionValuesPaginated(Long companyId, int pageNumber, int pageSize) {
+    Pageable pageable = PageRequest.of(pageNumber, pageSize, Sort.by(Sort.Direction.DESC, "updatedAt"));
+    Page<AssetCategoryInspectionInstance> page = assetCategoryInspectionInstanceRepository.findByCompanyId(companyId, pageable);
+    return new PaginatedResultDTO<>(page.getContent(), page.getTotalElements());
+  }
+
     @Override
     public List<AssetCategoryInspectionInstance> getAllAssetCategoryInspectionInstanceByAsset(String assetId) {
         return assetCategoryInspectionInstanceRepository.findByAssetId(assetId);
     }
+
+  @Override
+  public PaginatedResultDTO<AssetCategoryInspectionInstance> getAllAssetCategoryInspectionInstanceByAssetPaginated(String assetId, int pageNumber, int pageSize) {
+    Pageable pageable = PageRequest.of(pageNumber, pageSize, Sort.by(Sort.Direction.DESC, "updatedAt"));
+    Page<AssetCategoryInspectionInstance> page = assetCategoryInspectionInstanceRepository.findByAssetId(assetId, pageable);
+    log.info("Total Instances for Asset {} : {}",assetId,page.getTotalElements());
+    return new PaginatedResultDTO<>(page.getContent(), page.getTotalElements());
+  }
   public void updateNameForAssetExtraFields(String oldName,  String newName,Long companyId) {
     Query query = new Query();
     query.addCriteria(

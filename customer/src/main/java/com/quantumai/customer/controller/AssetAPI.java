@@ -271,10 +271,33 @@ public class AssetAPI {
     return assetsService.getAllAssetCategoryInspectionValues(companyId);
   }
 
+  @GetMapping(value = "/getAllAssetInspectionInstance/{companyId}/{pageNumber}/{pageSize}")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
+  public PaginatedResultDTO<AssetCategoryInspectionInstance> getAllAssetInspectionInstancePaginated(
+          @PathVariable Long companyId,
+          @PathVariable Integer pageNumber,
+          @PathVariable Integer pageSize) {
+    if (pageNumber == null) pageNumber = 0;
+    if (pageSize == null) pageSize = 10;
+    return assetsService.getAllAssetCategoryInspectionValuesPaginated(companyId, pageNumber, pageSize);
+  }
+
   @GetMapping(value = "/getAllAssetInspectionInstanceByAssetId/{assetId}")
   @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
   public List<AssetCategoryInspectionInstance> getAllAssetInspectionInstanceByAssetId(@PathVariable String assetId) {
     return assetsService.getAllAssetCategoryInspectionInstanceByAsset(assetId);
+  }
+
+  @GetMapping(value = "/getAllAssetInspectionInstanceByAssetId/{assetId}/{pageNumber}/{pageSize}")
+  @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
+  public PaginatedResultDTO<AssetCategoryInspectionInstance> getAllAssetInspectionInstanceByAssetIdPaginated(
+          @PathVariable String assetId,
+          @PathVariable Integer pageNumber,
+          @PathVariable Integer pageSize) {
+    if (pageNumber == null) pageNumber = 0;
+    if (pageSize == null) pageSize = 10;
+    log.info("Fetching paginated inspection instances for assetId: {}, pageNumber: {}, pageSize: {}", assetId, pageNumber, pageSize);
+    return assetsService.getAllAssetCategoryInspectionInstanceByAssetPaginated(assetId, pageNumber, pageSize);
   }
 
   @GetMapping(value = "/getAssetByCategory/{companyId}")
