@@ -5,7 +5,11 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.Optional;
 
-public interface LocationIdGeneratorRepository extends MongoRepository<LocationIdGenerator,String> {
+public interface LocationIdGeneratorRepository extends MongoRepository<LocationIdGenerator,String>, CompanyScopedRepository {
 
     Optional<LocationIdGenerator> findByCompanyId(Long companyId);
+
+    boolean existsByCompanyId(Long companyId);
+
+    void deleteByCompanyId(Long companyId);
 }

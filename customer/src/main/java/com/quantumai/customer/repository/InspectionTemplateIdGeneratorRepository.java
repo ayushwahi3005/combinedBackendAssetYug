@@ -5,7 +5,11 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.Optional;
 
-public interface InspectionTemplateIdGeneratorRepository extends MongoRepository<InspectionTemplateIdGenerator,String> {
+public interface InspectionTemplateIdGeneratorRepository extends MongoRepository<InspectionTemplateIdGenerator,String>, CompanyScopedRepository {
 
     Optional<InspectionTemplateIdGenerator> findByCompanyId(Long companyId);
+
+    boolean existsByCompanyId(Long companyId);
+
+    void deleteByCompanyId(Long companyId);
 }

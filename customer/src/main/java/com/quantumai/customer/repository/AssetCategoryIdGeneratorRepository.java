@@ -8,5 +8,9 @@ import java.util.Optional;
 public interface AssetCategoryIdGeneratorRepository extends MongoRepository<AssetCategoryIdGenerator,String> , CompanyScopedRepository{
     Optional<AssetCategoryIdGenerator>  findByCompanyId(Long companyId);
 
-    public void deleteByCompanyId(Long companyId);
+    boolean existsByCompanyId(Long companyId);
+
+    void deleteByCompanyId(Long companyId);
 }
+
+

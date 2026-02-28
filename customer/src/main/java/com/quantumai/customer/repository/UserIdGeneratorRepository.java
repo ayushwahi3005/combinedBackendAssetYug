@@ -5,7 +5,11 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.Optional;
 
-public interface UserIdGeneratorRepository extends MongoRepository<UserIdGenerator, String> {
+public interface UserIdGeneratorRepository extends MongoRepository<UserIdGenerator, String>, CompanyScopedRepository {
 
     Optional<UserIdGenerator> findByCompanyId(Long companyId);
+
+    boolean existsByCompanyId(Long companyId);
+
+    void deleteByCompanyId(Long companyId);
 }
