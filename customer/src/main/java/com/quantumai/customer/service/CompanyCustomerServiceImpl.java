@@ -74,6 +74,9 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   private CompanyCustomerCategoryIdGeneratorRepository companyCustomerCategoryIdGeneratorRepository;
 
   @Autowired
+  private CompanyCustomerExtraFieldIdGeneratorRepository companyCustomerExtraFieldIdGeneratorRepository;
+
+  @Autowired
   private com.quantumai.customer.repository.CompanyInformationRepository companyInformationRepository;
 
     @Autowired
@@ -456,18 +459,67 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
     return fieldNameValueMap;
   }
 
+  private static final Object companyCustomerIdGeneratorLock = new Object();
+
   @Override
-  public void addExtraFields(CompanyCustomerExtraFieldsDTO extraFieldsDTO) {
-    // TODO Auto-generated method stub
+  public void addExtraFields(CompanyCustomerExtraFieldsDTO extraFieldsDTO) throws Exception {
     extraFieldsDTO.setName(extraFieldsDTO.getName());
 
-    // List<CompanyCustomerExtraFields>
-    // extraFieldsList=extraFieldsRepository.findByName(extraFieldsDTO.getName().toLowerCase());
-    // if(!extraFieldsList.isEmpty()) {
-    // throw new Exception("Extra Field Already Present");
-    // }
+    log.info("Adding extra field with name: "+extraFieldsDTO.getName()+" for companyId: "+extraFieldsDTO.getCompanyId());
+
+    // Validate companyId is not null
+    if (extraFieldsDTO.getCompanyId() == null) {
+      throw new Exception("CompanyId cannot be null");
+    }
+
+    // Get and increment sequence atomically (inside synchronized block)
+    long companyCustomerExtraFieldId = getAndIncrementCompanyCustomerSequence(extraFieldsDTO.getCompanyId());
+    extraFieldsDTO.setCompanyCustomerExtraFieldId(companyCustomerExtraFieldId);
+    log.info("Assigned companyCustomerExtraFieldId: "+companyCustomerExtraFieldId+" for companyId: "+extraFieldsDTO.getCompanyId());
+
     CompanyCustomerExtraFields extraFields = modelMapper.map(extraFieldsDTO, CompanyCustomerExtraFields.class);
     extraFieldsRepository.save(extraFields);
+  }
+
+  /**
+   * Atomically gets current sequence and increments it for the company
+   * Ensures no two calls get the same ID - entire operation is in synchronized block
+   */
+  private long getAndIncrementCompanyCustomerSequence(Long companyId) throws Exception {
+    synchronized (companyCustomerIdGeneratorLock) {
+      // Initialize if needed
+      if (!companyCustomerExtraFieldIdGeneratorRepository.existsByCompanyId(companyId)) {
+        try {
+          log.info("Creating new companyCustomer extra field id generator for companyId: " + companyId);
+          com.quantumai.customer.entity.IdGenerator.CompanyCustomerExtraFieldIdGenerator idGenerator =
+              new com.quantumai.customer.entity.IdGenerator.CompanyCustomerExtraFieldIdGenerator();
+          idGenerator.setCompanyId(companyId);
+          idGenerator.setSeq(1L);
+          companyCustomerExtraFieldIdGeneratorRepository.save(idGenerator);
+          log.info("Successfully created companyCustomer extra field id generator for companyId: " + companyId);
+        } catch (Exception e) {
+          log.debug("ID generator creation failed (likely concurrent creation), verifying existence: ", e);
+          if (!companyCustomerExtraFieldIdGeneratorRepository.existsByCompanyId(companyId)) {
+            log.error("Failed to create or find ID generator for companyId: " + companyId, e);
+            throw new RuntimeException("Failed to initialize ID generator for companyId: " + companyId, e);
+          }
+          log.info("ID generator exists after concurrent attempt for companyId: " + companyId);
+        }
+      }
+
+      // Fetch, get current seq, and increment - ALL INSIDE SYNCHRONIZED BLOCK
+      com.quantumai.customer.entity.IdGenerator.CompanyCustomerExtraFieldIdGenerator idGenerator =
+          companyCustomerExtraFieldIdGeneratorRepository.findByCompanyId(companyId)
+              .orElseThrow(() -> new RuntimeException("ID Generator not found for companyId: " + companyId));
+
+      long currentSeq = idGenerator.getSeq();
+      long nextSeq = currentSeq + 1;
+      idGenerator.setSeq(nextSeq);
+      companyCustomerExtraFieldIdGeneratorRepository.save(idGenerator);
+
+      log.debug("Sequence incremented from "+currentSeq+" to "+nextSeq+" for companyId: "+companyId);
+      return currentSeq;
+    }
   }
 
   @Override

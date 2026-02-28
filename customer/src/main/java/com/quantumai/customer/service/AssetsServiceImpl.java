@@ -6,10 +6,8 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
-import com.quantumai.customer.entity.IdGenerator.AssetCategoryIdGenerator;
+import com.quantumai.customer.entity.IdGenerator.*;
 import com.quantumai.customer.entity.IdGenerator.AssetIdTable;
-import com.quantumai.customer.entity.IdGenerator.InspectionInstanceIdGenerator;
-import com.quantumai.customer.entity.IdGenerator.InspectionTemplateIdGenerator;
 import com.quantumai.customer.exception.AssetExtraFieldDeletionException;
 import com.quantumai.customer.exception.CategoryException;
 import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
@@ -90,7 +88,10 @@ public class AssetsServiceImpl implements AssetsService {
   @Autowired InspectionInstanceIdGeneratorRepository inspectionInstanceIdGeneratorRepository;
 
   @Autowired
-    InspectionTemplateIdGeneratorRepository inspectionTemplateIdGeneratorRepository;
+  private  InspectionTemplateIdGeneratorRepository inspectionTemplateIdGeneratorRepository;
+
+  @Autowired
+  private AssetCustomFieldIdGeneratorRepository assetCustomFieldIdGeneratorRepository;
 
   private static final String SEQ_ID = "asset_category_sequence";
   LocalDateTime localDateTime;
@@ -222,18 +223,88 @@ public class AssetsServiceImpl implements AssetsService {
     return assetDTO;
   }
 
+  private static final Object idGeneratorLock = new Object();
+
   @Override
   public void addExtraFields(AssetExtraFieldsDTO extraFieldsDTO) throws Exception {
-    // TODO Auto-generated method stub
     extraFieldsDTO.setName(extraFieldsDTO.getName());
 
-    //		List<AssetExtraFields>
-    // extraFieldsList=extraFieldsRepository.findByName(extraFieldsDTO.getName().toLowerCase());
-    //		if(!extraFieldsList.isEmpty()) {
-    //			throw new Exception("Extra Field Already Present");
-    //		}
+    log.info("Adding extra field with name: "+extraFieldsDTO.getName()+" for companyId: "+extraFieldsDTO.getCompanyId());
+
+    // Get and increment sequence atomically (inside synchronized block)
+    long assetExtraFieldId = getAndIncrementSequence(extraFieldsDTO.getCompanyId());
+    extraFieldsDTO.setAssetExtraFieldId(assetExtraFieldId);
+    log.info("Assigned assetExtraFieldId: "+assetExtraFieldId+" for companyId: "+extraFieldsDTO.getCompanyId());
+
     AssetExtraFields extraFields = modelMapper.map(extraFieldsDTO, AssetExtraFields.class);
     extraFieldsRepository.save(extraFields);
+  }
+
+  /**
+   * Atomically gets current sequence and increments it for the company
+   * Ensures no two calls get the same ID - entire operation is in synchronized block
+   */
+  private long getAndIncrementSequence(Long companyId) throws Exception {
+    synchronized (idGeneratorLock) {
+      // Initialize if needed
+      if (!assetCustomFieldIdGeneratorRepository.existsByCompanyId(companyId)) {
+        try {
+          log.info("Creating new id generator for companyId: " + companyId);
+          AssetCustomFieldIdGenerator idGenerator = new AssetCustomFieldIdGenerator();
+          idGenerator.setCompanyId(companyId);
+          idGenerator.setSeq(1L);
+          assetCustomFieldIdGeneratorRepository.save(idGenerator);
+          log.info("Successfully created id generator for companyId: " + companyId);
+        } catch (Exception e) {
+          log.debug("ID generator creation failed (likely concurrent creation), verifying existence: ", e);
+          if (!assetCustomFieldIdGeneratorRepository.existsByCompanyId(companyId)) {
+            log.error("Failed to create or find ID generator for companyId: " + companyId, e);
+            throw new RuntimeException("Failed to initialize ID generator for companyId: " + companyId, e);
+          }
+          log.info("ID generator exists after concurrent attempt for companyId: " + companyId);
+        }
+      }
+
+      // Fetch, get current seq, and increment - ALL INSIDE SYNCHRONIZED BLOCK
+      AssetCustomFieldIdGenerator idGenerator = assetCustomFieldIdGeneratorRepository.findByCompanyId(companyId)
+          .orElseThrow(() -> new Exception("ID Generator not found for companyId: " + companyId));
+
+      long currentSeq = idGenerator.getSeq();
+      long nextSeq = currentSeq + 1;
+      idGenerator.setSeq(nextSeq);
+      assetCustomFieldIdGeneratorRepository.save(idGenerator);
+
+      log.debug("Sequence incremented from "+currentSeq+" to "+nextSeq+" for companyId: "+companyId);
+      return currentSeq;
+    }
+  }
+
+  /**
+   * Thread-safe initialization of ID generator per company
+   * Uses synchronized block to ensure only one thread creates the generator
+   */
+  private void initializeIdGeneratorIfNeeded(Long companyId) {
+    synchronized (idGeneratorLock) {
+      // Double-check pattern: check again inside synchronized block
+      if (!assetCustomFieldIdGeneratorRepository.existsByCompanyId(companyId)) {
+        try {
+          log.info("Creating new id generator for companyId: " + companyId);
+          AssetCustomFieldIdGenerator idGenerator = new AssetCustomFieldIdGenerator();
+          idGenerator.setCompanyId(companyId);
+          idGenerator.setSeq(1L);
+          assetCustomFieldIdGeneratorRepository.save(idGenerator);
+          log.info("Successfully created id generator for companyId: " + companyId);
+        } catch (Exception e) {
+          // Handle case where another thread created it while we were in the synchronized block
+          log.debug("ID generator creation failed (likely concurrent creation), verifying existence: ", e);
+          if (!assetCustomFieldIdGeneratorRepository.existsByCompanyId(companyId)) {
+            log.error("Failed to create or find ID generator for companyId: " + companyId, e);
+            throw new RuntimeException("Failed to initialize ID generator for companyId: " + companyId, e);
+          }
+          log.info("ID generator exists after concurrent attempt for companyId: " + companyId);
+        }
+      }
+    }
   }
 
   @Override

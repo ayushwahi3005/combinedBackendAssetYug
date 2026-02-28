@@ -51,7 +51,7 @@ public interface CompanyCustomerService {
 
   public Map<String, Map<String, String>> getextraFieldList(Long companyId);
 
-  public void addExtraFields(CompanyCustomerExtraFieldsDTO extraFieldsDTO);
+  public void addExtraFields(CompanyCustomerExtraFieldsDTO extraFieldsDTO) throws Exception;
 
   public List<CompanyCustomerExtraFieldsDTO> getExtraFields(String id);
 
