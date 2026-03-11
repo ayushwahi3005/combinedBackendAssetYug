@@ -27,6 +27,8 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.DataFormat;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -1094,6 +1096,11 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
       for (CompanyCustomerExtraFieldName ef : extraFieldNames) header.createCell(col++).setCellValue(ef.getName());
     }
 
+    // Create a text (string) cell style to prevent Excel from converting phone/zip to numbers
+    CellStyle textCellStyle = workbook.createCellStyle();
+    DataFormat dataFormat = workbook.createDataFormat();
+    textCellStyle.setDataFormat(dataFormat.getFormat("@"));
+
     // Add mock/sample rows (3 rows)
     int sampleRows = 3;
     for (int r = 1; r <= sampleRows; r++) {
@@ -1107,9 +1114,13 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
           case "email":
             row.createCell(c++).setCellValue("sample" + r + "@example.com");
             break;
-          case "phone":
-            row.createCell(c++).setCellValue("+1-555-010" + (10 + r));
+          case "phone": {
+            Cell phoneCell = row.createCell(c++);
+            phoneCell.setCellStyle(textCellStyle);
+            phoneCell.setCellType(org.apache.poi.ss.usermodel.CellType.STRING);
+            phoneCell.setCellValue("555-010-100" + r);
             break;
+          }
           case "address":
             // Address sample without Apartment column
             row.createCell(c++).setCellValue("123 Sample St");
@@ -1223,7 +1234,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
             row.add("sample" + r + "@example.com");
             break;
           case "phone":
-            row.add("+1-555-010" + (10 + r));
+            row.add("555-010-100" + r);
             break;
           case "address":
             row.add("123 Sample St");
