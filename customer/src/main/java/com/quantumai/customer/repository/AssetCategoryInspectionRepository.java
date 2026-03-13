@@ -12,7 +12,7 @@ public interface AssetCategoryInspectionRepository
 
   public Optional<AssetCategoryInspection> findByName(String name);
 
-  public Optional<AssetCategoryInspection> findByCategoryId(String categoryId);
+//  public Optional<AssetCategoryInspection> findByCategoryId(String categoryId);
 
   public List<AssetCategoryInspection> findByCompanyId(Long companyId);
 

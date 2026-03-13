@@ -1471,6 +1471,7 @@ public class AssetsServiceImpl implements AssetsService {
 
   @Override
   public void addAssetInspection(AssetCategoryInspection assetCategoryInspection) {
+
       inspectionTemplateIdGeneratorRepository.findByCompanyId(assetCategoryInspection.getCompanyId()).ifPresentOrElse((data)->{
         Long seqId=data.getSeq();
         data.setSeq(seqId+1);
@@ -1499,12 +1500,40 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
-  public List<AssetCategoryInspection> getAllAssetInspectionByCategory(Long companyId,String category) {
-      System.out.println("===================>>>"+category);
-      if(category.trim().isEmpty()){
-          return null;
+  public List<AssetCategoryInspection> getAllAssetInspectionByCategory(Long companyId, String category) {
+      System.out.println("===================>>>" + category);
+      if (category.trim().isEmpty()) {
+          return new ArrayList<>();
       }
-    return assetCategoryInspectionRepository.findByCompanyIdAndCategoryNameIgnoreCase(companyId,category);
+
+      return assetCategoryInspectionRepository.findByCompanyId(companyId)
+          .stream()
+          .filter(data -> {
+              System.out.println("Category Name : " + data.getCategoryName());
+              if (data.getCategoryName() == null || data.getCategoryName().isEmpty()) {
+                  return false;
+              }
+              // Check if any category in the list matches the provided category (case-insensitive)
+              return data.getCategoryName().stream()
+                  .filter(Objects::nonNull)
+                  .anyMatch(categoryObj -> {
+                      try {
+                          // Handle the case where categoryObj is a Map (like {id: 1, categoryName: 'abc'})
+                          if (categoryObj instanceof Map) {
+                              Map<?, ?> categoryMap = (Map<?, ?>) categoryObj;
+                              Object categoryNameValue = categoryMap.get("categoryName");
+                              return categoryNameValue != null &&
+                                     categoryNameValue.toString().equalsIgnoreCase(category);
+                          }
+                          // Fallback to toString() for other object types
+                          return categoryObj.toString().equalsIgnoreCase(category);
+                      } catch (Exception e) {
+                          System.out.println("Error processing category object: " + e.getMessage());
+                          return false;
+                      }
+                  });
+          })
+          .collect(Collectors.toList());
   }
 
     @Override
