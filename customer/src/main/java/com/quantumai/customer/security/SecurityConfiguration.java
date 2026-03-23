@@ -60,6 +60,7 @@ public class SecurityConfiguration {
                     "/assetyug-notifications/**",
                      "/invitation/**",
                      "/subscription/subscription-valid/**",
+                    "/chatbot/capabilities",
                     "/topic/**",
                     "/stripe/*",
                     "/app/**")
@@ -76,7 +77,8 @@ public class SecurityConfiguration {
                     "/users/**",
                     "/companycustomer/**",
                     "/payment/**",
-                    "/subscription/**")
+                    "/subscription/**",
+                    "/chatbot/**")
             .authenticated()
 
             // Protected paths for admins
