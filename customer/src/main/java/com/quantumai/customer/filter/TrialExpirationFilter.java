@@ -5,6 +5,7 @@ import com.google.common.base.Optional;
 import com.quantumai.customer.entity.Customer;
 import com.quantumai.customer.entity.Subscription;
 import com.quantumai.customer.entity.SubscriptionEnum;
+import com.quantumai.customer.repository.BlacklistedEmailRepository;
 import com.quantumai.customer.repository.CustomerRepository;
 import com.quantumai.customer.repository.SubscriptionRepository;
 import com.quantumai.customer.security.JwtService;
@@ -38,6 +39,9 @@ public class TrialExpirationFilter extends OncePerRequestFilter {
     @Autowired
     CustomerRepository customerRepository;
 
+    @Autowired
+    BlacklistedEmailRepository blacklistedEmailRepository;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     // Endpoints that should be excluded from trial check
@@ -51,6 +55,8 @@ public class TrialExpirationFilter extends OncePerRequestFilter {
             "/assets/advancedFilter/optimized",
             "/payment",
             "/customer/working",
+            "/customer/trial-eligible",
+            "/customer/trial-status",
             "/notification");
 
     private boolean shouldSkipTrialCheck(String requestPath, String method) {
@@ -58,15 +64,23 @@ public class TrialExpirationFilter extends OncePerRequestFilter {
         if ("OPTIONS".equals(method)) {
             return true;
         }
+
+        // Skip ALL GET requests - read operations should always be available
         if ("GET".equalsIgnoreCase(method)) {
             return true;
         }
-        if ("POST".equalsIgnoreCase(method) && requestPath.startsWith("/assets/advanceFilter")) {
-            return true;
+
+        // Skip POST requests for payment and location APIs (country/state)
+        if ("POST".equalsIgnoreCase(method)) {
+            if (requestPath.startsWith("/payment") ||
+                requestPath.startsWith("/customer/countries") ||
+                requestPath.startsWith("/customer/states") ||
+                requestPath.startsWith("/assets/advanceFilter") ||
+                requestPath.startsWith("/companycustomer/advanceFilter/")) {
+                return true;
+            }
         }
-        if ("POST".equalsIgnoreCase(method) && requestPath.startsWith("/companycustomer/advanceFilter/")) {
-            return true;
-        }
+
         // Skip for excluded paths
         for (String excludedPath : excludedPaths) {
             if (requestPath.startsWith(excludedPath)) {
@@ -123,6 +137,24 @@ public class TrialExpirationFilter extends OncePerRequestFilter {
                             errorResponse.put("error", "TRIAL_EXPIRED");
                             errorResponse.put("message",
                                     "Your free trial/plan has expired. Please upgrade to continue using our services.");
+                            errorResponse.put("redirectTo", "/payment");
+                            errorResponse.put("trialExpired", true);
+
+                            response.getWriter().write(objectMapper.writeValueAsString(errorResponse));
+                            return;
+                        }
+
+                        // Check if user is blacklisted (returning user, no trial given) and has no subscription
+                        if (subscriptionOptional.isEmpty()
+                                && !trialService.isTrialActive(userEmail)
+                                && blacklistedEmailRepository.existsByEmail(userEmail)) {
+                            response.setStatus(HttpServletResponse.SC_PAYMENT_REQUIRED); // 402
+                            response.setContentType("application/json");
+
+                            Map<String, Object> errorResponse = new HashMap<>();
+                            errorResponse.put("error", "SUBSCRIPTION_REQUIRED");
+                            errorResponse.put("message",
+                                    "You have previously used a free trial. Please subscribe to a plan to use the application.");
                             errorResponse.put("redirectTo", "/payment");
                             errorResponse.put("trialExpired", true);
 

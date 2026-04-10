@@ -128,6 +128,13 @@ public class CompanyCustomerAPI {
     return companyCustomerService.getCompanyCustomerByLocalId(Integer.valueOf(id), companyId);
   }
 
+//  @GetMapping("/getCompanyCustomerByLocalId/{id}/{companyId}")
+//  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
+//  public CompanyCustomerDTO getCompanyCustomerByName(
+//          @PathVariable String name, @PathVariable Long companyId) {
+//    return companyCustomerService.getCompanyCustomerByName(name, companyId);
+//  }
+
   @PostMapping("/addCompanyCustomer")
   @PreAuthorize("@appSecurity.canCreate(authentication, #companyId, 'customers')")
   public CompanyCustomerDTO addNewFields(
@@ -500,7 +507,7 @@ public class CompanyCustomerAPI {
          BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
       totalCount = reader.lines().count() - 1;
       System.out.println("Total Count" + totalCount);
-      if (reader.lines().count() > MAX_IMPORT_ROWS + 1) {
+      if (totalCount > MAX_IMPORT_ROWS ) {
         throw new ImportFileRowException("Import File cannot import more than " + MAX_IMPORT_ROWS + " rows");
       }
 
@@ -899,7 +906,7 @@ public class CompanyCustomerAPI {
 
                   extraFieldsDTO.setCompanyId(companyId);
                   log.info("Mandatory Fields "+mandatoryFieldsMap.toString());
-                  log.info("Mandatory Fields Map Check for {}: {}", companyCustomerExtraFieldName.getName(), mandatoryFieldsMap.containsKey(companyCustomerExtraFieldName.getName().toLowerCase()));
+                  log.info("Mandatory Fields Map Check for {} : {}", companyCustomerExtraFieldName.getName(), mandatoryFieldsMap.containsKey(companyCustomerExtraFieldName.getName().toLowerCase()));
                   if(mandatoryFieldsMap.containsKey(companyCustomerExtraFieldName.getName().toLowerCase())){
                     if(value.trim().isEmpty()){
                       errorDesc.append("ERROR WITH ").append(companyCustomerExtraFieldName.getName().toUpperCase()).append(" MANDATORY WHILE ADDING IN CUSTOMER");
@@ -1074,6 +1081,7 @@ public class CompanyCustomerAPI {
       importHistoryDTO.setStatus("Failed");
       importHistoryDTO.setMessage(e.getMessage());
       e.printStackTrace();
+
     }
     customerService.addImportHistory(importHistoryDTO);
     log.info("Import History {}", importHistoryDTO);

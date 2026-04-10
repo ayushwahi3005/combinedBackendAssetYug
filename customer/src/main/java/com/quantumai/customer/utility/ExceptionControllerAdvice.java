@@ -1,14 +1,20 @@
 package com.quantumai.customer.utility;
 
 import com.quantumai.customer.exception.*;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
+
 @RestControllerAdvice
 public class ExceptionControllerAdvice {
+
+  @Value("${max_import_rows_count}")
+  private String max_import_rows_count;
+
   @ExceptionHandler(UserAlreadyPresentException.class)
   public ResponseEntity<ErrorInfo> UserAlreadyPresentException(
       UserAlreadyPresentException exception) {
@@ -216,6 +222,14 @@ public class ExceptionControllerAdvice {
   public ResponseEntity<ErrorInfo> BinAlreadyPresentException(BinAlreadyPresentException exception) {
     ErrorInfo errorInfo = new ErrorInfo();
     errorInfo.setErrorMessage("Bin Number Already Present in this Location");
+    errorInfo.setErrorCode(HttpStatus.BAD_REQUEST.value());
+    return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
+  }
+
+  @ExceptionHandler(ImportFileRowException.class)
+  public ResponseEntity<ErrorInfo> ImportFileRowException(ImportFileRowException exception) {
+    ErrorInfo errorInfo = new ErrorInfo();
+    errorInfo.setErrorMessage("Upload Limit Exceeded: The system only allows a maximum of 1,000 records per upload. Please modify your file and re-upload");
     errorInfo.setErrorCode(HttpStatus.BAD_REQUEST.value());
     return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
   }

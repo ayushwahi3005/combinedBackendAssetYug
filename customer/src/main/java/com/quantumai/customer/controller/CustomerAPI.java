@@ -411,4 +411,19 @@ public class CustomerAPI {
     response.put("status", "success");
     return ResponseEntity.ok(response);
   }
+
+  /**
+   * Check if a user is eligible for a free trial.
+   * The response contains "eligible" = true/false. If blacklisted, eligible is set to false.
+   */
+  @GetMapping(value = "/trial-eligible/{email}")
+  public ResponseEntity<Map<String, Object>> isTrialEligible(@PathVariable String email) {
+    Map<String, Object> response = new HashMap<>();
+    boolean eligible = trialService.isEligibleForTrial(email);
+    response.put("eligible", eligible);
+    if (!eligible) {
+      response.put("message", "You have previously used a free trial. Please subscribe to a plan to use the application.");
+    }
+    return ResponseEntity.ok(response);
+  }
 }

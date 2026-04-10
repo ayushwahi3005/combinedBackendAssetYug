@@ -104,6 +104,8 @@ public interface AssetsService {
 
   public List<AssetCategory> getCategoryList(Long companyId);
 
+
+
   public void deleteCategory(String id);
 
   public AssetCategory getCategoryListById(Long companyId, String id);
@@ -148,5 +150,7 @@ public interface AssetsService {
   public byte[] generateAssetTemplateXlsx(Long companyId) throws IOException;
 
   public AssetTemplateFieldsDTO getTemplateFields(Long companyId);
+
+  void updateAssetInspection(AssetCategoryInspection assetCategoryInspection);
 //  public List<Map<String,>> getAssetByCompanyCategory(Long companyId);
 }

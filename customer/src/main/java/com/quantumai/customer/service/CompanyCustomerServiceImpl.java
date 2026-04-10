@@ -1292,6 +1292,8 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
     return sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
   }
 
+
+
 //    @Override
 //    public Integer getCustomFieldCustomerCount(Long companyId, String id) {
 //        companyCustomerCategoryRepository.countByCompanyIdAndcompanyCustomerCategoryId(companyId,id);

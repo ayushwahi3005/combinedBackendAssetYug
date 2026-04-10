@@ -145,6 +145,7 @@ public class AssetsServiceImpl implements AssetsService {
 
     assets.setUpdatedAt(LocalDateTime.now().toString());
     AssetsDTO myAssetsDTO = modelMapper.map(assetsRepository.save(assets), AssetsDTO.class);
+    log.info("Asset Saved : {}", myAssetsDTO.toString());
     return myAssetsDTO;
   }
 
@@ -1901,6 +1902,22 @@ public class AssetsServiceImpl implements AssetsService {
     }
     dto.setExtraFields(extraNames);
     return dto;
+  }
+
+  @Override
+  public void updateAssetInspection(AssetCategoryInspection assetCategoryInspection) {
+    log.info("Updating AssetCategoryInspection: {}", assetCategoryInspection.toString());
+    // Check if the inspection template exists
+    assetCategoryInspectionRepository.findById(assetCategoryInspection.getId()).ifPresent((existingInspection) -> {
+      // Preserve the original ID and inspection ID
+      assetCategoryInspection.setAssetCategoryInspectionId(existingInspection.getAssetCategoryInspectionId());
+      log.info("Updated inspection with ID: {} and inspection ID: {}",
+              assetCategoryInspection.getId(),
+              assetCategoryInspection.getAssetCategoryInspectionId());
+    });
+    assetCategoryInspectionRepository.save(assetCategoryInspection);
+    log.info("AssetCategoryInspection updated successfully");
+
   }
 
 }

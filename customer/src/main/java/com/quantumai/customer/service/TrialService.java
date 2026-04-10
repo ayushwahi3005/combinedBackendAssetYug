@@ -3,6 +3,7 @@ package com.quantumai.customer.service;
 import com.quantumai.customer.entity.Customer;
 import com.quantumai.customer.entity.Notification;
 import com.quantumai.customer.entity.TrialStatus;
+import com.quantumai.customer.repository.BlacklistedEmailRepository;
 import com.quantumai.customer.repository.CustomerRepository;
 import com.quantumai.customer.repository.TrialStatusRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,12 +26,22 @@ public class TrialService {
     @Autowired
     private NotificationService notificationService;
 
+    @Autowired
+    private BlacklistedEmailRepository blacklistedEmailRepository;
+
     /**
-     * Initialize trial for a new customer
-     *
+     * Initialize trial for a new customer.
+     * If the email is blacklisted (previously had a trial and account was deleted),
+     * no trial is granted — user must subscribe to a plan.
      */
     int trial_period=7;
     public void initializeTrial(String customerEmail, Long companyId) {
+        // Check if user previously had a trial and was blacklisted
+        if (blacklistedEmailRepository.existsByEmail(customerEmail)) {
+            // Do not grant trial — user must subscribe
+            return;
+        }
+
         Optional<TrialStatus> existingTrial = trialStatusRepository.findByCustomerEmail(customerEmail);
         
         if (existingTrial.isEmpty()) {
@@ -204,5 +215,13 @@ public class TrialService {
     public TrialStatus getTrialDetails(Long companyId){
         Optional<TrialStatus> trialStatusOptional=trialStatusRepository.findByCompanyId(companyId);
         return trialStatusOptional.orElse(null);
+    }
+
+    /**
+     * Check if user is eligible for a free trial.
+     * Returns false if the email is blacklisted (previously had trial and account was deleted).
+     */
+    public boolean isEligibleForTrial(String email) {
+        return !blacklistedEmailRepository.existsByEmail(email);
     }
 }

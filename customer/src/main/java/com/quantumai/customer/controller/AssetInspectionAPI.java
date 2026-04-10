@@ -41,8 +41,9 @@ public class AssetInspectionAPI {
         @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
         public List<UserInspectionAnalyticsDTO> userInspectionAnalytics(
                 @PathVariable Long companyId,
-                LocalDate startDate,
-                LocalDate endDate) {
+                @RequestParam LocalDate startDate,
+                @RequestParam LocalDate endDate)  {
+//                Thread.sleep(3000);
                 return assetInspectionService.getUserInspectionAnalytics(companyId, startDate, endDate);
         }
 
@@ -50,8 +51,9 @@ public class AssetInspectionAPI {
         @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
         public Map<InspectionInstanceStatus, Long> statusDistribution(
                 @PathVariable Long companyId,
-                LocalDate startDate,
-                LocalDate endDate) {
+                @RequestParam LocalDate startDate,
+                @RequestParam LocalDate endDate)  {
+//                Thread.sleep(3000);
                 return assetInspectionService.getStatusDistribution(companyId, startDate, endDate);
         }
 
@@ -88,12 +90,21 @@ public class AssetInspectionAPI {
                 return assetInspectionService.getInspectionCompletionPerDay(companyId, startDate, endDate);
         }
 
-        @GetMapping("/inspection-export/{companyId}/{assetId}")
+        @GetMapping("/inspection-detailed-export/{companyId}/{assetId}")
         @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
         public ResponseEntity<byte[]> inspectionDetailedExport(
                 @PathVariable Long companyId,
                 @PathVariable String assetId) throws Exception {
                 return ResponseEntity.ok(assetInspectionService.exportInspectionExcel(companyId, assetId));
+        }
+
+
+        @GetMapping("/inspection-overview-export/{companyId}/{assetId}")
+        public ResponseEntity<byte[]> inspectionOverviewExport(@PathVariable Long companyId,@PathVariable String assetId) throws Exception {
+//                return assetInspectionService.getInspectionCompletionPerDay(companyId, startDate, endDate);
+                return ResponseEntity.ok(assetInspectionService.exportInspectionOverviewExcel(companyId,assetId));
+
+
         }
 
 }

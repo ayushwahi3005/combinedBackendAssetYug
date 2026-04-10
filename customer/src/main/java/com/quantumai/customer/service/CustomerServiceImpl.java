@@ -120,6 +120,8 @@ public class CustomerServiceImpl implements CustomerService {
 
   @Autowired private UserIdGeneratorRepository userIdGeneratorRepository;
 
+  @Autowired private BlacklistedEmailRepository blacklistedEmailRepository;
+
 
   @Override
   public BaseResponseDTO addCustomer(CustomerDTO customerDTO) throws Exception {
@@ -131,6 +133,10 @@ public class CustomerServiceImpl implements CustomerService {
     if (customerRepository.existsByEmail(customerDTO.getEmail())) {
       throw new UserAlreadyPresentException("User Already Present");
     }
+
+    // Check if email is blacklisted (previously had trial, account deleted)
+    boolean isBlacklisted = blacklistedEmailRepository.existsByEmail(customerDTO.getEmail());
+
     Customer customer = modelMapper.map(customerDTO, Customer.class);
     customer.setRole("ADMIN");
     customer.setPassword(passwordEncoder.encode(customerDTO.getPassword()));
@@ -160,12 +166,18 @@ public class CustomerServiceImpl implements CustomerService {
     });
     usersRepository.save(users);
     
-    // Initialize 15-day free trial for new customer
-    trialService.initializeTrial(savedCustomer.getEmail(), savedCustomer.getCompanyId());
-    
+    // Initialize free trial only if email is not blacklisted
+    if (!isBlacklisted) {
+      trialService.initializeTrial(savedCustomer.getEmail(), savedCustomer.getCompanyId());
+    }
+
     BaseResponseDTO baseResponseDTO = new BaseResponseDTO();
     baseResponseDTO.setSucess(true);
-    baseResponseDTO.setMessage("User Successfully Created with 15-day free trial");
+    if (isBlacklisted) {
+      baseResponseDTO.setMessage("Account created. You have previously used a free trial. Please subscribe to a plan to use the application.");
+    } else {
+      baseResponseDTO.setMessage("User Successfully Created with 7-day free trial");
+    }
 
     // Admin admin = new Admin();
     // admin.setEmail(customer.getEmail());

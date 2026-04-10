@@ -38,9 +38,16 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
     public List<UserInspectionAnalyticsDTO> getUserInspectionAnalytics(Long companyId, LocalDate startDate, LocalDate endDate) {
         List<AssetCategoryInspectionInstance> assetCategoryInspectionInstanceList =assetCategoryInspectionInstanceRepository.findByCompanyId(companyId);
         List<UserInspectionAnalyticsDTO> userInspectionAnalyticsDTOList = new ArrayList<>();
+        log.info("getUserInspectionAnalytics Start Date: {}, End Date: {}", startDate, endDate);
         Map<String, Long> countByActionPerformedBy =
                 assetCategoryInspectionInstanceList.stream()
                         .filter(data -> data.getStatus() == InspectionInstanceStatus.COMPLETED)
+                        .filter(data -> {
+                            LocalDateTime updatedAt = data.getUpdatedAt();
+                            return updatedAt != null &&
+                                    !updatedAt.toLocalDate().isBefore(startDate) &&
+                                    !updatedAt.toLocalDate().isAfter(endDate);
+                        })
                         .collect(Collectors.groupingBy(
                                 AssetCategoryInspectionInstance::getActionPerformedBy,
                                 Collectors.counting()
@@ -72,6 +79,12 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
 
         Map<InspectionInstanceStatus, Long> countByStatus =
                 assetCategoryInspectionInstanceList.stream()
+                        .filter(data -> {
+                            LocalDateTime updatedAt = data.getUpdatedAt();
+                            return updatedAt != null &&
+                                    !updatedAt.toLocalDate().isBefore(startDate) &&
+                                    !updatedAt.toLocalDate().isAfter(endDate);
+                        })
                         .collect(Collectors.groupingBy(
                                 AssetCategoryInspectionInstance::getStatus,
                                 Collectors.counting()
@@ -232,7 +245,7 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
             // ─────────────────────────────────────────
             String[] overviewHeaders = {
                     "Asset ID", "Asset Name", "Inspection ID", "Inspection Name",
-                    "Date Started", "Date Completed", "Inspector", "Geo Location", "Inspection Status"
+                    "Date Started", "Date Completed", "Inspector", "Geo Location", "Inspection Status", "Created By", "Modified By"
             };
 
             Sheet overviewSheet = workbook.createSheet("Overview");
@@ -247,7 +260,7 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
             String[] detailedHeaders = {
                     "Asset ID", "Asset Name", "Inspection ID", "Inspection Name",
                     "Date Started", "Date Completed", "Inspector",
-                    "Instruction Name", "Instruction Value", "Notes", "Geo Location", "Inspection Status"
+                    "Instruction Name", "Instruction Value", "Notes", "Geo Location", "Inspection Status", "Created By", "Modified By"
             };
 
             Sheet detailedSheet = workbook.createSheet("Detailed");
@@ -295,6 +308,8 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
                     overviewRow.createCell(6).setCellValue(inspection.getActionPerformedBy());
                     overviewRow.createCell(7).setCellValue("");
                     overviewRow.createCell(8).setCellValue(status);  // Inspection Status
+                    overviewRow.createCell(9).setCellValue(inspection.getCreatedBy());
+                    overviewRow.createCell(10).setCellValue(inspection.getActionPerformedBy());
 
                     // Detailed — one row per step
                     for (InspectionStepValues step : inspection.getStepValues()) {
@@ -311,6 +326,8 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
                         detailedRow.createCell(9).setCellValue(inspection.getNotes());
                         detailedRow.createCell(10).setCellValue("");
                         detailedRow.createCell(11).setCellValue(status);  // Inspection Status
+                        detailedRow.createCell(9).setCellValue(inspection.getCreatedBy());
+                        detailedRow.createCell(10).setCellValue(inspection.getActionPerformedBy());
                     }
 
                 } else {
@@ -325,6 +342,10 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
                     overviewRow.createCell(6).setCellValue(inspection.getActionPerformedBy());
                     overviewRow.createCell(7).setCellValue("");
                     overviewRow.createCell(8).setCellValue(status);  // Inspection Status
+                    overviewRow.createCell(9).setCellValue(inspection.getCreatedBy());
+                    overviewRow.createCell(10).setCellValue(inspection.getActionPerformedBy());
+
+
 
                     // Detailed
                     Row detailedRow = detailedSheet.createRow(detailedRowIndex++);
@@ -340,6 +361,9 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
                     detailedRow.createCell(9).setCellValue(inspection.getNotes());
                     detailedRow.createCell(10).setCellValue("");
                     detailedRow.createCell(11).setCellValue(status);  // Inspection Status
+                    detailedRow.createCell(11).setCellValue(inspection.getCreatedBy());
+                    detailedRow.createCell(12).setCellValue(inspection.getActionPerformedBy());
+
                 }
             }
 
@@ -387,7 +411,7 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
                     "Instruction Name",
                     "Instruction Value",
                     "Notes",
-                    "Geo Location"
+                    "Geo Location","Created By", "Modified By"
             };
 
             Row headerRow = sheet.createRow(0);
@@ -430,6 +454,8 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
                         row.createCell(8).setCellValue(step.getValue());
                         row.createCell(9).setCellValue(inspection.getNotes());
                         row.createCell(10).setCellValue(""); // Geo Location if available elsewhere
+                        row.createCell(11).setCellValue(inspection.getCreatedBy());
+                        row.createCell(12).setCellValue(inspection.getActionPerformedBy());
                     }
 
                 } else {
@@ -452,6 +478,8 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
                     row.createCell(8).setCellValue("");
                     row.createCell(9).setCellValue(inspection.getNotes());
                     row.createCell(10).setCellValue("");
+                    row.createCell(11).setCellValue(inspection.getCreatedBy());
+                    row.createCell(12).setCellValue(inspection.getActionPerformedBy());
                 }
             }
 
@@ -492,7 +520,7 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
                     "Date Started",
                     "Date Completed",
                     "Inspector",
-                    "Geo Location"
+                    "Geo Location","Created By", "Modified By"
             };
 
             Row headerRow = sheet.createRow(0);
@@ -532,6 +560,8 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
                         );
                         row.createCell(6).setCellValue(inspection.getActionPerformedBy());
                         row.createCell(7).setCellValue(""); // Geo Location if available elsewhere
+                        row.createCell(8).setCellValue(inspection.getCreatedBy());
+                        row.createCell(9).setCellValue(inspection.getActionPerformedBy());
                     }
 
                 } else {
@@ -551,6 +581,8 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
                                     : "");
                     row.createCell(6).setCellValue(inspection.getActionPerformedBy());
                     row.createCell(7).setCellValue("");
+                    row.createCell(8).setCellValue(inspection.getCreatedBy());
+                    row.createCell(9).setCellValue(inspection.getActionPerformedBy());
 
                 }
             }

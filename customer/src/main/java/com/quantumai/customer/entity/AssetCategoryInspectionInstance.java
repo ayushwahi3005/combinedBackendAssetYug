@@ -17,6 +17,7 @@ public class AssetCategoryInspectionInstance {
   private Long companyId;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
+  private String createdBy;
   private String actionPerformedBy;
   private String notes;
   private InspectionInstanceStatus status;
