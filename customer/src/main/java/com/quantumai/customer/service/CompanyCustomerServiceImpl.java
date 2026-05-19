@@ -1292,7 +1292,19 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
     return sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
   }
 
-
+  @Override
+  public List<AssetCountByCompanyCustomerDTO> getAssetCountByCompanyCustomer(Long companyId, String sortOrder) {
+    log.info("Service: Getting asset count by company customer for companyId: {} with sortOrder: {}", companyId, sortOrder);
+    try {
+      String order = (sortOrder == null || sortOrder.isEmpty()) ? "DESC" : sortOrder.toUpperCase();
+      List<AssetCountByCompanyCustomerDTO> results = companyCustomerRepository.getAssetCountByCompanyCustomer(companyId, order);
+      log.info("Successfully retrieved {} records", results.size());
+      return results;
+    } catch (Exception e) {
+      log.error("Error in getAssetCountByCompanyCustomer: {}", e.getMessage(), e);
+      throw new RuntimeException("Failed to retrieve asset count by company customer", e);
+    }
+  }
 
 //    @Override
 //    public Integer getCustomFieldCustomerCount(Long companyId, String id) {

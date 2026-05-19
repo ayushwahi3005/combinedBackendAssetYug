@@ -10,6 +10,7 @@ import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
+import com.quantumai.customer.entity.enums.ImportHistoryRecordType;
 import com.quantumai.customer.exception.*;
 import com.quantumai.customer.repository.*;
 import com.quantumai.customer.service.CompanyCustomerService;
@@ -66,6 +67,9 @@ public class CompanyCustomerAPI {
   @Autowired private CustomerRepository customerRepository;
   @Autowired private JavaMailSender emailSender;
   @Autowired private UsersRepository usersRepository;
+  @Autowired private ImportHistoryRepository importHistoryRepository;
+
+  private static final String DEFAULT_COUNTRY_CODE = "1"; // India
 
   private final ModelMapper modelMapper = new ModelMapper();
 
@@ -439,8 +443,32 @@ public class CompanyCustomerAPI {
           @PathVariable Long companyId,
           @PathVariable String email)
           throws CsvValidationException, MessagingException, ImportFileRowException,
-          NoSubscriptionError, EmailAlreadyExistsException, NameColumnMissingException {
+          NoSubscriptionError, EmailAlreadyExistsException, NameColumnMissingException, ImportInProgressException {
 
+
+    boolean isInProgress = importHistoryRepository
+            .findTopByCompanyIdAndStatusAndRecordTypeOrderByDateDesc(companyId, "In-Progress", ImportHistoryRecordType.ADDCUSTOMER)
+            .map(h -> h.getDate().isAfter(LocalDateTime.now().minusMinutes(30))) // stale-lock guard
+            .orElse(false);
+
+    if (isInProgress) {
+      throw new ImportInProgressException(
+              "An import is already in progress for this company. Please wait until it completes. You can check in the Import History for details."
+      );
+    }
+
+    ImportHistory importHistoryDTO = new ImportHistory();
+    importHistoryDTO.setFileName(file.getOriginalFilename());
+    importHistoryDTO.setRecordType(ImportHistoryRecordType.ADDCUSTOMER);
+    importHistoryDTO.setExecutedBy(email);
+    importHistoryDTO.setDate(LocalDateTime.now());
+    importHistoryDTO.setStatus("In-Progress");
+    importHistoryDTO.setCompanyId(companyId);
+    System.out.println("===========>");
+    System.out.println(importHistoryDTO);
+    importHistoryDTO.setDate(LocalDateTime.now());
+    importHistoryDTO.setComplete(0L);
+    importHistoryDTO = customerService.addImportHistory(importHistoryDTO);
 
     System.out.println("------||---------------------------------------/////////////////////////////////////------->"+columnMappings);
     List<CompanyCustomerMandatoryFields> mandatoryFieldsList=mandatoryFieldsRepository.findByCompanyIdAndMandatory(companyId,true);
@@ -515,7 +543,7 @@ public class CompanyCustomerAPI {
       e.printStackTrace();
     }
 
-    ImportHistory importHistoryDTO = new ImportHistory();
+
     try (InputStreamReader reader = new InputStreamReader(file.getInputStream());
          CSVReader csvReader = new CSVReader(reader)) {
 
@@ -548,14 +576,7 @@ public class CompanyCustomerAPI {
       int excelIndex = 1;
       int currCount = 0;
 
-      importHistoryDTO.setFileName(file.getOriginalFilename());
-      importHistoryDTO.setRecordType("Customer Record");
-      importHistoryDTO.setExecutedBy(email);
-      importHistoryDTO.setDate(LocalDateTime.now());
-      importHistoryDTO.setStatus("In-Progress");
-      importHistoryDTO.setCompanyId(companyId);
-      System.out.println("===========>");
-      System.out.println(importHistoryDTO);
+
 
       while ((row = csvReader.readNext()) != null) {
 
@@ -606,16 +627,29 @@ public class CompanyCustomerAPI {
                 break;
 
               case "phone":
-                companyCustomerDTO.setPhone(row[j]);
                 log.info("Phone to be set: {}", row[j]);
-                if(mandatoryFieldsMap.containsKey("phone")){
+                if (mandatoryFieldsMap.containsKey("phone")) {
                   log.info("Phone before inside empty: {}", row[j]);
-                  if(row[j].trim().isEmpty()){
+                  if (row[j].trim().isEmpty()) {
                     log.info("Phone inside empty: {}", row[j]);
                     errorDesc.append("ERROR WITH PHONE MANDATORY WHILE ADDING IN CUSTOMER");
                     errorFlag = 1;
                     errorCellMap.put(j + 1, true);
+                    break;
                   }
+                }
+
+                if (!row[j].trim().isEmpty()) {
+                  String rawPhone = row[j].trim();
+                  if (!rawPhone.matches("^[^a-zA-Z]{3,15}$")) {
+                    errorDesc.append("INVALID PHONE NUMBER: Must be 3-15 characters, no letters allowed. Example: +11876543210");
+                    errorFlag = 1;
+                    errorCellMap.put(j + 1, true);
+                    break;
+                  }
+
+                  companyCustomerDTO.setPhone(rawPhone);
+
                 }
                 break;
 
@@ -797,6 +831,10 @@ public class CompanyCustomerAPI {
                   }
                 }
                 else {
+                  if(row[j].trim().isEmpty()){
+                    companyCustomerDTO.setStatus("active");
+                    break;
+                  }
                   if ((row[j].equalsIgnoreCase("active"))
                           || (row[j].equalsIgnoreCase("inactive"))) {
 
@@ -1095,7 +1133,32 @@ public class CompanyCustomerAPI {
           @PathVariable Long companyId,
           @PathVariable String email)
           throws CsvValidationException, JsonParseException, IOException,
-          MessagingException, ImportFileRowException, NoSubscriptionError {
+          MessagingException, ImportFileRowException, NoSubscriptionError, ImportInProgressException {
+
+
+    boolean isInProgress = importHistoryRepository
+            .findTopByCompanyIdAndStatusAndRecordTypeOrderByDateDesc(companyId, "In-Progress", ImportHistoryRecordType.ADDCUSTOMER)
+            .map(h -> h.getDate().isAfter(LocalDateTime.now().minusMinutes(30))) // stale-lock guard
+            .orElse(false);
+
+    if (isInProgress) {
+      throw new ImportInProgressException(
+              "An import is already in progress for this company. Please wait until it completes. You can check in the Import History for details."
+      );
+    }
+
+    ImportHistory importHistoryDTO = new ImportHistory();
+    importHistoryDTO.setFileName(file.getOriginalFilename());
+    importHistoryDTO.setRecordType(ImportHistoryRecordType.UPDATECUSTOMER);
+    importHistoryDTO.setExecutedBy(email);
+    importHistoryDTO.setDate(LocalDateTime.now());
+    importHistoryDTO.setStatus("In-Progress");
+    importHistoryDTO.setCompanyId(companyId);
+    System.out.println("===========>");
+    System.out.println(importHistoryDTO);
+    importHistoryDTO.setDate(LocalDateTime.now());
+    importHistoryDTO.setComplete(0L);
+    importHistoryDTO = customerService.addImportHistory(importHistoryDTO);
 
     // Parse column mappings (expects a JSON object mapping CSV header -> field name)
     Map<String, String> columnMap = new HashMap<>();
@@ -1108,13 +1171,7 @@ public class CompanyCustomerAPI {
     }
 
     // Prepare import history
-    ImportHistory importHistoryDTO = new ImportHistory();
-    importHistoryDTO.setFileName(file.getOriginalFilename());
-    importHistoryDTO.setRecordType("Update Customer Record");
-    importHistoryDTO.setExecutedBy(email);
-    importHistoryDTO.setDate(LocalDateTime.now());
-    importHistoryDTO.setStatus("In-Progress");
-    importHistoryDTO.setCompanyId(companyId);
+
 
     long totalCount = 0L;
     try (InputStream inputStream = file.getInputStream();
@@ -1566,6 +1623,99 @@ public class CompanyCustomerAPI {
     errorStyle.setFillForegroundColor(IndexedColors.RED.getIndex());
     errorStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
     return errorStyle;
+  }
+
+  private String normalizeToE164(String phone) {
+    if (phone == null || phone.trim().isEmpty()) return null;
+
+
+    // Strip all formatting characters (spaces, dashes, dots, parentheses)
+    String cleaned = phone.trim()
+            .replaceAll("[\\s\\-().+]", "");
+
+    // After stripping, must be all digits
+    if (!cleaned.matches("\\d+")) {
+      log.warn("Phone contains non-numeric characters after cleaning: {}", phone);
+      return null;
+    }
+
+    // Re-attach + if original started with +
+    String e164;
+    if (phone.trim().startsWith("+")) {
+      e164 = "+" + cleaned;
+    } else {
+      // No + prefix — if number is long enough to have a country code, add +
+      // But we can't safely assume country code, so reject ambiguous numbers
+      log.warn("Phone number missing + country code prefix: {}", phone);
+      return null;
+    }
+
+    // E.164 max length is 15 digits (excluding +)
+    if (cleaned.length() > 15) {
+      log.warn("Phone number exceeds 15 digits (E.164 max): {}", phone);
+      return null;
+    }
+
+    // E.164 min length — shortest valid numbers are 7 digits total
+    if (cleaned.length() < 7) {
+      log.warn("Phone number too short to be valid: {}", phone);
+      return null;
+    }
+
+    // Country code cannot start with 0
+    if (cleaned.startsWith("0")) {
+      log.warn("Phone number has invalid country code starting with 0: {}", phone);
+      return null;
+    }
+    else {
+      // Assume default country code if no + prefix
+      log.info("No country code prefix, assuming default +{}: {}", DEFAULT_COUNTRY_CODE, phone);
+      e164 = "+" + DEFAULT_COUNTRY_CODE + cleaned;
+    }
+
+    return e164;
+  }
+
+  /**
+   * Get asset count by company customer with sorting capability
+   * @param sortOrder Optional sort order (ASC or DESC). Default is DESC
+   * @return List of company customers with their asset count, sorted by count
+   */
+  @GetMapping("/assetCountByCustomer")
+//  @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY_ADMIN')")
+  public ResponseEntity<?> getAssetCountByCompanyCustomer(
+          @RequestParam(value = "sortOrder", required = false, defaultValue = "DESC") String sortOrder) {
+    try {
+      log.info("API: Received request to get asset count by company customer with sortOrder: {}", sortOrder);
+
+      Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+      String username = authentication.getName();
+      log.info("User: {} requesting asset count", username);
+
+      Long companyId = null;
+      Optional<Users> userOptional = usersRepository.findByEmail(username);
+      if (userOptional.isPresent()) {
+        companyId = userOptional.get().getCompanyId();
+      }
+
+      if (companyId == null) {
+        log.error("Company ID not found for user: {}", username);
+        ResponseMessageDTO response = new ResponseMessageDTO();
+        response.setResponseMessage("Company ID not found");
+        return ResponseEntity.badRequest().body(response);
+      }
+
+      List<AssetCountByCompanyCustomerDTO> results = companyCustomerService.getAssetCountByCompanyCustomer(companyId, sortOrder);
+
+      log.info("Successfully retrieved asset count for {} company customers", results.size());
+      return ResponseEntity.ok(results);
+
+    } catch (Exception e) {
+      log.error("Error getting asset count by company customer: {}", e.getMessage(), e);
+      ResponseMessageDTO response = new ResponseMessageDTO();
+      response.setResponseMessage("Failed to retrieve asset count: " + e.getMessage());
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+    }
   }
 }
 

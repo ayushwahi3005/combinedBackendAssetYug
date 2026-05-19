@@ -104,7 +104,13 @@ public interface CompanyCustomerService {
 
   public byte[] generateCompanyCustomerTemplateCsv(Long companyId) throws IOException;
 
-
+  /**
+   * Get asset count by company customer with sorting capability
+   * @param companyId the company ID to filter by
+   * @param sortOrder "ASC" for ascending, "DESC" for descending order by asset count
+   * @return List of AssetCountByCompanyCustomerDTO containing customer details and asset count
+   */
+  public List<AssetCountByCompanyCustomerDTO> getAssetCountByCompanyCustomer(Long companyId, String sortOrder);
 
 //  public Integer getCustomFieldCustomerCount(Long companyId, String id);
 }

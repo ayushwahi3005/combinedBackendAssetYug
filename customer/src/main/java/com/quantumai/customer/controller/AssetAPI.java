@@ -2,31 +2,28 @@ package com.quantumai.customer.controller;
 
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
 import com.quantumai.customer.entity.Notification;
+import com.quantumai.customer.entity.enums.ImportHistoryRecordType;
 import com.quantumai.customer.exception.*;
 import com.quantumai.customer.repository.*;
 import com.quantumai.customer.service.*;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import java.io.*;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
-import jakarta.servlet.http.HttpServletRequest;
+
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.json.JSONObject;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -71,6 +68,7 @@ public class AssetAPI {
   @Autowired private AssetCheckInOutRepository assetCheckInOutRepository;
   @Autowired private CompanyCustomerRepository companyCustomerRepository;
   @Autowired private MongoTemplate mongoTemplate;
+  @Autowired private ImportHistoryRepository importHistoryRepository;
 
   private final ModelMapper modelMapper = new ModelMapper();
 
@@ -101,6 +99,12 @@ public class AssetAPI {
   @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
   public AssetsDTO getAsset(@PathVariable String id) throws Exception {
     return assetsService.getAsset(id);
+  }
+
+  @GetMapping("/getAssetDetails/{id}")
+  @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
+  public AssetsDTO getAssetDetails(@PathVariable String id) throws Exception {
+    return assetsService.getAssetSpecific(id);
   }
 
   @GetMapping("/getExtraFields/{id}")
@@ -249,6 +253,12 @@ public class AssetAPI {
     return assetsService.countAssetByCategory(category);
   }
 
+  @GetMapping(value = "/countAssetByCategories/{companyId}")
+  @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
+  public List<AssetCountByCategoryDTO> countAssetByCategories(@PathVariable Long companyId) throws CategoryException {
+    return assetsService.countAssetByCategories(companyId);
+  }
+
   @GetMapping(value = "/getActiveAssets/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public List<AssetsDTO> getActiveAssets(@PathVariable Long companyId) {
@@ -378,7 +388,19 @@ public class AssetAPI {
           @RequestParam("columnMappings") String columnMappings,
           @PathVariable Long companyId,
           @PathVariable String email)
-          throws ImportFileRowException, MessagingException, NoSubscriptionError {
+          throws ImportFileRowException, MessagingException, ImportInProgressException {
+
+    // ✅ STEP 1: Check if an import is already running for this company
+    boolean isInProgress = importHistoryRepository
+            .findTopByCompanyIdAndStatusAndRecordTypeOrderByDateDesc(companyId, "In-Progress", ImportHistoryRecordType.ADDASSET)
+            .map(h -> h.getDate().isAfter(LocalDateTime.now().minusMinutes(30))) // stale-lock guard
+            .orElse(false);
+
+    if (isInProgress) {
+      throw new ImportInProgressException(
+              "An import is already in progress for this company. Please wait until it completes. You can check in the Import History for details."
+      );
+    }
 
     List<Location> locationList = locationRepository.findByCompanyId(companyId);
     List<Bin> binList = binRepository.findByCompanyId(companyId);
@@ -386,20 +408,42 @@ public class AssetAPI {
             assetMandatoryFieldsRepository.findByCompanyIdAndMandatory(companyId, true);
     List<String> mandatoryColumnList =
             assetMandatoryList.stream().map(ele -> ele.getName().toLowerCase()).toList();
-    log.info("📌 Columns for companyId {}: {}", companyId, columnMappings.toString());
+
+//    log.info("📌 Columns for companyId {}: {}", companyId, columnMappings.toString());
     Map<String, String> columnMap = parseColumnMappings(columnMappings);
-    log.info("📋 Column Mappings Parsed: {}", columnMap);
+//    log.info("📋 Column Mappings Parsed: {}", columnMap);
 
     long totalCount = countFileRows(file);
     if (totalCount > 1001) throw new ImportFileRowException("Import File cannot import more than 1000 rows");
 
     ImportHistory importHistoryDTO = new ImportHistory();
+    importHistoryDTO.setFileName(file.getOriginalFilename());
+    importHistoryDTO.setRecordType(ImportHistoryRecordType.ADDASSET);
+    importHistoryDTO.setExecutedBy(email);
+    importHistoryDTO.setDate(LocalDateTime.now());
+    importHistoryDTO.setStatus("In-Progress");
+    importHistoryDTO.setCompanyId(companyId);
+    importHistoryDTO.setDate(LocalDateTime.now());
+    importHistoryDTO.setComplete(0L);
+    importHistoryDTO = customerService.addImportHistory(importHistoryDTO);
+
+
+//    try {
+//      Thread.sleep(50000);
+//    } catch (InterruptedException e) {
+//      throw new RuntimeException(e);
+//    }
+
+
+
+
     try (CSVReader csvReader = new CSVReader(new InputStreamReader(file.getInputStream()))) {
       String[] headers = csvReader.readNext();
       Map<Integer, String> headerMap = buildHeaderMap(headers);
 
       Workbook workbook = new XSSFWorkbook();
       Sheet errorSheet = workbook.createSheet("Errors");
+      CellStyle errorCellStyle = createErrorCellStyle(workbook);
       int excelIndex = 0;
 
       Row headerRow = errorSheet.createRow(excelIndex++);
@@ -407,12 +451,7 @@ public class AssetAPI {
       headerRow.createCell(headers.length).setCellValue("Error");
 
       long currCount = 0;
-      importHistoryDTO.setFileName(file.getOriginalFilename());
-      importHistoryDTO.setRecordType("Add Asset Record");
-      importHistoryDTO.setExecutedBy(email);
-      importHistoryDTO.setDate(LocalDateTime.now());
-      importHistoryDTO.setStatus("In-Progress");
-      importHistoryDTO.setCompanyId(companyId);
+
 
       String[] row;
       while ((row = csvReader.readNext()) != null) {
@@ -422,42 +461,68 @@ public class AssetAPI {
         assetsDTO.setCompanyId(companyId);
         int errorFlag =0;
         StringBuilder errorDesc = new StringBuilder();
+        Map<Integer, Boolean> errorCellMap = new HashMap<>();
 
         for (int j = 0; j < row.length; j++) {
           String field = headerMap.get(j);
+          log.info("Column Mapping for field '{}': '{}'", field, columnMap.get(field));
           if (errorFlag == 1) break;
           if (columnMap.get(field) == null) continue;
 
           label:
           switch (columnMap.get(field).toLowerCase()) {
-            case "name": assetsDTO.setName(row[j]); break;
+            case "name":
+              log.info("NAME FIELD VALUE: '{}'", row[j]);
+              if(row[j].trim().isEmpty()){
+
+                  errorDesc.append("Name is Mandatory");
+                  errorFlag = 1;
+                  errorCellMap.put(j, true);
+
+              } else{
+              assetsDTO.setName(row[j]);}
+              break;
             case "serialnumber":
               if (mandatoryColumnList.contains("serialnumber") && row[j].trim().isEmpty()) {
-                errorDesc.append("Serial Number is Mandatory"); errorFlag = 1;
+                errorDesc.append("Serial Number is Mandatory");
+                errorFlag = 1;
+                errorCellMap.put(j, true);
               } else { assetsDTO.setSerialNumber(row[j]); }
               break;
             case "category":
               if (mandatoryColumnList.contains("category") && row[j].trim().isEmpty()) {
-                errorDesc.append("Category is Mandatory"); errorFlag = 1; break;
+                errorDesc.append("Category is Mandatory");
+                errorFlag = 1;
+                errorCellMap.put(j, true);
+                break;
               }
               final String categoryValue = row[j].trim();  // ✅ effectively final, safe for lambda
               if (!categoryValue.isBlank()) {
                 List<AssetCategory> match = assetCategoryRepository.findByCompanyId(companyId)
                         .stream().filter(x -> x.getName().equalsIgnoreCase(categoryValue))
                         .toList();
-                if (match.isEmpty()) { errorDesc.append("CATEGORY"); errorFlag = 1; }
+                if (match.isEmpty()) {
+                  errorDesc.append("CATEGORY");
+                  errorFlag = 1;
+                  errorCellMap.put(j, true);
+                }
                 else assetsDTO.setCategory(match.get(0).getName());
               }
               break;
             case "customer":
               if (mandatoryColumnList.contains("customer") && row[j].trim().isEmpty()) {
-                errorDesc.append("Customer is Mandatory"); errorFlag = 1; break;
+                errorDesc.append("Customer is Mandatory");
+                errorFlag = 1;
+                errorCellMap.put(j, true);
+                break;
               }
               String customerName = row[j].trim();
               if (!customerName.isBlank()) {
                 CompanyCustomerDTO customerDTO = companyCustomerAPI.getCompanyCustomerByLocalId(customerName, companyId);
                 if (customerDTO == null) {
-                  errorDesc.append("CUSTOMER NOT FOUND"); errorFlag = 1;
+                  errorDesc.append("CUSTOMER NOT FOUND");
+                  errorFlag = 1;
+                  errorCellMap.put(j, true);
                 } else {
                   assetsDTO.setCustomerId(customerDTO.getId());
                   assetsDTO.setCustomer(customerDTO.getName());
@@ -466,8 +531,12 @@ public class AssetAPI {
               break;
             case "location":
               if (mandatoryColumnList.contains("location") && row[j].trim().isEmpty()) {
-                errorDesc.append("Location is Mandatory"); errorFlag = 1; break;
+                errorDesc.append("Location is Mandatory");
+                errorFlag = 1;
+                errorCellMap.put(j, true);
+                break;
               }
+              else if(row[j].trim().isEmpty()) { break; }
               String loc = row[j].trim();
               List<Location> locs = locationList.stream()
                       .filter(l -> l.getName().equalsIgnoreCase(loc)).toList();
@@ -475,14 +544,16 @@ public class AssetAPI {
               List<Bin> bins = binList.stream()
                       .filter(b -> b.getBinNumber().equalsIgnoreCase(loc)).toList();
               if (!bins.isEmpty()) { assetsDTO.setLocation("bin:" + bins.get(0).getId()); break; }
-              errorDesc.append("LOCATION"); errorFlag = 1;
+              errorDesc.append("LOCATION");
+              errorFlag = 1;
+              errorCellMap.put(j, true);
               break;
             case "status":
               switch (row[j].toLowerCase()) {
                 case "active": assetsDTO.setStatus("active"); break label;
-                case "inactive": assetsDTO.setStatus("inActive"); break label;
-                case "outofservice": assetsDTO.setStatus("outOfService"); break label;
-                default: errorDesc.append("STATUS"); errorFlag= 1; break label;
+                case "inactive": assetsDTO.setStatus("inactive"); break label;
+                case "outofservice": assetsDTO.setStatus("outofservice"); break label;
+                default:  assetsDTO.setStatus("active"); break label;
               }
           }
         }
@@ -490,9 +561,25 @@ public class AssetAPI {
         log.info("Asset DTO : {}",assetsDTO.toString());
         if (errorFlag == 1) {
           Row errorRow = errorSheet.createRow(excelIndex++);
-          for (int k = 0; k < row.length; k++) errorRow.createCell(k).setCellValue(row[k]);
-          errorRow.createCell(row.length).setCellValue(errorDesc.toString());
+          for (int k = 0; k < row.length; k++) {
+            Cell cell = errorRow.createCell(k);
+            cell.setCellValue(row[k]);
+          }
+
+          // Apply red background to error cells
+          for (Map.Entry<Integer, Boolean> entry : errorCellMap.entrySet()) {
+            if (entry.getValue()) {
+              Cell errorCell = errorRow.getCell(entry.getKey());
+              if (errorCell != null) errorCell.setCellStyle(errorCellStyle);
+            }
+          }
+
+          // Create error description cell with red background
+          Cell errorDescriptionCell = errorRow.createCell(row.length);
+          errorDescriptionCell.setCellValue(errorDesc.toString());
+          errorDescriptionCell.setCellStyle(errorCellStyle);
         } else {
+          log.info("Attempting to save asset: {}", assetsDTO.toString());
          AssetsDTO savedAssetDTO= assetsService.addAssets(assetsDTO);
 
 
@@ -524,6 +611,7 @@ public class AssetAPI {
 
                   if(mandatoryColumnList.contains(extraFields.getName().toLowerCase())){
                     if(value.trim().isEmpty()){
+                      log.info("Mandatory extra field '{}' is empty for asset '{}'", extraFields.getName(), savedAssetDTO.getName());
                       errorDesc.append("ERROR WITH ").append(extraFields.getName().toUpperCase()).append(" MANDATORY WHILE ADDING IN ASSET");
                       errorFlag = 1;
                       break;
@@ -531,6 +619,10 @@ public class AssetAPI {
                   }
                   else {
                     if ("number".equals(extraFieldName.getType())) {
+                      if(value.trim().isEmpty()){
+                        extraFields.setValue("");
+                        continue;
+                      }
                       try {
                         int val = Integer.parseInt(value);
                         formattedValue = Integer.toString(val);
@@ -540,6 +632,10 @@ public class AssetAPI {
                         break;
                       }
                     } else if ("date".equals(extraFieldName.getType())) {
+                      if(value.trim().isEmpty()){
+                        extraFields.setValue("");
+                        continue;
+                      }
                       try {
                         DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
                         LocalDate date = LocalDate.parse(value, inputFormatter);
@@ -570,8 +666,23 @@ public class AssetAPI {
 
           if (errorFlag != 0) {
             Row errorRow = errorSheet.createRow(excelIndex++);
-            for (int col = 0; col < row.length; col++) errorRow.createCell(col).setCellValue(row[col]);
-            errorRow.createCell(row.length).setCellValue(errorDesc.toString());
+            for (int col = 0; col < row.length; col++) {
+              Cell cell = errorRow.createCell(col);
+              cell.setCellValue(row[col]);
+            }
+
+            // Apply red background to error cells
+            for (Map.Entry<Integer, Boolean> entry : errorCellMap.entrySet()) {
+              if (entry.getValue()) {
+                Cell errorCell = errorRow.getCell(entry.getKey());
+                if (errorCell != null) errorCell.setCellStyle(errorCellStyle);
+              }
+            }
+
+            // Create error description cell with red background
+            Cell errorDescriptionCell = errorRow.createCell(row.length);
+            errorDescriptionCell.setCellValue(errorDesc.toString());
+            errorDescriptionCell.setCellStyle(errorCellStyle);
             log.warn("📋 Extra field error recorded at row {}: {}", excelIndex - 1, errorDesc.toString());
           }
         }
@@ -605,8 +716,32 @@ public class AssetAPI {
           @PathVariable Long companyId,
           @PathVariable String email)
           throws CsvValidationException, JsonParseException, IOException,
-          MessagingException, ImportFileRowException, NoSubscriptionError {
+          MessagingException, ImportFileRowException, NoSubscriptionError, ImportInProgressException {
 
+
+    boolean isInProgress = importHistoryRepository
+            .findTopByCompanyIdAndStatusAndRecordTypeOrderByDateDesc(companyId, "In-Progress", ImportHistoryRecordType.ADDASSET)
+            .map(h -> h.getDate().isAfter(LocalDateTime.now().minusMinutes(30))) // stale-lock guard
+            .orElse(false);
+
+    if (isInProgress) {
+      throw new ImportInProgressException(
+              "An import is already in progress for this company. Please wait until it completes. You can check in the Import History for details."
+      );
+    }
+
+
+
+    ImportHistory importHistoryDTO = new ImportHistory();
+    importHistoryDTO.setFileName(file.getOriginalFilename());
+    importHistoryDTO.setRecordType(ImportHistoryRecordType.UPDATEASSET);
+    importHistoryDTO.setExecutedBy(email);
+    importHistoryDTO.setDate(LocalDateTime.now());
+    importHistoryDTO.setStatus("In-Progress");
+    importHistoryDTO.setCompanyId(companyId);
+    importHistoryDTO.setDate(LocalDateTime.now());
+    importHistoryDTO.setComplete(0L);
+    importHistoryDTO = customerService.addImportHistory(importHistoryDTO);
     List<Location> locationList = locationRepository.findByCompanyId(companyId);
     List<Bin> binList = binRepository.findByCompanyId(companyId);
     Map<String, String> columnMap = parseColumnMappings(columnMappings);
@@ -614,13 +749,7 @@ public class AssetAPI {
     long totalCount = countFileRows(file);
     if (totalCount > 1001) throw new ImportFileRowException("Import File cannot import more than 1000 rows");
 
-    ImportHistory importHistoryDTO = new ImportHistory();
-    importHistoryDTO.setFileName(file.getOriginalFilename());
-    importHistoryDTO.setRecordType("Updated Asset Record");
-    importHistoryDTO.setExecutedBy(email);
-    importHistoryDTO.setDate(LocalDateTime.now());
-    importHistoryDTO.setStatus("In-Progress");
-    importHistoryDTO.setCompanyId(companyId);
+
 
     long currCount = 0;
     try (CSVReader csvReader = new CSVReader(new InputStreamReader(file.getInputStream()))) {
@@ -697,20 +826,31 @@ public class AssetAPI {
                 assets.setCategory(cats.get(0).getName());
               }
               break;
+            case "location":
+
+             if(row[j].trim().isEmpty()) { break; }
+              String loc = row[j].trim();
+              List<Location> locs = locationList.stream()
+                      .filter(l -> l.getName().equalsIgnoreCase(loc)).toList();
+              if (!locs.isEmpty()) { assets.setLocation("location:" + locs.get(0).getId()); break; }
+              List<Bin> bins = binList.stream()
+                      .filter(b -> b.getBinNumber().equalsIgnoreCase(loc)).toList();
+              if (!bins.isEmpty()) { assets.setLocation("bin:" + bins.get(0).getId()); break; }
+              errorDesc.append("LOCATION"); errorFlag = 1;
+              break;
             case "status":
               switch (row[j].toLowerCase()) {
                 case "active":
                   assets.setStatus("active");
                   break;
                 case "inactive":
-                  assets.setStatus("inActive");
+                  assets.setStatus("inactive");
                   break;
                 case "outofservice":
-                  assets.setStatus("outOfService");
+                  assets.setStatus("outofservice");
                   break;
                 default:
-                  errorDesc.append("ERROR IN STATUS");
-                  errorFlag = 1;
+                  assets.setStatus("active");
               }
               break;
           }
@@ -762,6 +902,10 @@ public class AssetAPI {
                   // Validate and format based on type
                   String formattedValue = value;
                   if ("number".equals(extraFieldName.getType())) {
+                    if(value.trim().isEmpty()){
+                      extraFields.setValue("");
+                      continue;
+                    }
                     try {
                       int val = Integer.parseInt(value);
                       formattedValue = Integer.toString(val);
@@ -772,6 +916,10 @@ public class AssetAPI {
                       break;
                     }
                   } else if ("date".equals(extraFieldName.getType())) {
+                    if(value.trim().isEmpty()){
+                      extraFields.setValue("");
+                      continue;
+                    }
                     try {
                       DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
                       LocalDate date = LocalDate.parse(value, inputFormatter);
@@ -995,11 +1143,17 @@ public class AssetAPI {
   public ResponseEntity<byte[]> exportAssetsXlsx(@PathVariable Long companyId) throws IOException {
     List<Assets> assets = assetsRepository.findByCompanyId(companyId);
     List<AssetExtraFieldName> extraFieldNames = extraFieldNameRepository.findByCompanyId(companyId);
+
+    // Fetch all check-in/out records for all assets
+    Query q = new Query(Criteria.where("assetId").in(
+            assets.stream().map(Assets::getId).collect(Collectors.toList())));
+    List<AssetCheckInOut> checkInOutList = mongoTemplate.find(q, AssetCheckInOut.class);
+
     Workbook workbook = new XSSFWorkbook();
     Sheet sheet = workbook.createSheet("Assets");
     Row header = sheet.createRow(0);
     int col = 0;
-    for (String h : new String[]{"ID","Name","AssetId","Category","Customer","CustomerId","Location","Status"})
+    for (String h : new String[]{"ID","Name","AssetId","Category","Customer","CustomerId","Location","Status","Checked In/Out"})
       header.createCell(col++).setCellValue(h);
     for (AssetExtraFieldName ef : extraFieldNames) header.createCell(col++).setCellValue(ef.getName());
     int rowIdx = 1;
@@ -1014,6 +1168,13 @@ public class AssetAPI {
       row.createCell(c++).setCellValue(asset.getCustomerId());
       row.createCell(c++).setCellValue(asset.getLocation());
       row.createCell(c++).setCellValue(asset.getStatus());
+
+      // Add check-in/out status
+      List<AssetCheckInOut> matched = checkInOutList.stream()
+              .filter(a -> a.getAssetId().equals(asset.getId())).toList();
+      String checkedInOutStatus = !matched.isEmpty() ? matched.get(0).getStatus() : "";
+      row.createCell(c++).setCellValue(checkedInOutStatus);
+
       List<AssetExtraFields> extras = extraFieldsRepository.findByAssetId(asset.getId());
       Map<String, String> extraMap = new HashMap<>();
       for (AssetExtraFields ef : extras) extraMap.put(ef.getName(), ef.getValue());
@@ -1030,7 +1191,7 @@ public class AssetAPI {
 
   @GetMapping("/export-asset/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
-  public ResponseEntity<byte[]> exportCompanyCustomers(@PathVariable Long companyId) throws IOException {
+  public ResponseEntity<byte[]> exportAssets(@PathVariable Long companyId) throws IOException {
     List<Assets> assets = assetsRepository.findByCompanyId(companyId);
     List<AssetExtraFieldName> extraFieldNames = extraFieldNameRepository.findByCompanyId(companyId);
     Query q = new Query(Criteria.where("assetId").in(
@@ -1044,7 +1205,7 @@ public class AssetAPI {
     CellStyle textStyle = workbook.createCellStyle();
     textStyle.setDataFormat(workbook.createDataFormat().getFormat("@"));
 
-    for (String h : new String[]{"ID","Serial Number","Customer","Category","Location","Status","Last Handled By","Last Known Location"})
+    for (String h : new String[]{"ID","Serial Number","Customer","Category","Location","Status","Checked In/Out","Last Handled By","Last Known Location"})
       header.createCell(col++).setCellValue(h);
     for (AssetExtraFieldName ef : extraFieldNames) header.createCell(col++).setCellValue(ef.getName());
 
@@ -1076,6 +1237,13 @@ public class AssetAPI {
 
       List<AssetCheckInOut> matched = checkInOutList.stream()
               .filter(a -> a.getAssetId().equals(asset.getId())).toList();
+
+      // Add check-in/out status
+      String checkedInOutStatus = !matched.isEmpty() ? matched.get(0).getStatus() : "Checked In";
+      Cell checkedCell = row.createCell(c++);
+      checkedCell.setCellValue(checkedInOutStatus);
+      checkedCell.setCellStyle(textStyle);
+
       if (!matched.isEmpty()) {
         int len = matched.get(0).getDetailsList().size();
         row.createCell(c++).setCellValue(matched.get(0).getDetailsList().get(len-1).getEmployee());
@@ -1188,7 +1356,11 @@ public class AssetAPI {
               new TypeReference<Map<String, String>>() {}
       );
       if (parsed != null) {
-        map.putAll(parsed);
+        parsed.forEach((key, value) -> {
+          if (key != null && value != null) {
+            map.put(key.trim(), value.trim()); // ✅ trim both key and value
+          }
+        });
       }
       log.debug("✅ Successfully parsed columnMappings: {}", map);
     } catch (Exception e) {
@@ -1204,9 +1376,14 @@ public class AssetAPI {
   }
 
   private Map<Integer, String> buildHeaderMap(String[] headers) {
-    Map<Integer, String> map = new HashMap<>();
-    if (headers != null) for (int i = 0; i < headers.length; i++) map.put(i, headers[i]);
-    return map;
+    Map<Integer, String> headerMap = new HashMap<>();
+    for (int i = 0; i < headers.length; i++) {
+      String header = headers[i]
+              .trim()
+              .replace("\uFEFF", ""); // ✅ strip BOM wherever it appears
+      headerMap.put(i, header);
+    }
+    return headerMap;
   }
 
   private boolean isEmptyRow(String[] row) {
@@ -1259,6 +1436,13 @@ public class AssetAPI {
     if (bin.getLocationId() != null)
       return locationRepository.findById(bin.getLocationId().toString()).orElse(null);
     return null;
+  }
+
+  private CellStyle createErrorCellStyle(Workbook workbook) {
+    CellStyle errorStyle = workbook.createCellStyle();
+    errorStyle.setFillForegroundColor(IndexedColors.RED.getIndex());
+    errorStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+    return errorStyle;
   }
 }
 

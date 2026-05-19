@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
+import java.util.Map;
+
 
 @RestControllerAdvice
 public class ExceptionControllerAdvice {
@@ -232,6 +234,16 @@ public class ExceptionControllerAdvice {
     errorInfo.setErrorMessage("Upload Limit Exceeded: The system only allows a maximum of 1,000 records per upload. Please modify your file and re-upload");
     errorInfo.setErrorCode(HttpStatus.BAD_REQUEST.value());
     return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
+  }
+
+  @ExceptionHandler(ImportInProgressException.class)
+  public ResponseEntity<Map<String, String>> handleImportInProgress(ImportInProgressException ex) {
+    return ResponseEntity
+            .status(HttpStatus.CONFLICT)  // 409
+            .body(Map.of(
+                    "error", "IMPORT_IN_PROGRESS",
+                    "message", ex.getMessage()
+            ));
   }
 
 

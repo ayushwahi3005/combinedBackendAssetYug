@@ -1,5 +1,6 @@
 package com.quantumai.customer.entity;
 
+import com.quantumai.customer.entity.enums.ImportHistoryRecordType;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -15,7 +16,7 @@ public class ImportHistory {
   private LocalDateTime date;
   private String status;
   private Long complete;
-  private String recordType;
+  private ImportHistoryRecordType recordType;
   private String message;
   private String executedBy;
   private Long companyId;

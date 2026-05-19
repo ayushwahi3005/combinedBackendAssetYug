@@ -10,6 +10,7 @@ import com.quantumai.customer.repository.CustomerRepository;
 import com.quantumai.customer.repository.SubscriptionRepository;
 import com.quantumai.customer.security.JwtService;
 import com.quantumai.customer.service.TrialService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -24,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Component
 public class TrialExpirationFilter extends OncePerRequestFilter {
 
@@ -127,6 +129,10 @@ public class TrialExpirationFilter extends OncePerRequestFilter {
                         java.util.Optional<Subscription> subscriptionOptional = subscriptionRepository
                                 .findByCompanyIdAndStatus(customerOptional.get().getCompanyId(),
                                         SubscriptionEnum.ACTIVE);
+
+
+                        log.info("Subscription check for user: {}, subscription found: {}", userEmail, subscriptionOptional);
+
                         // Check if trial has expired
                         if (subscriptionOptional.isEmpty()&&trialService.isTrialExpired(userEmail)) {
                             // Return JSON response indicating trial expiration

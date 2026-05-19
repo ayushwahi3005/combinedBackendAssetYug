@@ -2,14 +2,11 @@ package com.quantumai.customer.service;
 
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
-import com.quantumai.customer.exception.AssetExtraFieldDeletionException;
-import com.quantumai.customer.exception.CategoryException;
 import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-import com.quantumai.customer.exception.ExtraFieldDeletionException;
 import org.springframework.web.multipart.MultipartFile;
 import com.quantumai.customer.dto.AssetTemplateFieldsDTO;
 
@@ -30,6 +27,8 @@ public interface AssetsService {
   public void removeAsset(String id) throws Exception;
 
   public AssetsDTO getAsset(String assetId) throws Exception;
+
+  public AssetsDTO getAssetSpecific(String assetId) throws Exception;
 
   public void addExtraFields(AssetExtraFieldsDTO extraFieldsDTO) throws Exception;
 
@@ -111,6 +110,8 @@ public interface AssetsService {
   public AssetCategory getCategoryListById(Long companyId, String id);
 
   public int countAssetByCategory(String category);
+
+  public List<AssetCountByCategoryDTO> countAssetByCategories(Long companyId);
 
   public List<AssetCategory> getActiveCategoryList(Long companyId);
 

@@ -16,7 +16,6 @@ import com.quantumai.customer.repository.*;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
@@ -96,6 +95,9 @@ public class AssetsServiceImpl implements AssetsService {
 
   @Autowired
   private AssetCustomFieldIdGeneratorRepository assetCustomFieldIdGeneratorRepository;
+
+  @Autowired
+  private AssetCountByCategoriesRepository assetCountByCategoriesRepository;;
 
   private static final String SEQ_ID = "asset_category_sequence";
   LocalDateTime localDateTime;
@@ -226,6 +228,36 @@ public class AssetsServiceImpl implements AssetsService {
     }
 
     return assetDTO;
+  }
+
+  @Override
+  public AssetsDTO getAssetSpecific(String assetId) throws Exception {
+    Optional<Assets> optionalasset = assetsRepository.findById(assetId);
+
+    Assets asset = optionalasset.orElseThrow(() -> new Exception("No Such Asset"));
+    AssetsDTO assetDTO = modelMapper.map(asset, AssetsDTO.class);
+    if (asset.getLocation()!=null&&asset.getLocation().startsWith("bin")) {
+      Optional<Bin> binOptional = binRepository.findById(asset.getLocation().substring(4));
+      binOptional.ifPresent(bin -> {
+        assetDTO.setLocation(bin.getBinNumber());
+        // Get the location name directly from the bin's locationId (which is a DBRef Location object)
+        if (bin.getLocationId() != null) {
+          assetDTO.setLocationName(bin.getLocationId().getName());
+          log.info("Bin found with location name: {}", bin.getLocationId().getName());
+        }
+      });
+
+    } else if (asset.getLocation()!=null&&asset.getLocation().startsWith("location")) {
+      Optional<Location> locationOptional =
+              locationRepository.findById(asset.getLocation().substring(9));
+      locationOptional.ifPresent(loc -> {
+        assetDTO.setLocation(loc.getName());
+        assetDTO.setLocationName(loc.getName());
+      });
+    }
+
+    return assetDTO;
+
   }
 
   private static final Object idGeneratorLock = new Object();
@@ -1418,6 +1450,11 @@ public class AssetsServiceImpl implements AssetsService {
   @Override
   public int countAssetByCategory(String category) {
     return assetsRepository.countByCategoryIgnoreCase(category);
+  }
+
+  @Override
+  public List<AssetCountByCategoryDTO> countAssetByCategories(Long companyId) {
+    return assetCountByCategoriesRepository.getAssetCountByCategories(companyId,"ASC");
   }
 
   public List<AssetCategory> getActiveCategoryList(Long companyId) {

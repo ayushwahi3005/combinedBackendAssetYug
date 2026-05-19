@@ -93,8 +93,13 @@ public class TrialService {
             TrialStatus trial = trialStatus.get();
             return trial.isTrialExpired() || LocalDateTime.now().isAfter(trial.getTrialEndDate());
         }
-        return false;
+        else{
+            return true;
+        }
+
+//        return false;
     }
+
 
     /**
      * Get trial status for a customer

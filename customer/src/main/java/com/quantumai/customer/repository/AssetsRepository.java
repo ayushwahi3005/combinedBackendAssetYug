@@ -10,7 +10,7 @@ import org.springframework.data.mongodb.repository.Query;
 
 public interface AssetsRepository extends MongoRepository<Assets, String>, CompanyScopedRepository, AssetRepositoryCustomAdvanced{
   List<Assets> findByCompanyId(Long companyId);
-
+  List<Assets> findByCompanyIdAndStatus(Long companyId,String status);
   List<Assets> findByCustomerId(String customerId);
 
   Optional<Assets> findByAssetIdAndCompanyId(Integer assetId, Long companyId);
