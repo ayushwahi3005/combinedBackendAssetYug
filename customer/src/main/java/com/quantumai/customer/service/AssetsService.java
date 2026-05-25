@@ -3,6 +3,7 @@ package com.quantumai.customer.service;
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
 import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
+import com.quantumai.customer.exception.AssetUniqueFieldViolationException;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -16,7 +17,7 @@ public interface AssetsService {
   public PaginatedResultDTO<String> getAssetsDetailsByCustomerId(
       String customerId, Integer pageNumber);
 
-  public AssetsDTO addAssets(AssetsDTO assetsDTO);
+  public AssetsDTO addAssets(AssetsDTO assetsDTO) throws Exception;
 
   public void importExcel(List<AssetsDTO> assetsDTOList, Map<String, String> columnMap);
 
@@ -153,5 +154,15 @@ public interface AssetsService {
   public AssetTemplateFieldsDTO getTemplateFields(Long companyId);
 
   void updateAssetInspection(AssetCategoryInspection assetCategoryInspection);
-//  public List<Map<String,>> getAssetByCompanyCategory(Long companyId);
+
+  // Unique field configuration methods
+  public AssetUniqueFieldConfigurationDTO saveUniqueFieldConfiguration(AssetUniqueFieldConfigurationDTO configDTO);
+
+  public List<AssetUniqueFieldConfigurationDTO> getUniqueFieldConfigurations(Long companyId);
+
+  public AssetUniqueFieldValidationDTO validateUniqueFields(AssetsDTO assetsDTO, Long companyId);
+
+  public void deleteUniqueFieldConfiguration(String configId);
+
+  public void deleteUniqueFieldConfigurationByCompanyAndField(Long companyId, String fieldName);
 }

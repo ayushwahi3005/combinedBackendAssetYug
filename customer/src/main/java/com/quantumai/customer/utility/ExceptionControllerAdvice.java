@@ -246,5 +246,28 @@ public class ExceptionControllerAdvice {
             ));
   }
 
+  @ExceptionHandler(AssetUniqueFieldViolationException.class)
+  public ResponseEntity<Map<String, Object>> handleAssetUniqueFieldViolation(AssetUniqueFieldViolationException exception) {
+    Map<String, Object> response = new java.util.HashMap<>();
+    response.put("error", "UNIQUE_FIELD_VIOLATION");
+    response.put("message", exception.getMessage());
+    
+    // Return all field names from conflicts map instead of single fieldName
+    if (exception.getConflicts() != null && !exception.getConflicts().isEmpty()) {
+      response.put("fieldNames", exception.getConflicts().keySet());
+    } else {
+      response.put("fieldName", exception.getFieldName());
+    }
+    
+    response.put("conflicts", exception.getConflicts());
+
+    if (exception.getValidationDetails() != null) {
+      response.put("validationDetails", exception.getValidationDetails());
+    }
+
+    return ResponseEntity
+            .status(HttpStatus.CONFLICT)  // 409
+            .body(response);
+  }
 
 }

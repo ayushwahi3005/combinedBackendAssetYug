@@ -1,6 +1,7 @@
 package com.quantumai.customer.dto;
 
 import lombok.Data;
+import java.util.Map;
 
 @Data
 public class AssetsDTO {
@@ -19,4 +20,5 @@ public class AssetsDTO {
   private String image;
   private Long companyId;
   private String updatedAt;
+  private Map<String, String> extraFields; // For custom field validation
 }

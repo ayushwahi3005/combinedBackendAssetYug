@@ -9,6 +9,7 @@ import com.quantumai.customer.entity.*;
 import com.quantumai.customer.entity.IdGenerator.*;
 import com.quantumai.customer.entity.IdGenerator.AssetIdTable;
 import com.quantumai.customer.exception.AssetExtraFieldDeletionException;
+import com.quantumai.customer.exception.AssetUniqueFieldViolationException;
 import com.quantumai.customer.exception.CategoryException;
 import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
 import com.quantumai.customer.repository.*;
@@ -99,6 +100,9 @@ public class AssetsServiceImpl implements AssetsService {
   @Autowired
   private AssetCountByCategoriesRepository assetCountByCategoriesRepository;;
 
+  @Autowired
+  private AssetUniqueFieldConfigurationRepository assetUniqueFieldConfigurationRepository;
+
   private static final String SEQ_ID = "asset_category_sequence";
   LocalDateTime localDateTime;
 
@@ -120,8 +124,51 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
-  public AssetsDTO addAssets(AssetsDTO assetsDTO) {
-    // TODO Auto-generated method stub
+  public AssetsDTO addAssets(AssetsDTO assetsDTO) throws Exception {
+    // Step 1: Validate standard unique fields before adding asset
+    AssetUniqueFieldValidationDTO validation = validateUniqueFields(assetsDTO, assetsDTO.getCompanyId());
+    if (!validation.isValid()) {
+      log.warn("Unique field validation failed: {}", validation.getMessage());
+      throw new AssetUniqueFieldViolationException(
+        "Unique field constraint violated: " + validation.getMessage(),
+        validation
+      );
+    }
+    log.info("AssetTO-->:{}",assetsDTO.toString());
+
+    // Step 2: VALIDATE ALL EXTRA FIELDS BEFORE SAVING ASSET
+    if (assetsDTO.getExtraFields() != null && !assetsDTO.getExtraFields().isEmpty()) {
+      for (Map.Entry<String, String> entry : assetsDTO.getExtraFields().entrySet()) {
+        String fieldName = entry.getKey();
+        String fieldValue = entry.getValue();
+
+        if (fieldValue == null || fieldValue.trim().isEmpty()) {
+          log.debug("Extra field {} has empty value, skipping validation", fieldName);
+          continue;
+        }
+
+        if (isFieldMarkedUnique(assetsDTO.getCompanyId(), fieldName, "EXTRA")) {
+          List<AssetExtraFields> existingFields = checkExtraFieldUniqueness(
+            assetsDTO.getCompanyId(),
+            fieldName,
+            fieldValue,
+            null
+          );
+
+          if (!existingFields.isEmpty()) {
+            log.warn("Unique extra field {} already has value: {}", fieldName, fieldValue);
+            throw new AssetUniqueFieldViolationException(
+              "Unique constraint violated for extra field '" + fieldName + "' with value '" + fieldValue + "'",
+              fieldName,
+              Map.of(fieldName,
+                existingFields.stream().map(AssetExtraFields::getAssetId).collect(Collectors.toList()))
+            );
+          }
+        }
+      }
+    }
+
+    // Step 3: All validations passed - save the asset
     Assets assets = modelMapper.map(assetsDTO, Assets.class);
     if (assets.getAssetId() == null) {
       Optional<AssetIdTable> optionalIdTable =
@@ -131,23 +178,47 @@ public class AssetsServiceImpl implements AssetsService {
         AssetIdTable myidTable = new AssetIdTable();
         myidTable.setTableId(2);
         myidTable.setCompanyId(assetsDTO.getCompanyId());
-        //				//System.out.println("---------------------new---------->"+idTable.getTableId());
         idTableRepository.save(myidTable);
       } else {
-        //				List<AssetIdTable> idTableList=idTableRepository.findAll();
-        //				AssetIdTable idTable=idTableList.get(0);
         AssetIdTable idTable = optionalIdTable.get();
         assets.setAssetId(idTable.getTableId());
         idTable.updateId();
-        //				//System.out.println("---------------------already---------->"+idTable.getTableId()+"
-        // "+idTable.get);
         idTableRepository.save(idTable);
       }
     }
 
     assets.setUpdatedAt(LocalDateTime.now().toString());
-    AssetsDTO myAssetsDTO = modelMapper.map(assetsRepository.save(assets), AssetsDTO.class);
-    log.info("Asset Saved : {}", myAssetsDTO.toString());
+    Assets savedAsset = assetsRepository.save(assets);
+    log.info("Asset Saved with ID: {}", savedAsset.getId());
+
+    // Step 4: Save extra fields
+    if (assetsDTO.getExtraFields() != null && !assetsDTO.getExtraFields().isEmpty()) {
+      for (Map.Entry<String, String> entry : assetsDTO.getExtraFields().entrySet()) {
+        String fieldName = entry.getKey();
+        String fieldValue = entry.getValue();
+
+        if (fieldValue == null || fieldValue.trim().isEmpty()) {
+          continue;
+        }
+
+        AssetExtraFieldsDTO extraFieldDTO = new AssetExtraFieldsDTO();
+        extraFieldDTO.setName(fieldName);
+        extraFieldDTO.setValue(fieldValue);
+        extraFieldDTO.setAssetId(savedAsset.getId());
+        extraFieldDTO.setCompanyId(assetsDTO.getCompanyId());
+        extraFieldDTO.setEmail(assetsDTO.getEmail());
+
+        long assetExtraFieldId = getAndIncrementSequence(assetsDTO.getCompanyId());
+        extraFieldDTO.setAssetExtraFieldId(assetExtraFieldId);
+
+        AssetExtraFields extraFields = modelMapper.map(extraFieldDTO, AssetExtraFields.class);
+        extraFieldsRepository.save(extraFields);
+        log.info("Extra field {} saved for asset {}", fieldName, savedAsset.getId());
+      }
+    }
+
+    AssetsDTO myAssetsDTO = modelMapper.map(savedAsset, AssetsDTO.class);
+    log.info("Asset with extra fields saved successfully: {}", myAssetsDTO.getId());
     return myAssetsDTO;
   }
 
@@ -1954,7 +2025,264 @@ public class AssetsServiceImpl implements AssetsService {
     });
     assetCategoryInspectionRepository.save(assetCategoryInspection);
     log.info("AssetCategoryInspection updated successfully");
-
   }
 
+  @Override
+  public AssetUniqueFieldConfigurationDTO saveUniqueFieldConfiguration(AssetUniqueFieldConfigurationDTO configDTO) {
+    try {
+      log.info("Saving unique field configuration for company: {} field: {}", configDTO.getCompanyId(), configDTO.getFieldName());
+
+      AssetUniqueFieldConfiguration config = modelMapper.map(configDTO, AssetUniqueFieldConfiguration.class);
+      config.setCreatedAt(LocalDateTime.now().toString());
+      config.setUpdatedAt(LocalDateTime.now().toString());
+
+      deleteUniqueFieldConfigurationByCompanyAndField(configDTO.getCompanyId(), configDTO.getFieldName());
+
+      AssetUniqueFieldConfiguration savedConfig = assetUniqueFieldConfigurationRepository.save(config);
+      log.info("Unique field configuration saved successfully with ID: {}", savedConfig.getId());
+
+      return modelMapper.map(savedConfig, AssetUniqueFieldConfigurationDTO.class);
+    } catch (Exception e) {
+      log.error("Error saving unique field configuration: {}", e.getMessage(), e);
+      throw new RuntimeException("Failed to save unique field configuration: " + e.getMessage());
+    }
+  }
+
+  @Override
+  public List<AssetUniqueFieldConfigurationDTO> getUniqueFieldConfigurations(Long companyId) {
+    try {
+      log.info("Fetching unique field configurations for company: {}", companyId);
+
+      List<AssetUniqueFieldConfiguration> configs = assetUniqueFieldConfigurationRepository.findByCompanyId(companyId);
+      List<AssetUniqueFieldConfigurationDTO> dtos = new ArrayList<>();
+
+      configs.forEach(config -> dtos.add(modelMapper.map(config, AssetUniqueFieldConfigurationDTO.class)));
+
+      log.info("Found {} unique field configurations", dtos.size());
+      return dtos;
+    } catch (Exception e) {
+      log.error("Error fetching unique field configurations: {}", e.getMessage(), e);
+      return new ArrayList<>();
+    }
+  }
+
+  @Override
+  public AssetUniqueFieldValidationDTO validateUniqueFields(AssetsDTO assetsDTO, Long companyId) {
+    try {
+      log.info("Validating unique fields for asset in company: {}", companyId);
+      log.info("Extra fields in DTO: {}", assetsDTO.getExtraFields());
+
+      AssetUniqueFieldValidationDTO validationResult = new AssetUniqueFieldValidationDTO();
+      Map<String, List<String>> conflicts = new HashMap<>();
+
+      List<AssetUniqueFieldConfiguration> uniqueConfigs = assetUniqueFieldConfigurationRepository.findByCompanyIdAndIsUniqueTrue(companyId);
+
+      log.info("Found {} unique field configurations", uniqueConfigs == null ? 0 : uniqueConfigs.size());
+
+      if (uniqueConfigs == null || uniqueConfigs.isEmpty()) {
+        validationResult.setValid(true);
+        validationResult.setMessage("No unique field configurations found");
+        return validationResult;
+      }
+
+      for (AssetUniqueFieldConfiguration config : uniqueConfigs) {
+        String fieldName = config.getFieldName();
+        String fieldType = config.getType();
+        Object fieldValue = null;
+
+        log.info("Checking unique config - fieldName: {}, type: {}, isUnique: {}", fieldName, fieldType, config.getIsUnique());
+
+        if ("STANDARD".equalsIgnoreCase(fieldType)) {
+          fieldValue = getStandardFieldValue(assetsDTO, fieldName);
+
+          if (fieldValue == null || "".equals(fieldValue.toString().trim())) {
+            log.debug("Field {} has empty value, skipping validation", fieldName);
+            continue;
+          }
+
+          List<Assets> existingAssets = checkStandardFieldUniqueness(companyId, fieldName, fieldValue, assetsDTO.getId());
+          if (!existingAssets.isEmpty()) {
+            List<String> conflictingIds = existingAssets.stream()
+              .map(a -> a.getId() != null ? a.getId() : (a.getAssetId() != null ? a.getAssetId().toString() : ""))
+              .collect(Collectors.toList());
+            conflicts.put(fieldName, conflictingIds);
+            log.warn("Unique field {} violation found with values: {}", fieldName, conflictingIds);
+          }
+        } else if ("EXTRA".equalsIgnoreCase(fieldType)) {
+          log.info("Validating EXTRA field: {}", fieldName);
+
+          if (assetsDTO.getExtraFields() != null && assetsDTO.getExtraFields().containsKey(fieldName)) {
+            fieldValue = assetsDTO.getExtraFields().get(fieldName);
+            log.info("Extra field {} value from DTO: {}", fieldName, fieldValue);
+
+            if (fieldValue == null || "".equals(fieldValue.toString().trim())) {
+              log.debug("Extra field {} has empty value, skipping validation", fieldName);
+              continue;
+            }
+
+            log.info("Checking uniqueness for extra field {} with value: {}", fieldName, fieldValue);
+            List<AssetExtraFields> existingExtraFields = checkExtraFieldUniqueness(companyId, fieldName, fieldValue.toString(), assetsDTO.getId());
+            log.info("Found {} existing extra fields with same name and value", existingExtraFields.size());
+
+            if (!existingExtraFields.isEmpty()) {
+              List<String> conflictingIds = existingExtraFields.stream()
+                .map(e -> e.getAssetId() != null ? e.getAssetId() : "")
+                .collect(Collectors.toList());
+              conflicts.put(fieldName, conflictingIds);
+              log.warn("Unique extra field {} violation found with values: {}", fieldName, conflictingIds);
+            }
+          } else {
+            log.info("Extra field {} not provided in request or extraFields is null", fieldName);
+            log.debug("ExtraFields: {}", assetsDTO.getExtraFields());
+          }
+        }
+      }
+
+      if (!conflicts.isEmpty()) {
+        validationResult.setValid(false);
+        validationResult.setConflicts(conflicts);
+
+        String conflictFields = conflicts.keySet().stream()
+                .map(key -> key.equals("serialNumber") ? "Serial Number" : key)
+                .collect(Collectors.joining(", "));
+
+        validationResult.setMessage("Unique field constraint violated for fields: " + conflictFields);
+      }else {
+        validationResult.setValid(true);
+        validationResult.setMessage("All unique field constraints satisfied");
+      }
+
+      return validationResult;
+    } catch (Exception e) {
+      log.error("Error validating unique fields: {}", e.getMessage(), e);
+      AssetUniqueFieldValidationDTO result = new AssetUniqueFieldValidationDTO();
+      result.setValid(false);
+      result.setMessage("Error during validation: " + e.getMessage());
+      return result;
+    }
+  }
+
+  @Override
+  public void deleteUniqueFieldConfiguration(String configId) {
+    try {
+      log.info("Deleting unique field configuration: {}", configId);
+      assetUniqueFieldConfigurationRepository.deleteById(configId);
+      log.info("Unique field configuration deleted successfully");
+    } catch (Exception e) {
+      log.error("Error deleting unique field configuration: {}", e.getMessage(), e);
+      throw new RuntimeException("Failed to delete unique field configuration: " + e.getMessage());
+    }
+  }
+
+  @Override
+  public void deleteUniqueFieldConfigurationByCompanyAndField(Long companyId, String fieldName) {
+    try {
+      log.info("Deleting unique field configuration for company: {} field: {}", companyId, fieldName);
+      assetUniqueFieldConfigurationRepository.deleteByCompanyIdAndFieldName(companyId, fieldName);
+      log.info("Unique field configuration deleted successfully");
+    } catch (Exception e) {
+      log.error("Error deleting unique field configuration: {}", e.getMessage(), e);
+    }
+  }
+
+  private Object getStandardFieldValue(AssetsDTO assetsDTO, String fieldName) {
+    switch (fieldName.toLowerCase()) {
+      case "name":
+        return assetsDTO.getName();
+      case "serialnumber":
+        return assetsDTO.getSerialNumber();
+      case "category":
+        return assetsDTO.getCategory();
+      case "customer":
+        return assetsDTO.getCustomer();
+      case "customerid":
+        return assetsDTO.getCustomerId();
+      case "location":
+        return assetsDTO.getLocation();
+      case "status":
+        return assetsDTO.getStatus();
+      case "assetid":
+        return assetsDTO.getAssetId();
+      default:
+        return null;
+    }
+  }
+
+  private List<Assets> checkStandardFieldUniqueness(Long companyId, String fieldName, Object fieldValue, String excludeAssetId) {
+    try {
+      Query query = new Query();
+      query.addCriteria(Criteria.where("companyId").is(companyId));
+
+      switch (fieldName.toLowerCase()) {
+        case "name":
+          query.addCriteria(Criteria.where("name").is(fieldValue));
+          break;
+        case "serialnumber":
+          query.addCriteria(Criteria.where("serialNumber").is(fieldValue));
+          break;
+        case "category":
+          query.addCriteria(Criteria.where("category").is(fieldValue));
+          break;
+        case "customer":
+          query.addCriteria(Criteria.where("customer").is(fieldValue));
+          break;
+        case "customerid":
+          query.addCriteria(Criteria.where("customerId").is(fieldValue));
+          break;
+        case "location":
+          query.addCriteria(Criteria.where("location").is(fieldValue));
+          break;
+        case "status":
+          query.addCriteria(Criteria.where("status").is(fieldValue));
+          break;
+        case "assetid":
+          query.addCriteria(Criteria.where("assetId").is(fieldValue));
+          break;
+      }
+
+      if (excludeAssetId != null && !excludeAssetId.isEmpty()) {
+        query.addCriteria(Criteria.where("_id").ne(excludeAssetId));
+      }
+
+      return mongoTemplate.find(query, Assets.class);
+    } catch (Exception e) {
+      log.error("Error checking standard field uniqueness: {}", e.getMessage(), e);
+      return new ArrayList<>();
+    }
+  }
+
+  public List<AssetExtraFields> checkExtraFieldUniqueness(Long companyId, String fieldName, String fieldValue, String excludeAssetId) {
+    try {
+      log.info("Checking extra field uniqueness - companyId: {}, fieldName: {}, fieldValue: {}, excludeAssetId: {}",
+        companyId, fieldName, fieldValue, excludeAssetId);
+
+      Query query = new Query();
+      query.addCriteria(Criteria.where("companyId").is(companyId));
+      query.addCriteria(Criteria.where("name").is(fieldName));
+      query.addCriteria(Criteria.where("value").is(fieldValue));
+
+      if (excludeAssetId != null && !excludeAssetId.isEmpty()) {
+        query.addCriteria(Criteria.where("assetId").ne(excludeAssetId));
+      }
+
+      List<AssetExtraFields> results = mongoTemplate.find(query, AssetExtraFields.class);
+      log.info("Query results for extra field uniqueness: {} records found", results.size());
+      results.forEach(r -> log.info("  - AssetId: {}, Name: {}, Value: {}", r.getAssetId(), r.getName(), r.getValue()));
+
+      return results;
+    } catch (Exception e) {
+      log.error("Error checking extra field uniqueness: {}", e.getMessage(), e);
+      return new ArrayList<>();
+    }
+  }
+
+  public boolean isFieldMarkedUnique(Long companyId, String fieldName, String fieldType) {
+    try {
+      Optional<AssetUniqueFieldConfiguration> config = assetUniqueFieldConfigurationRepository.findByCompanyIdAndFieldName(companyId, fieldName);
+      return config.isPresent() && config.get().getIsUnique() != null && config.get().getIsUnique();
+    } catch (Exception e) {
+      log.error("Error checking if field is marked unique: {}", e.getMessage(), e);
+      return false;
+    }
+  }
 }

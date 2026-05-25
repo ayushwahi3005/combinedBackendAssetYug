@@ -339,6 +339,13 @@ public class AssetAPI {
     return assetsService.getAssetInspection(id);
   }
 
+  @GetMapping("/uniqueFieldConfig/{companyId}")
+//  @PreAuthorize("@appSecurity.canViewAny(authentication, #companyId, 'assets')")
+  public ResponseEntity<List<AssetUniqueFieldConfigurationDTO>> getUniqueFieldConfig(@PathVariable Long companyId) throws Exception {
+
+    return ResponseEntity.ok(assetsService.getUniqueFieldConfigurations(companyId));
+  }
+
   @PostMapping("/advanceFilter/{pageNumber}/{pageSize}")
   @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
   public PaginatedResultDTO<String> advanceFilter(
@@ -370,15 +377,22 @@ public class AssetAPI {
 
   @PutMapping("/addassets")
   @PreAuthorize("@appSecurity.canEdit(authentication, #assestsDTO.companyId, 'assets')")
-  public void addAssets(@RequestBody AssetsDTO assestsDTO) throws NoSubscriptionError {
+  public void addAssets(@RequestBody AssetsDTO assestsDTO) throws Exception {
     assetsService.addAssets(assestsDTO);
   }
 
   @PostMapping("/addNewAssets")
   @PreAuthorize("@appSecurity.canCreate(authentication, #assestsDTO.companyId, 'assets')")
-  public ResponseEntity<AssetsDTO> addNewAssets(@RequestBody AssetsDTO assestsDTO) throws NoSubscriptionError {
+  public ResponseEntity<AssetsDTO> addNewAssets(@RequestBody AssetsDTO assestsDTO) throws Exception {
     log.info("NEW ASSET DATA: {}", assestsDTO);
     return ResponseEntity.ok(assetsService.addAssets(assestsDTO));
+  }
+
+  @PostMapping("/uniqueFieldConfig")
+  @PreAuthorize("@appSecurity.canCreate(authentication, #assetUniqueFieldConfigurationDTO.companyId, 'assets')")
+  public ResponseEntity<AssetUniqueFieldConfigurationDTO> addUniqueFieldConfig(@RequestBody AssetUniqueFieldConfigurationDTO assetUniqueFieldConfigurationDTO) throws Exception {
+
+    return ResponseEntity.ok(assetsService.saveUniqueFieldConfiguration(assetUniqueFieldConfigurationDTO));
   }
 
   @PostMapping("/import/{companyId}/{email}")
@@ -701,9 +715,11 @@ public class AssetAPI {
       importHistoryDTO.setStatus("Failed");
       importHistoryDTO.setMessage(e.getMessage());
       log.error("Import failed", e);
+    } catch (Exception e) {
+        throw new RuntimeException(e);
     }
 
-    customerService.addImportHistory(importHistoryDTO);
+      customerService.addImportHistory(importHistoryDTO);
     sendImportNotification(companyId, file.getOriginalFilename());
     log.info("Import completed for companyId: {}", companyId);
   }
@@ -963,9 +979,11 @@ public class AssetAPI {
       importHistoryDTO.setStatus("Failed");
       importHistoryDTO.setMessage(e.getMessage());
       log.error("Update import failed", e);
+    } catch (Exception e) {
+        throw new RuntimeException(e);
     }
 
-    customerService.addImportHistory(importHistoryDTO);
+      customerService.addImportHistory(importHistoryDTO);
     log.info("Update import completed for companyId: {}", companyId);
   }
 
