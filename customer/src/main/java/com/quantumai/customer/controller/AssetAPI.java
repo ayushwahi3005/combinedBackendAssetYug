@@ -23,6 +23,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import lombok.extern.slf4j.Slf4j;
@@ -74,6 +75,7 @@ public class AssetAPI {
   @Autowired private CompanyCustomerRepository companyCustomerRepository;
   @Autowired private MongoTemplate mongoTemplate;
   @Autowired private ImportHistoryRepository importHistoryRepository;
+  @Autowired private AssetUniqueFieldConfigurationRepository assetUniqueFieldConfigurationRepository;
 
   private final ModelMapper modelMapper = new ModelMapper();
 
@@ -643,89 +645,119 @@ public class AssetAPI {
           errorDescriptionCell.setCellStyle(errorCellStyle);
         } else {
           log.info("Attempting to save asset: {}", assetsDTO.toString());
-         AssetsDTO savedAssetDTO= assetsService.addAssets(assetsDTO);
 
+          // ✅ STEP 1: Collect all extra field values and validate format/mandatory (don't stop on first error)
+          List<AssetExtraFieldName> extraFieldNames = extraFieldNameRepository.findByCompanyId(companyId);
+          Map<String, String> extraFieldValues = new HashMap<>();
+          List<String> formatErrorMessages = new ArrayList<>();
 
-            // Handle extra fields for update
-            List<AssetExtraFieldName> extraFieldNames = extraFieldNameRepository.findByCompanyId(companyId);
+          // Process extra fields from CSV to collect values and validate format
+          for (int j = 0; j < row.length; j++) {
+            String field = headerMap.get(j);
+            String value = row[j] != null ? row[j].trim() : "";
 
-            // Process extra fields from CSV
-            for (int j = 0; j < row.length; j++) {
-              String field = headerMap.get(j);
-              String value = row[j] != null ? row[j].trim() : "";
+            if (columnMap.get(field) == null) continue;
 
-              if (columnMap.get(field) == null) continue;
+            // Check if this column maps to an extra field
+            for (AssetExtraFieldName extraFieldName : extraFieldNames) {
+              if (columnMap.get(field).equalsIgnoreCase(extraFieldName.getName())) {
+                String formattedValue = value;
 
-              // Check if this column maps to an extra field
-              for (AssetExtraFieldName extraFieldName : extraFieldNames) {
-                if (columnMap.get(field).equalsIgnoreCase(extraFieldName.getName())) {
-                  // Find or create extra field
-                  Optional<AssetExtraFields> existingExtra =
-                          extraFieldsRepository.findByNameAndAssetId(
-                                  extraFieldName.getName(), savedAssetDTO.getId());
+                // ✅ Check mandatory extra fields
+                if (mandatoryColumnList.contains(extraFieldName.getName().toLowerCase())) {
+                  if (value.trim().isEmpty()) {
+                    formatErrorMessages.add(extraFieldName.getName().toUpperCase() + " is MANDATORY");
+                    errorCellMap.put(j, true);
+                    errorFlag = 1;
+                    break;
+                  }
+                }
 
-                  AssetExtraFields extraFields = existingExtra.orElse(new AssetExtraFields());
-                  extraFields.setAssetId(savedAssetDTO.getId());
-                  extraFields.setName(extraFieldName.getName());
-                  extraFields.setType(extraFieldName.getType());
-
-                  // Validate and format based on type
-                  String formattedValue = value;
-
-                  if(mandatoryColumnList.contains(extraFields.getName().toLowerCase())){
-                    if(value.trim().isEmpty()){
-                      log.info("Mandatory extra field '{}' is empty for asset '{}'", extraFields.getName(), savedAssetDTO.getName());
-                      errorDesc.append("ERROR WITH ").append(extraFields.getName().toUpperCase()).append(" MANDATORY WHILE ADDING IN ASSET");
+                // ✅ Validate format based on type (don't break, collect all errors)
+                if ("number".equals(extraFieldName.getType())) {
+                  if (!value.trim().isEmpty()) {
+                    try {
+                      int val = Integer.parseInt(value);
+                      formattedValue = Integer.toString(val);
+                    } catch (NumberFormatException e) {
+                      formatErrorMessages.add(extraFieldName.getName().toUpperCase() + " - Invalid number format");
+                      errorCellMap.put(j, true);
                       errorFlag = 1;
                       break;
                     }
                   }
-                  else {
-                    if ("number".equals(extraFieldName.getType())) {
-                      if(value.trim().isEmpty()){
-                        extraFields.setValue("");
-                        continue;
-                      }
-                      try {
-                        int val = Integer.parseInt(value);
-                        formattedValue = Integer.toString(val);
-                      } catch (NumberFormatException e) {
-                        errorDesc.append("ERROR WHILE ADDING IN ").append(extraFieldName.getName().toUpperCase()).append(" - Invalid number format");
-                        errorFlag = 1;
-                        break;
-                      }
-                    } else if ("date".equals(extraFieldName.getType())) {
-                      if(value.trim().isEmpty()){
-                        extraFields.setValue("");
-                        continue;
-                      }
-                      try {
-                        DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
-                        LocalDate date = LocalDate.parse(value, inputFormatter);
-                        DateTimeFormatter outputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-                        formattedValue = date.format(outputFormatter);
-                      } catch (Exception e) {
-                        errorDesc.append("ERROR WHILE ADDING IN ").append(extraFieldName.getName().toUpperCase()).append(" - Invalid date format (use dd-MM-yyyy)");
-                        errorFlag = 1;
-                        break;
-                      }
+                } else if ("date".equals(extraFieldName.getType())) {
+                  if (!value.trim().isEmpty()) {
+                    try {
+                      DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+                      LocalDate date = LocalDate.parse(value, inputFormatter);
+                      DateTimeFormatter outputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+                      formattedValue = date.format(outputFormatter);
+                    } catch (Exception e) {
+                      formatErrorMessages.add(extraFieldName.getName().toUpperCase() + " - Invalid date format (use dd-MM-yyyy)");
+                      errorCellMap.put(j, true);
+                      errorFlag = 1;
+                      break;
                     }
                   }
-                  if(errorFlag == 0) {
-                    extraFields.setValue(formattedValue);
-                    extraFields.setCompanyId(companyId);
-                    extraFieldsRepository.save(extraFields);
-                    break;
-                  } else {
-                    log.warn("Extra field validation failed for asset: {}", errorDesc.toString());
-                    Assets assets = modelMapper.map(savedAssetDTO, Assets.class);
-                    assetsRepository.delete(assets);
-                    break;  // Exit extra field loop on error
+                }
+
+                // Only add to map if format validation passed for this field
+                if (errorFlag == 0) {
+                  extraFieldValues.put(extraFieldName.getName().toLowerCase(), formattedValue);
+                }
+                break;
+              }
+            }
+          }
+
+          // ✅ STEP 2: Validate unique fields (even if there are format errors, so we can highlight all problems)
+          if (!validateAllUniqueFieldsForImport(assetsDTO, extraFieldValues, companyId, errorDesc,
+                                                errorCellMap, headerMap, columnMap)) {
+            errorFlag = 1;
+            log.warn("Unique field validation failed: {}", errorDesc.toString());
+          }
+
+          // ✅ Combine all error messages
+          if (errorFlag == 1) {
+            if (!formatErrorMessages.isEmpty()) {
+              for (int i = 0; i < formatErrorMessages.size(); i++) {
+                if (i == 0 && errorDesc.length() == 0) {
+                  errorDesc.append("ERROR: ").append(formatErrorMessages.get(i));
+                } else {
+                  if (errorDesc.length() > 0) {
+                    errorDesc.append(" | ");
                   }
+                  errorDesc.append(formatErrorMessages.get(i));
                 }
               }
             }
+          }
 
+          // ✅ STEP 3: Save asset and extra fields ONLY if all validations pass
+          if (errorFlag == 0) {
+            AssetsDTO savedAssetDTO = assetsService.addAssets(assetsDTO);
+
+            // Save extra fields
+            for (Map.Entry<String, String> entry : extraFieldValues.entrySet()) {
+              AssetExtraFields extraFields = new AssetExtraFields();
+              extraFields.setAssetId(savedAssetDTO.getId());
+              extraFields.setName(entry.getKey());
+              extraFields.setValue(entry.getValue());
+              extraFields.setCompanyId(companyId);
+
+              // Find type from extraFieldNames
+              for (AssetExtraFieldName extraFieldName : extraFieldNames) {
+                if (extraFieldName.getName().equalsIgnoreCase(entry.getKey())) {
+                  extraFields.setType(extraFieldName.getType());
+                  break;
+                }
+              }
+
+              extraFieldsRepository.save(extraFields);
+              log.info("Extra field saved: {} = {}", entry.getKey(), entry.getValue());
+            }
+          }
 
           if (errorFlag != 0) {
             Row errorRow = errorSheet.createRow(excelIndex++);
@@ -1464,6 +1496,161 @@ public class AssetAPI {
       log.error("❌ Failed to parse column mappings: {}", columnMappings, e);
     }
     return map;
+  }
+
+  /**
+   * ✅ Validates if a field value is unique for the given company
+   * Checks both standard fields and extra fields
+   */
+  private boolean isUniqueFieldValid(Long companyId, String fieldName, String fieldValue, String fieldType) {
+    if (fieldValue == null || fieldValue.trim().isEmpty()) {
+      return true; // Empty values are allowed
+    }
+
+    try {
+      if ("STANDARD".equalsIgnoreCase(fieldType)) {
+        // Check standard fields
+        Query query = new Query();
+        query.addCriteria(Criteria.where("companyId").is(companyId));
+
+        String fieldNameLower = fieldName.toLowerCase();
+        switch (fieldNameLower) {
+          case "name":
+            query.addCriteria(Criteria.where("name").regex("^" + Pattern.quote(fieldValue) + "$", "i"));
+            break;
+          case "serialnumber":
+            query.addCriteria(Criteria.where("serialNumber").regex("^" + Pattern.quote(fieldValue) + "$", "i"));
+            break;
+          case "customer":
+            query.addCriteria(Criteria.where("customer").regex("^" + Pattern.quote(fieldValue) + "$", "i"));
+            break;
+          case "category":
+            query.addCriteria(Criteria.where("category").regex("^" + Pattern.quote(fieldValue) + "$", "i"));
+            break;
+          case "location":
+            query.addCriteria(Criteria.where("location").regex("^" + Pattern.quote(fieldValue) + "$", "i"));
+            break;
+          default:
+            return true;
+        }
+
+        List<Assets> existingAssets = mongoTemplate.find(query, Assets.class);
+        return existingAssets.isEmpty();
+      } else if ("EXTRA".equalsIgnoreCase(fieldType)) {
+        // Check extra fields
+        Query extraQuery = new Query();
+        extraQuery.addCriteria(Criteria.where("companyId").is(companyId));
+        extraQuery.addCriteria(Criteria.where("name").is(fieldName));
+        extraQuery.addCriteria(Criteria.where("value").regex("^" + Pattern.quote(fieldValue) + "$", "i"));
+
+        List<AssetExtraFields> existingExtraFields = mongoTemplate.find(extraQuery, AssetExtraFields.class);
+        return existingExtraFields.isEmpty();
+      }
+    } catch (Exception e) {
+      log.error("Error validating unique field: {}", e.getMessage(), e);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * ✅ Validates all unique fields for the asset before saving
+   * Collects ALL violations (not just the first one) and returns:
+   * - true if all valid
+   * - false if any duplicates found
+   * Highlights all problematic fields and provides comprehensive error message
+   */
+  private boolean validateAllUniqueFieldsForImport(AssetsDTO assetsDTO, Map<String, String> extraFieldValues,
+                                                   Long companyId, StringBuilder errorDesc,
+                                                   Map<Integer, Boolean> errorCellMap, Map<Integer, String> headerMap,
+                                                   Map<String, String> columnMap) {
+    try {
+      List<AssetUniqueFieldConfiguration> uniqueConfigs = assetUniqueFieldConfigurationRepository.findByCompanyIdAndIsUniqueTrue(companyId);
+
+      if (uniqueConfigs == null || uniqueConfigs.isEmpty()) {
+        log.debug("No unique field configurations found for company: {}", companyId);
+        return true;
+      }
+
+      boolean hasViolations = false;
+      List<String> violationMessages = new ArrayList<>();
+
+      // ✅ Check ALL fields and collect all violations
+      for (AssetUniqueFieldConfiguration config : uniqueConfigs) {
+        String fieldName = config.getFieldName();
+        String fieldType = config.getType();
+        String fieldValue = null;
+        int cellIndex = -1;
+
+        // Get field value from standard fields or extra fields
+        if ("STANDARD".equalsIgnoreCase(fieldType)) {
+          switch (fieldName.toLowerCase()) {
+            case "name":
+              fieldValue = assetsDTO.getName();
+              break;
+            case "serialnumber":
+              fieldValue = assetsDTO.getSerialNumber();
+              break;
+            case "customer":
+              fieldValue = assetsDTO.getCustomer();
+              break;
+            case "category":
+              fieldValue = assetsDTO.getCategory();
+              break;
+            case "location":
+              fieldValue = assetsDTO.getLocation();
+              break;
+          }
+        } else if ("EXTRA".equalsIgnoreCase(fieldType)) {
+          fieldValue = extraFieldValues.get(fieldName.toLowerCase());
+        }
+
+        // Find cell index for highlighting error
+        for (Map.Entry<Integer, String> entry : headerMap.entrySet()) {
+          String header = entry.getValue();
+          if (columnMap.get(header) != null && columnMap.get(header).equalsIgnoreCase(fieldName)) {
+            cellIndex = entry.getKey();
+            break;
+          }
+        }
+
+        // Validate uniqueness
+        if (fieldValue != null && !fieldValue.trim().isEmpty()) {
+          boolean isValid = isUniqueFieldValid(companyId, fieldName, fieldValue, fieldType);
+          if (!isValid) {
+            hasViolations = true;
+            String violation = fieldName.toUpperCase() + " (value: '" + fieldValue + "' already exists)";
+            violationMessages.add(violation);
+
+            // ✅ Highlight ALL problematic cells
+            if (cellIndex >= 0) {
+              errorCellMap.put(cellIndex, true);
+            }
+
+            log.warn("Unique field validation failed for {}: {}", fieldName, fieldValue);
+          }
+        }
+      }
+
+      // ✅ Build comprehensive error message with all violations
+      if (hasViolations) {
+        errorDesc.append("DUPLICATE VALUES FOUND: ");
+        for (int i = 0; i < violationMessages.size(); i++) {
+          errorDesc.append(violationMessages.get(i));
+          if (i < violationMessages.size() - 1) {
+            errorDesc.append(" | ");
+          }
+        }
+        return false;
+      }
+
+    } catch (Exception e) {
+      log.error("Error validating unique fields during import: {}", e.getMessage(), e);
+      return false;
+    }
+
+    return true;
   }
 
   private long countFileRows(MultipartFile file) {
