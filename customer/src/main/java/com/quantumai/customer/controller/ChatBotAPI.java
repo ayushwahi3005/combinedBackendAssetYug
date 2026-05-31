@@ -1,5 +1,9 @@
 package com.quantumai.customer.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+
 import com.quantumai.customer.dto.ChatBotRequestDTO;
 import com.quantumai.customer.dto.ChatBotResponseDTO;
 import com.quantumai.customer.service.ChatBotService;
@@ -19,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
         allowedHeaders = {"device-id", "Content-Type", "Authorization"}
 )
 @Slf4j
+@Tag(name = "ChatBot", description = "ChatBot Management API")
 public class ChatBotAPI {
 
     @Autowired
@@ -28,6 +33,7 @@ public class ChatBotAPI {
      * Main chatbot endpoint.
      * Accepts a natural language query and returns structured data + AI-generated answer.
      */
+    @Operation(summary = "Query", description = "Endpoint to query")
     @PostMapping("/query")
     @PreAuthorize("@appSecurity.canView(authentication, #request.companyId, 'assets')")
     public ResponseEntity<ChatBotResponseDTO> query(@RequestBody ChatBotRequestDTO request) {
@@ -56,6 +62,7 @@ public class ChatBotAPI {
     /**
      * Health check / capability endpoint.
      */
+    @Operation(summary = "Capabilities", description = "Endpoint to capabilities")
     @GetMapping("/capabilities")
     public ResponseEntity<?> capabilities() {
         return ResponseEntity.ok(java.util.Map.of(

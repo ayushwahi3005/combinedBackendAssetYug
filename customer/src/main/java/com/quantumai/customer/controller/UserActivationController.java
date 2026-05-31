@@ -1,5 +1,9 @@
 package com.quantumai.customer.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+
 import com.quantumai.customer.service.UserActivationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -7,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/user-activation")
+@Tag(name = "UserActivation", description = "UserActivation Management API")
 public class UserActivationController {
 
     private final UserActivationService userActivationService;
@@ -16,6 +21,7 @@ public class UserActivationController {
         this.userActivationService = userActivationService;
     }
 
+    @Operation(summary = "Activate User", description = "Endpoint to activate user")
     @PostMapping("/activate/{userId}")
     public ResponseEntity<?> activateUser(@PathVariable String userId) {
         boolean activated = userActivationService.activateUser(userId);
@@ -26,6 +32,7 @@ public class UserActivationController {
         }
     }
 
+    @Operation(summary = "Deactivate User", description = "Endpoint to deactivate user")
     @PostMapping("/deactivate/{userId}")
     public ResponseEntity<?> deactivateUser(@PathVariable String userId) {
         boolean deactivated = userActivationService.deactivateUser(userId);
@@ -36,6 +43,7 @@ public class UserActivationController {
         }
     }
 
+    @Operation(summary = "Can Activate New User", description = "Endpoint to can activate new user")
     @GetMapping("/can-activate/{companyId}")
     public ResponseEntity<Boolean> canActivateNewUser(@PathVariable Long companyId) {
         boolean canActivate = userActivationService.canActivateNewUser(companyId);

@@ -1,5 +1,9 @@
 package com.quantumai.customer.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,6 +50,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/assets")
 @Slf4j
+@Tag(name = "Asset", description = "Asset Management API")
 public class AssetAPI {
 
   @Autowired private JavaMailSender emailSender;
@@ -74,6 +79,7 @@ public class AssetAPI {
 
   // ─── Health check (public) ────────────────────────────────────────────────
 
+  @Operation(summary = "Working", description = "Endpoint to working")
   @GetMapping("/working")
   public String working() {
     return "Working";
@@ -81,12 +87,14 @@ public class AssetAPI {
 
   // ─── Read endpoints ───────────────────────────────────────────────────────
 
+  @Operation(summary = "Get Assets", description = "Endpoint to get assets")
   @GetMapping("/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public List<AssetsDTO> getAssets(@PathVariable Long companyId) {
     return assetsService.getAssetsDetails(companyId);
   }
 
+  @Operation(summary = "Get Assets By Customer", description = "Endpoint to get assets by customer")
   @GetMapping("/getByCutomerId/{customerId}/{pageNumber}")
   @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
   public PaginatedResultDTO<String> getAssetsByCustomer(
@@ -95,48 +103,56 @@ public class AssetAPI {
     return assetsService.getAssetsDetailsByCustomerId(customerId, pageNumber);
   }
 
+  @Operation(summary = "Get Asset", description = "Endpoint to get asset")
   @GetMapping("/getAsset/{id}")
   @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
   public AssetsDTO getAsset(@PathVariable String id) throws Exception {
     return assetsService.getAsset(id);
   }
 
+  @Operation(summary = "Get Asset Details", description = "Endpoint to get asset details")
   @GetMapping("/getAssetDetails/{id}")
   @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
   public AssetsDTO getAssetDetails(@PathVariable String id) throws Exception {
     return assetsService.getAssetSpecific(id);
   }
 
+  @Operation(summary = "Get Extra Fields", description = "Endpoint to get extra fields")
   @GetMapping("/getExtraFields/{id}")
   @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
   public List<AssetExtraFieldsDTO> getExtraFields(@PathVariable String id) {
     return assetsService.getExtraFields(id);
   }
 
+  @Operation(summary = "Get Extra Field Name", description = "Endpoint to get extra field name")
   @GetMapping("/getExtraFieldName/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public List<AssetExtraFieldNameDTO> getExtraFieldName(@PathVariable Long companyId) {
     return assetsService.getAssetExtraField(companyId);
   }
 
+  @Operation(summary = "Get Extra Field Name Value", description = "Endpoint to get extra field name value")
   @GetMapping("/getExtraFieldNameValue/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public Map<String, Map<String, String>> getExtraFieldNameValue(@PathVariable Long companyId) {
     return assetsService.getextraFieldList(companyId);
   }
 
+  @Operation(summary = "Get Check In Out List", description = "Endpoint to get check in out list")
   @GetMapping("/getCheckInOutList/{assetId}")
   @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
   public ResponseEntity<List<AssetCheckInOutDTO>> getCheckInOutList(@PathVariable String assetId) {
     return new ResponseEntity<>(assetsService.getCheckOutInList(assetId), HttpStatus.ACCEPTED);
   }
 
+  @Operation(summary = "Get Asset File", description = "Endpoint to get asset file")
   @GetMapping("/getFile/{assetId}")
   @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
   public List<AssetFileDTO> getAssetFile(@PathVariable String assetId) {
     return assetsService.getAssetFile(assetId);
   }
 
+  @Operation(summary = "Download File", description = "Endpoint to download file")
   @GetMapping("/getFile/download/{id}")
   @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
   public ResponseEntity<?> downloadFile(@PathVariable String id) {
@@ -146,6 +162,7 @@ public class AssetAPI {
             .body(assetFileDTO.getFile());
   }
 
+  @Operation(summary = "Get Mandatory Fields", description = "Endpoint to get mandatory fields")
   @GetMapping("/getMandatoryFields/{name}/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public ResponseEntity<AssetMandatoryFields> getMandatoryFields(
@@ -153,6 +170,7 @@ public class AssetAPI {
     return ResponseEntity.ok(assetsService.getMandatoryFields(name, companyId));
   }
 
+  @Operation(summary = "Get Show Fields", description = "Endpoint to get show fields")
   @GetMapping("/getShowFields/{name}/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public ResponseEntity<AssetShowFields> getShowFields(
@@ -160,30 +178,35 @@ public class AssetAPI {
     return ResponseEntity.ok(assetsService.getShowFields(name, companyId));
   }
 
+  @Operation(summary = "Get All Mandatory Fields", description = "Endpoint to get all mandatory fields")
   @GetMapping("/getAllMandatoryFields/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public ResponseEntity<List<AssetMandatoryFields>> getAllMandatoryFields(@PathVariable Long companyId) {
     return ResponseEntity.ok(assetsService.getAllMandatoryFields(companyId));
   }
 
+  @Operation(summary = "Get All Show Fields", description = "Endpoint to get all show fields")
   @GetMapping("/getAllShowFields/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public ResponseEntity<List<AssetShowFields>> getAllShowFields(@PathVariable Long companyId) {
     return ResponseEntity.ok(assetsService.getAllShowFields(companyId));
   }
 
+  @Operation(summary = "Get Qrdata", description = "Endpoint to get qrdata")
   @GetMapping("/getQRData/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public ResponseEntity<AssetQR> getQRData(@PathVariable Long companyId) {
     return ResponseEntity.ok(assetsService.getQRData(companyId));
   }
 
+  @Operation(summary = "Get All Asset Data", description = "Endpoint to get all asset data")
   @GetMapping("/getAllAssetData/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public PaginatedResultDTO<String> getAllAssetData(@PathVariable Long companyId) {
     return assetsService.getAllAssetDetails(companyId);
   }
 
+  @Operation(summary = "Get Work Order From Asset", description = "Endpoint to get work order from asset")
   @GetMapping(value = "/searchAssetlist/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public List<String> getWorkOrderFromAsset(
@@ -193,6 +216,7 @@ public class AssetAPI {
     return assetsService.searchedAssets(companyId, search, category);
   }
 
+  @Operation(summary = "Get Sorted Work Order From Asset", description = "Endpoint to get sorted work order from asset")
   @GetMapping(value = "/sortAssetlist/{companyId}/{pageNumber}/{pageSize}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public PaginatedResultDTO<String> getSortedWorkOrderFromAsset(
@@ -205,12 +229,14 @@ public class AssetAPI {
     return assetsService.sortAssets(companyId, category, pageNumber, pageSize);
   }
 
+  @Operation(summary = "Check In Check Out Count Dto", description = "Endpoint to check in check out count dto")
   @GetMapping("checkInOutCount/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public CheckInCheckOutCountDTO checkInCheckOutCountDTO(@PathVariable Long companyId) {
     return assetsService.checkInCheckOut(companyId);
   }
 
+  @Operation(summary = "Check In Out Asset", description = "Endpoint to check in out asset")
   @GetMapping("/checkInOutAsset/{companyId}/{checkedIn}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public List<AssetCheckInOut> checkInOutAsset(
@@ -218,6 +244,7 @@ public class AssetAPI {
     return assetsService.filterByCheckedInOut(companyId, checkedIn);
   }
 
+  @Operation(summary = "Get Check In Out Data", description = "Endpoint to get check in out data")
   @GetMapping("/checkInOutAssetData/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public PaginatedResultCheckInOutDTO<AssetCheckInOutData> getCheckInOutData(
@@ -227,6 +254,7 @@ public class AssetAPI {
     return assetsService.getAssetCheckInOutData(companyId, pageNumber, pageSize);
   }
 
+  @Operation(summary = "Get Category List", description = "Endpoint to get category list")
   @GetMapping(value = "/getCategoryList/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public List<AssetCategory> getCategoryList(@PathVariable Long companyId) {
@@ -235,36 +263,42 @@ public class AssetAPI {
 
 
 
+  @Operation(summary = "Get Category Active List", description = "Endpoint to get category active list")
   @GetMapping(value = "/getCategoryActiveList/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public List<AssetCategory> getCategoryActiveList(@PathVariable Long companyId) {
     return assetsService.getActiveCategoryList(companyId);
   }
 
+  @Operation(summary = "Get Category By Id", description = "Endpoint to get category by id")
   @GetMapping(value = "/getCategoryListById/{companyId}/{id}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public AssetCategory getCategoryById(@PathVariable Long companyId, @PathVariable String id) {
     return assetsService.getCategoryListById(companyId, id);
   }
 
+  @Operation(summary = "Count Asset By Category", description = "Endpoint to count asset by category")
   @GetMapping(value = "/countAssetByCategory/{category}")
   @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
   public int countAssetByCategory(@PathVariable String category) throws CategoryException {
     return assetsService.countAssetByCategory(category);
   }
 
+  @Operation(summary = "Count Asset By Categories", description = "Endpoint to count asset by categories")
   @GetMapping(value = "/countAssetByCategories/{companyId}")
   @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
   public List<AssetCountByCategoryDTO> countAssetByCategories(@PathVariable Long companyId) throws CategoryException {
     return assetsService.countAssetByCategories(companyId);
   }
 
+  @Operation(summary = "Get Active Assets", description = "Endpoint to get active assets")
   @GetMapping(value = "/getActiveAssets/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public List<AssetsDTO> getActiveAssets(@PathVariable Long companyId) {
     return assetsService.getActiveAssets(companyId);
   }
 
+  @Operation(summary = "Get All Asset Inspection By Category", description = "Endpoint to get all asset inspection by category")
   @GetMapping(value = "/getAllAssetInspectionByCategory/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public List<AssetCategoryInspection> getAllAssetInspectionByCategory(
@@ -272,18 +306,21 @@ public class AssetAPI {
     return assetsService.getAllAssetInspectionByCategory(companyId, category);
   }
 
+  @Operation(summary = "Get All Asset Inspection", description = "Endpoint to get all asset inspection")
   @GetMapping(value = "/getAllAssetInspection/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public List<AssetCategoryInspection> getAllAssetInspection(@PathVariable Long companyId) throws Exception {
     return assetsService.getAllAssetInspection(companyId);
   }
 
+  @Operation(summary = "Get All Asset Inspection Instance", description = "Endpoint to get all asset inspection instance")
   @GetMapping(value = "/getAllAssetInspectionInstance/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public List<AssetCategoryInspectionInstance> getAllAssetInspectionInstance(@PathVariable Long companyId) {
     return assetsService.getAllAssetCategoryInspectionValues(companyId);
   }
 
+  @Operation(summary = "Get All Asset Inspection Instance Paginated", description = "Endpoint to get all asset inspection instance paginated")
   @GetMapping(value = "/getAllAssetInspectionInstance/{companyId}/{pageNumber}/{pageSize}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public PaginatedResultDTO<AssetCategoryInspectionInstance> getAllAssetInspectionInstancePaginated(
@@ -295,12 +332,14 @@ public class AssetAPI {
     return assetsService.getAllAssetCategoryInspectionValuesPaginated(companyId, pageNumber, pageSize);
   }
 
+  @Operation(summary = "Get All Asset Inspection Instance By Asset Id", description = "Endpoint to get all asset inspection instance by asset id")
   @GetMapping(value = "/getAllAssetInspectionInstanceByAssetId/{assetId}")
   @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
   public List<AssetCategoryInspectionInstance> getAllAssetInspectionInstanceByAssetId(@PathVariable String assetId) {
     return assetsService.getAllAssetCategoryInspectionInstanceByAsset(assetId);
   }
 
+  @Operation(summary = "Get All Asset Inspection Instance By Asset Id Paginated", description = "Endpoint to get all asset inspection instance by asset id paginated")
   @GetMapping(value = "/getAllAssetInspectionInstanceByAssetId/{assetId}/{pageNumber}/{pageSize}")
   @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
   public PaginatedResultDTO<AssetCategoryInspectionInstance> getAllAssetInspectionInstanceByAssetIdPaginated(
@@ -313,12 +352,14 @@ public class AssetAPI {
     return assetsService.getAllAssetCategoryInspectionInstanceByAssetPaginated(assetId, pageNumber, pageSize);
   }
 
+  @Operation(summary = "Get Asset By Category", description = "Endpoint to get asset by category")
   @GetMapping(value = "/getAssetByCategory/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public Map<String, List<AssetsDTO>> getAssetByCategory(@PathVariable Long companyId) {
     return assetsService.getAssetByCategory(companyId);
   }
 
+  @Operation(summary = "Get Location Bin Details", description = "Endpoint to get location bin details")
   @GetMapping(value = "/locationBinDetails/{companyId}/{name}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public String getLocationBinDetails(@PathVariable Long companyId, @PathVariable String name) {
@@ -333,12 +374,14 @@ public class AssetAPI {
     }
   }
 
+  @Operation(summary = "Get Asset Inspection", description = "Endpoint to get asset inspection")
   @GetMapping(value = "/getAssetInspection/{id}")
   @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
   public AssetCategoryInspection getAssetInspection(@PathVariable String id) throws Exception {
     return assetsService.getAssetInspection(id);
   }
 
+  @Operation(summary = "Get Unique Field Config", description = "Endpoint to get unique field config")
   @GetMapping("/uniqueFieldConfig/{companyId}")
 //  @PreAuthorize("@appSecurity.canViewAny(authentication, #companyId, 'assets')")
   public ResponseEntity<List<AssetUniqueFieldConfigurationDTO>> getUniqueFieldConfig(@PathVariable Long companyId) throws Exception {
@@ -346,6 +389,7 @@ public class AssetAPI {
     return ResponseEntity.ok(assetsService.getUniqueFieldConfigurations(companyId));
   }
 
+  @Operation(summary = "Advance Filter", description = "Endpoint to advance filter")
   @PostMapping("/advanceFilter/{pageNumber}/{pageSize}")
   @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
   public PaginatedResultDTO<String> advanceFilter(
@@ -362,6 +406,7 @@ public class AssetAPI {
     return assetsService.advanceFilter(filter, pageNumber, pageSize, category, searchData, asc);
   }
 
+  @Operation(summary = "Get Assets With Advanced Filter", description = "Endpoint to get assets with advanced filter")
   @PostMapping("/advancedFilter/optimized")
   @PreAuthorize("@appSecurity.canView(authentication, #filter.companyId, 'assets')")
   public PaginatedAssetResponseDTO getAssetsWithAdvancedFilter(@RequestBody AssetAdvancedFilterDTO filter)
@@ -375,12 +420,14 @@ public class AssetAPI {
 
   // ─── Create / Write endpoints ─────────────────────────────────────────────
 
+  @Operation(summary = "Add Assets", description = "Endpoint to add assets")
   @PutMapping("/addassets")
   @PreAuthorize("@appSecurity.canEdit(authentication, #assestsDTO.companyId, 'assets')")
   public void addAssets(@RequestBody AssetsDTO assestsDTO) throws Exception {
     assetsService.addAssets(assestsDTO);
   }
 
+  @Operation(summary = "Add New Assets", description = "Endpoint to add new assets")
   @PostMapping("/addNewAssets")
   @PreAuthorize("@appSecurity.canCreate(authentication, #assestsDTO.companyId, 'assets')")
   public ResponseEntity<AssetsDTO> addNewAssets(@RequestBody AssetsDTO assestsDTO) throws Exception {
@@ -388,6 +435,7 @@ public class AssetAPI {
     return ResponseEntity.ok(assetsService.addAssets(assestsDTO));
   }
 
+  @Operation(summary = "Add Unique Field Config", description = "Endpoint to add unique field config")
   @PostMapping("/uniqueFieldConfig")
   @PreAuthorize("@appSecurity.canCreate(authentication, #assetUniqueFieldConfigurationDTO.companyId, 'assets')")
   public ResponseEntity<AssetUniqueFieldConfigurationDTO> addUniqueFieldConfig(@RequestBody AssetUniqueFieldConfigurationDTO assetUniqueFieldConfigurationDTO) throws Exception {
@@ -395,6 +443,7 @@ public class AssetAPI {
     return ResponseEntity.ok(assetsService.saveUniqueFieldConfiguration(assetUniqueFieldConfigurationDTO));
   }
 
+  @Operation(summary = "Import File", description = "Endpoint to import file")
   @PostMapping("/import/{companyId}/{email}")
   @PreAuthorize("@appSecurity.canCreate(authentication, #companyId, 'assets')")
   public void importFile(
@@ -724,6 +773,7 @@ public class AssetAPI {
     log.info("Import completed for companyId: {}", companyId);
   }
 
+  @Operation(summary = "Update Asset With File", description = "Endpoint to update asset with file")
   @PostMapping("/importUpdation/{companyId}/{email}")
   @PreAuthorize("@appSecurity.canEdit(authentication, #companyId, 'assets')")
   public void updateAssetWithFile(
@@ -987,36 +1037,42 @@ public class AssetAPI {
     log.info("Update import completed for companyId: {}", companyId);
   }
 
+  @Operation(summary = "Upload Image", description = "Endpoint to upload image")
   @PostMapping("/imageUpload")
   @PreAuthorize("@appSecurity.canCreateAny(authentication, 'assets')")
   public void uploadImage(@RequestBody AssetImageDTO assetImageDTO) throws Exception {
     assetsService.addImage(assetImageDTO);
   }
 
+  @Operation(summary = "Remove Image", description = "Endpoint to remove image")
   @PostMapping("/removeImage")
   @PreAuthorize("@appSecurity.canCreateAny(authentication, 'assets')")
   public void removeImage(@RequestBody String id) throws Exception {
     assetsService.removeImage(id);
   }
 
+  @Operation(summary = "Add New Fields", description = "Endpoint to add new fields")
   @PostMapping("/addfields")
   @PreAuthorize("@appSecurity.canCreateAny(authentication, 'assets')")
   public void addNewFields(@RequestBody AssetExtraFieldsDTO extraFieldsDTO) throws Exception {
     assetsService.addExtraFields(extraFieldsDTO);
   }
 
+  @Operation(summary = "Add Extra Field Name", description = "Endpoint to add extra field name")
   @PostMapping("/addExtraFieldName")
   @PreAuthorize("@appSecurity.canCreate(authentication, #extraFieldNameDTO.companyId, 'assets')")
   public void addExtraFieldName(@RequestBody AssetExtraFieldNameDTO extraFieldNameDTO) throws Exception {
     assetsService.addAssetExtraField(extraFieldNameDTO);
   }
 
+  @Operation(summary = "Add Check In Out", description = "Endpoint to add check in out")
   @PostMapping("/addCheckInOut")
   @PreAuthorize("@appSecurity.canCreate(authentication, #checkInDTO.companyId, 'assets')")
   public void addCheckInOut(@RequestBody AssetCheckInDTO checkInDTO) throws NoSubscriptionError {
     assetsService.addCheckInOut(checkInDTO);
   }
 
+  @Operation(summary = "Add Asset File", description = "Endpoint to add asset file")
   @PostMapping("/addFile/{assetId}/{username}")
   @PreAuthorize("@appSecurity.canCreateAny(authentication, 'assets')")
   public ResponseEntity<ResponseMessageDTO> addAssetFile(
@@ -1040,42 +1096,49 @@ public class AssetAPI {
     }
   }
 
+  @Operation(summary = "Mandatory Fields", description = "Endpoint to mandatory fields")
   @PostMapping("/mandatoryFields")
   @PreAuthorize("@appSecurity.canEdit(authentication, #mandatoryFields.companyId, 'assets')")
   public void mandatoryFields(@RequestBody AssetMandatoryFields mandatoryFields) throws NoSubscriptionError {
     assetsService.updateMandatoryFields(mandatoryFields);
   }
 
+  @Operation(summary = "Show Fields", description = "Endpoint to show fields")
   @PostMapping("/showFields")
   @PreAuthorize("@appSecurity.canEdit(authentication, #showFields.companyId, 'assets')")
   public void showFields(@RequestBody AssetShowFields showFields) throws NoSubscriptionError {
     assetsService.updateShowFields(showFields);
   }
 
+  @Operation(summary = "Save Qrdata", description = "Endpoint to save qrdata")
   @PostMapping("/saveQRData")
   @PreAuthorize("@appSecurity.canCreateAny(authentication, 'assets')")
   public void saveQRData(@RequestBody AssetQR qr) {
     assetsService.qrDataUpdation(qr);
   }
 
+  @Operation(summary = "Update Assets With In Active", description = "Endpoint to update assets with in active")
   @PostMapping("/updateAssetsWithInActive")
   @PreAuthorize("@appSecurity.canEditAny(authentication, 'assets')")
   public void updateAssetsWithInActive(@RequestBody String customerId) throws NoSubscriptionError {
     assetsService.updateAssetsWithInActive(customerId);
   }
 
+  @Operation(summary = "Add Category", description = "Endpoint to add category")
   @PostMapping(value = "/addCategory")
   @PreAuthorize("@appSecurity.canCreate(authentication, #categoryDTO.companyId, 'assets')")
   public void addCategory(@RequestBody CategoryDTO categoryDTO) throws Exception {
     assetsService.addCategory(categoryDTO);
   }
 
+  @Operation(summary = "Add Asset Inspection", description = "Endpoint to add asset inspection")
   @PostMapping(value = "/addAssetInspection")
   @PreAuthorize("@appSecurity.canCreate(authentication, #assetCategoryInspection.companyId, 'assets')")
   public void addAssetInspection(@RequestBody AssetCategoryInspection assetCategoryInspection) throws NoSubscriptionError {
     assetsService.addAssetInspection(assetCategoryInspection);
   }
 
+  @Operation(summary = "Add Asset Inspection Instance", description = "Endpoint to add asset inspection instance")
   @PostMapping(value = "/addAssetInspectionInstance")
   @PreAuthorize("@appSecurity.canCreateAny(authentication, 'assets')")
   public void addAssetInspectionInstance(@RequestBody AssetCategoryInspectionInstance assetCategoryInspection) {
@@ -1084,12 +1147,14 @@ public class AssetAPI {
 
   // ─── Update endpoints ─────────────────────────────────────────────────────
 
+  @Operation(summary = "Add Asset Inspection", description = "Endpoint to add asset inspection")
   @PutMapping(value = "/addAssetInspectionInstance")
   @PreAuthorize("@appSecurity.canEdit(authentication, #assetCategoryInspection.companyId, 'assets')")
   public void addAssetInspection(@RequestBody AssetCategoryInspectionInstance assetCategoryInspection) throws NoSubscriptionError {
     assetsService.updateAssetInspectionInstance(assetCategoryInspection);
   }
 
+  @Operation(summary = "Update Asset Inspection", description = "Endpoint to update asset inspection")
   @PutMapping(value = "/updateAssetInspection")
   @PreAuthorize("@appSecurity.canCreate(authentication, #assetCategoryInspection.companyId, 'assets')")
   public void updateAssetInspection(@RequestBody AssetCategoryInspection assetCategoryInspection) throws NoSubscriptionError {
@@ -1097,12 +1162,14 @@ public class AssetAPI {
     log.info("Update Asset Inspection");
   }
 
+  @Operation(summary = "Update Category", description = "Endpoint to update category")
   @PutMapping(value = "/updateCategory")
   @PreAuthorize("@appSecurity.canEdit(authentication, #categoryDTO.companyId, 'assets')")
   public void updateCategory(@RequestBody CategoryDTO categoryDTO) throws NoSubscriptionError {
     assetsService.updateCategory(categoryDTO);
   }
 
+  @Operation(summary = "Update Extra Field Name", description = "Endpoint to update extra field name")
   @PutMapping("/extraFieldName")
   @PreAuthorize("@appSecurity.canEditAny(authentication, 'assets')")
   public ResponseEntity<AssetExtraFieldName> updateExtraFieldName(
@@ -1112,42 +1179,49 @@ public class AssetAPI {
 
   // ─── Delete endpoints ─────────────────────────────────────────────────────
 
+  @Operation(summary = "Remove Asset", description = "Endpoint to remove asset")
   @PostMapping("/removeAsset")
   @PreAuthorize("@appSecurity.canDeleteAny(authentication, 'assets')")
   public void removeAsset(@RequestBody String id) throws Exception {
     assetsService.removeAsset(id);
   }
 
+  @Operation(summary = "Delete Extra Field", description = "Endpoint to delete extra field")
   @DeleteMapping("/deleteExtraFields/{id}")
   @PreAuthorize("@appSecurity.canDeleteAny(authentication, 'assets')")
   public void deleteExtraField(@PathVariable String id) throws Exception {
     assetsService.deleteExtraFields(id);
   }
 
+  @Operation(summary = "Delete Extra Field Name", description = "Endpoint to delete extra field name")
   @DeleteMapping("/deleteExtraFieldName/{id}")
   @PreAuthorize("@appSecurity.canDeleteAny(authentication, 'assets')")
   public void deleteExtraFieldName(@PathVariable String id) throws Exception {
     assetsService.deleteAssetExtraField(id);
   }
 
+  @Operation(summary = "Delete File", description = "Endpoint to delete file")
   @DeleteMapping("deleteFile/{id}")
   @PreAuthorize("@appSecurity.canDeleteAny(authentication, 'assets')")
   public void deleteFile(@PathVariable String id) throws NoSubscriptionError {
     assetsService.deleteFile(id);
   }
 
+  @Operation(summary = "Delete Category", description = "Endpoint to delete category")
   @DeleteMapping(value = "/deleteCategory/{id}")
   @PreAuthorize("@appSecurity.canDeleteAny(authentication, 'assets')")
   public void deleteCategory(@PathVariable String id) throws NoSubscriptionError {
     assetsService.deleteCategory(id);
   }
 
+  @Operation(summary = "Delete Asset Inspection", description = "Endpoint to delete asset inspection")
   @DeleteMapping(value = "/deleteAssetInspection/{id}")
   @PreAuthorize("@appSecurity.canDeleteAny(authentication, 'assets')")
   public void deleteAssetInspection(@PathVariable String id) throws NoSubscriptionError {
     assetsService.deleteAssetInspection(id);
   }
 
+  @Operation(summary = "Delete Show And Mandatory Field", description = "Endpoint to delete show and mandatory field")
   @DeleteMapping("/deleteShowAndMandatoryField/{name}/{companyId}")
   @PreAuthorize("@appSecurity.canDelete(authentication, #companyId, 'assets')")
   public void deleteShowAndMandatoryField(@PathVariable String name, @PathVariable Long companyId) throws Exception {
@@ -1156,6 +1230,7 @@ public class AssetAPI {
 
   // ─── Export endpoints ─────────────────────────────────────────────────────
 
+  @Operation(summary = "Export Assets Xlsx", description = "Endpoint to export assets xlsx")
   @GetMapping("/export-asset-xlsx/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public ResponseEntity<byte[]> exportAssetsXlsx(@PathVariable Long companyId) throws IOException {
@@ -1207,6 +1282,7 @@ public class AssetAPI {
             .body(bos.toByteArray());
   }
 
+  @Operation(summary = "Export Assets", description = "Endpoint to export assets")
   @GetMapping("/export-asset/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public ResponseEntity<byte[]> exportAssets(@PathVariable Long companyId) throws IOException {
@@ -1288,6 +1364,7 @@ public class AssetAPI {
             .body(bos.toByteArray());
   }
 
+  @Operation(summary = "Export Check In Out", description = "Endpoint to export check in out")
   @GetMapping("/export-checkinout-xlsx/{companyId}/{assetId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public ResponseEntity<byte[]> exportCheckInOut(
@@ -1345,6 +1422,7 @@ public class AssetAPI {
   }
 
   // New endpoint: download template containing headers (standard + extra fields)
+  @Operation(summary = "Download Asset Template", description = "Endpoint to download asset template")
   @GetMapping("/template-download/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public ResponseEntity<byte[]> downloadAssetTemplate(@PathVariable Long companyId) throws IOException {
@@ -1356,6 +1434,7 @@ public class AssetAPI {
   }
 
   // New endpoint: return template fields (standard + extra) as JSON for UI preview
+  @Operation(summary = "Get Asset Template Fields", description = "Endpoint to get asset template fields")
   @GetMapping("/template-fields/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
   public ResponseEntity<AssetTemplateFieldsDTO> getAssetTemplateFields(@PathVariable Long companyId) {

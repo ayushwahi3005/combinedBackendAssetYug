@@ -1,5 +1,9 @@
 package com.quantumai.customer.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+
 import com.google.firebase.auth.FirebaseAuthException;
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
@@ -35,6 +39,7 @@ import org.springframework.web.client.RestTemplate;
         },
         allowedHeaders = {"device-id", "Content-Type", "Authorization"}
 )
+@Tag(name = "Users", description = "Users Management API")
 public class UsersAPI {
   private RestTemplate restTemplate = new RestTemplate();
 
@@ -81,6 +86,7 @@ public class UsersAPI {
 
   }
 
+  @Operation(summary = "Register", description = "Endpoint to register")
   @PostMapping("/registerUser")
   public Users register(@RequestBody Users users, @RequestHeader String Authorization)
           throws UserException, NoSubscriptionError, UserAccessException {
@@ -100,6 +106,7 @@ public class UsersAPI {
     return userService.registerUser(users);
   }
 
+  @Operation(summary = "Send Email", description = "Endpoint to send email")
   @PostMapping("/send/{companyId}")
   public void sendEmail(@PathVariable Long companyId, @RequestBody Mail mail)
           throws NoSubscriptionError, UserAccessException {
@@ -140,6 +147,7 @@ public class UsersAPI {
   //        return ResponseEntity.ok(customer);
   //
   //	}
+  @Operation(summary = "Get Invite Details", description = "Endpoint to get invite details")
   @PostMapping(value = "/invite")
   public void getInviteDetails(@RequestBody UsersDTO userDTO, @RequestHeader String Authorization)
       throws UserException, NoSubscriptionError {
@@ -168,12 +176,14 @@ public class UsersAPI {
     userService.registerUser(user);
   }
 
+  @Operation(summary = "Get All Users", description = "Endpoint to get all users")
   @GetMapping(value = "/getUsers/{companyId}")
   public ResponseEntity<List<UsersDTO>> getAllUsers(@PathVariable Long companyId) {
     List<UsersDTO> userList = userService.getAllUsers(companyId);
     return ResponseEntity.ok(userList);
   }
 
+  @Operation(summary = "Get Users", description = "Endpoint to get users")
   @GetMapping(value = "/invite/getUser/{companyId}/{details}")
   public ResponseEntity<UsersDTO> getUsers(
       @PathVariable Long companyId, @PathVariable String details) throws UserException {
@@ -182,6 +192,7 @@ public class UsersAPI {
     return ResponseEntity.ok(user);
   }
 
+  @Operation(summary = "Get Technical User", description = "Endpoint to get technical user")
   @GetMapping(value = "/getTechnicalUser/{companyId}")
   public ResponseEntity<List<UsersDTO>> getTechnicalUser(@PathVariable Long companyId) {
 
@@ -189,6 +200,7 @@ public class UsersAPI {
     return ResponseEntity.ok(userDTOList);
   }
 
+  @Operation(summary = "Resend Firebase Verification Email", description = "Endpoint to resend firebase verification email")
   @PostMapping(value = "/resend-email-firebase-verification/{companyId}/{email}")
   public ResponseEntity<Map<String, String>> resendFirebaseVerificationEmail(
       @PathVariable Long companyId,
@@ -202,6 +214,7 @@ public class UsersAPI {
     ));
   }
 
+  @Operation(summary = "Get User Details", description = "Endpoint to get user details")
   @GetMapping(value = "/getUserDetails/{companyId}/{email}")
   public ResponseEntity<UsersDTO> getUserDetails(
       @PathVariable Long companyId, @PathVariable String email) throws UserException {
@@ -210,6 +223,7 @@ public class UsersAPI {
     return ResponseEntity.ok(UserDTO);
   }
 
+  @Operation(summary = "Update User Details", description = "Endpoint to update user details")
   @PutMapping(value = "/userDetails")
   public ResponseEntity<String> updateUserDetails(
       @RequestBody UsersDTO usersDTO, @RequestHeader String Authorization)
@@ -230,6 +244,7 @@ public class UsersAPI {
     userService.updateUser(usersDTO);
     return ResponseEntity.ok("Status Updated Successfully");
   }
+  @Operation(summary = "User Status Update", description = "Endpoint to user status update")
   @PutMapping(value = "/userStatusUpdate")
   public ResponseEntity<String> userStatusUpdate(
           @RequestBody UsersDTO usersDTO, @RequestHeader String Authorization)
@@ -251,6 +266,7 @@ public class UsersAPI {
   }
 
   //    @Transactional
+  @Operation(summary = "Update User Details", description = "Endpoint to update user details")
   @PostMapping(value = "/updateUserDetails")
   public void updateUserDetails(@RequestBody UsersDTO usersDTO, HttpServletRequest request)
       throws Exception {
@@ -325,6 +341,7 @@ public class UsersAPI {
     }
   }
 
+  @Operation(summary = "Delete User Details", description = "Endpoint to delete user details")
   @DeleteMapping(value = "/deleteUserDetails/{companyId}/{email}")
   public void deleteUserDetails(
       @PathVariable Long companyId,
@@ -347,6 +364,7 @@ public class UsersAPI {
     userService.deleteUser(companyId, email, authHeader);
   }
 
+  @Operation(summary = "Add New Fields", description = "Endpoint to add new fields")
   @PostMapping("/addfields")
   public void addNewFields(
       @RequestBody UserExtraFieldsDTO extraFieldsDTO, @RequestHeader String Authorization)
@@ -366,11 +384,13 @@ public class UsersAPI {
     userService.addExtraFields(extraFieldsDTO);
   }
 
+  @Operation(summary = "Get Extra Fields", description = "Endpoint to get extra fields")
   @GetMapping("/getExtraFields/{id}")
   public List<UserExtraFieldsDTO> getExtraFields(@PathVariable String id) {
     return userService.getExtraFields(id);
   }
 
+  @Operation(summary = "Delete Extra Field", description = "Endpoint to delete extra field")
   @DeleteMapping("/deleteExtraFields/{id}")
   public void deleteExtraField(@PathVariable String id, @RequestHeader String Authorization)
       throws Exception {
@@ -389,12 +409,14 @@ public class UsersAPI {
     userService.deleteExtraFields(id);
   }
 
+  @Operation(summary = "Get Extra Field Name", description = "Endpoint to get extra field name")
   @GetMapping("/getExtraFieldName/{companyId}")
   public List<UserExtraFieldNameDTO> getExtraFieldName(@PathVariable Long companyId) {
     // System.out.println("----------my company------------->"+companyId);
     return userService.getUserExtraField(companyId);
   }
 
+  @Operation(summary = "Add Extra Field Name", description = "Endpoint to add extra field name")
   @PostMapping("/addExtraFieldName")
   public void addExtraFieldName(
       @RequestBody UserExtraFieldNameDTO extraFieldNameDTO, @RequestHeader String Authorization)
@@ -415,6 +437,7 @@ public class UsersAPI {
     userService.addUserExtraField(extraFieldNameDTO);
   }
 
+  @Operation(summary = "Delete Extra Field Name", description = "Endpoint to delete extra field name")
   @DeleteMapping("/deleteExtraFieldName/{id}")
   public void deleteExtraFieldName(@PathVariable String id, @RequestHeader String Authorization)
           throws NoSubscriptionError, UserAccessException {
@@ -434,11 +457,13 @@ public class UsersAPI {
     userService.deleteUserExtraField(id);
   }
 
+  @Operation(summary = "Get Extra Field Name Value", description = "Endpoint to get extra field name value")
   @GetMapping("/getExtraFieldNameValue/{companyId}")
   public Map<String, Map<String, String>> getExtraFieldNameValue(@PathVariable Long companyId) {
     return userService.getextraFieldList(companyId);
   }
 
+  @Operation(summary = "Mandatory Fields", description = "Endpoint to mandatory fields")
   @PostMapping("/mandatoryFields")
   public void mandatoryFields(
       @RequestBody UserMandatoryFields mandatoryFields, @RequestHeader String Authorization)
@@ -458,6 +483,7 @@ public class UsersAPI {
     userService.updateMandatoryFields(mandatoryFields);
   }
 
+  @Operation(summary = "Show Fields", description = "Endpoint to show fields")
   @PostMapping("/showFields")
   public void showFields(
       @RequestBody UserShowFields showFields, @RequestHeader String Authorization)
@@ -477,6 +503,7 @@ public class UsersAPI {
     userService.updateShowFields(showFields);
   }
 
+  @Operation(summary = "Get Mandatory Fields", description = "Endpoint to get mandatory fields")
   @GetMapping("/getMandatoryFields/{name}/{companyId}")
   public ResponseEntity<UserMandatoryFields> getMandatoryFields(
       @PathVariable String name, @PathVariable Long companyId) {
@@ -485,6 +512,7 @@ public class UsersAPI {
     return ResponseEntity.ok(mandatoryFields);
   }
 
+  @Operation(summary = "Get Show Fields", description = "Endpoint to get show fields")
   @GetMapping("/getShowFields/{name}/{companyId}")
   public ResponseEntity<UserShowFields> getShowFields(
       @PathVariable String name, @PathVariable Long companyId) {
@@ -492,6 +520,7 @@ public class UsersAPI {
     return ResponseEntity.ok(showFields);
   }
 
+  @Operation(summary = "Get All Mandatory Fields", description = "Endpoint to get all mandatory fields")
   @GetMapping("/getAllMandatoryFields/{companyId}")
   public ResponseEntity<List<UserMandatoryFields>> getAllMandatoryFields(
       @PathVariable Long companyId) {
@@ -499,12 +528,14 @@ public class UsersAPI {
     return ResponseEntity.ok(mandatoryFieldsList);
   }
 
+  @Operation(summary = "Get All Show Fields", description = "Endpoint to get all show fields")
   @GetMapping("/getAllShowFields/{companyId}")
   public ResponseEntity<List<UserShowFields>> getAllShowFields(@PathVariable Long companyId) {
     List<UserShowFields> showFieldsList = userService.getAllShowFields(companyId);
     return ResponseEntity.ok(showFieldsList);
   }
 
+  @Operation(summary = "Show Fields", description = "Endpoint to show fields")
   @DeleteMapping("/deleteShowAndMandatoryField/{name}/{companyId}")
   public void showFields(@PathVariable String name, @PathVariable Long companyId)
           throws NoSubscriptionError, UserAccessException {

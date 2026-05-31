@@ -1,5 +1,9 @@
 package com.quantumai.customer.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
@@ -54,6 +58,7 @@ import org.springframework.web.multipart.MultipartFile;
 )
 @RestController
 @RequestMapping(value = "/companycustomer")
+@Tag(name = "CompanyCustomer", description = "CompanyCustomer Management API")
 public class CompanyCustomerAPI {
 
   @Autowired private CompanyCustomerService companyCustomerService;
@@ -105,6 +110,7 @@ public class CompanyCustomerAPI {
     }
   }
 
+  @Operation(summary = "Working", description = "Endpoint to working")
   @GetMapping("/working")
   public String working() {
     System.out.println("working!!!");
@@ -113,18 +119,21 @@ public class CompanyCustomerAPI {
 
   // ─── Customer CRUD ────────────────────────────────────────────────────────
 
+  @Operation(summary = "Get Company Customer List", description = "Endpoint to get company customer list")
   @GetMapping("/allCompanyCustomer/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
   public List<CompanyCustomerDTO> getCompanyCustomerList(@PathVariable Long companyId) {
     return companyCustomerService.getAllCustomer(companyId);
   }
 
+  @Operation(summary = "Get Company Customer", description = "Endpoint to get company customer")
   @GetMapping("/getCompanyCustomer/{id}")
   @PreAuthorize("@appSecurity.canViewAny(authentication, 'customers')")
   public CompanyCustomerDTO getCompanyCustomer(@PathVariable String id) {
     return companyCustomerService.getCustomer(id);
   }
 
+  @Operation(summary = "Get Company Customer By Local Id", description = "Endpoint to get company customer by local id")
   @GetMapping("/getCompanyCustomerByLocalId/{id}/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
   public CompanyCustomerDTO getCompanyCustomerByLocalId(
@@ -139,6 +148,7 @@ public class CompanyCustomerAPI {
 //    return companyCustomerService.getCompanyCustomerByName(name, companyId);
 //  }
 
+  @Operation(summary = "Add New Fields", description = "Endpoint to add new fields")
   @PostMapping("/addCompanyCustomer")
   @PreAuthorize("@appSecurity.canCreate(authentication, #companyId, 'customers')")
   public CompanyCustomerDTO addNewFields(
@@ -148,6 +158,7 @@ public class CompanyCustomerAPI {
     return companyCustomerService.addCustomer(companyCustomerDTO);
   }
 
+  @Operation(summary = "Update Company Customer", description = "Endpoint to update company customer")
   @PutMapping("/updateCompanyCustomer")
   @PreAuthorize("@appSecurity.canEdit(authentication, #companyId, 'customers')")
   public void updateCompanyCustomer(
@@ -157,6 +168,7 @@ public class CompanyCustomerAPI {
     companyCustomerService.updateCustomer(companyCustomerDTO);
   }
 
+  @Operation(summary = "Delete Company Customer", description = "Endpoint to delete company customer")
   @DeleteMapping("/deleteCompanyCustomer/{id}")
   @PreAuthorize("@appSecurity.canDelete(authentication, #companyId, 'customers')")
   public void deleteCompanyCustomer(
@@ -168,6 +180,7 @@ public class CompanyCustomerAPI {
 
   // ─── Search & Sort ────────────────────────────────────────────────────────
 
+  @Operation(summary = "Search Company Customer", description = "Endpoint to search company customer")
   @GetMapping(value = "/searchCompanyCustomerlist/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
   public List<String> searchCompanyCustomer(
@@ -177,6 +190,7 @@ public class CompanyCustomerAPI {
     return companyCustomerService.searchedCompanyCustomer(companyId, search, category);
   }
 
+  @Operation(summary = "Sort Company Customer", description = "Endpoint to sort company customer")
   @GetMapping(value = "/sortCompanyCustomerlist/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
   public List<String> sortCompanyCustomer(
@@ -187,6 +201,7 @@ public class CompanyCustomerAPI {
 
   // ─── Extra Fields ─────────────────────────────────────────────────────────
 
+  @Operation(summary = "Add Extra Field Name", description = "Endpoint to add extra field name")
   @PostMapping("/addExtraFieldName")
   @PreAuthorize("@appSecurity.canCreate(authentication, #companyId, 'customers')")
   public void addExtraFieldName(
@@ -195,12 +210,14 @@ public class CompanyCustomerAPI {
     companyCustomerService.addCompanyCustomerExtraField(extraFieldNameDTO);
   }
 
+  @Operation(summary = "Get Extra Field Name", description = "Endpoint to get extra field name")
   @GetMapping("/getExtraFieldName/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
   public List<CompanyCustomerExtraFieldNameDTO> getExtraFieldName(@PathVariable Long companyId) {
     return companyCustomerService.getCompanyCustomerExtraField(companyId);
   }
 
+  @Operation(summary = "Delete Extra Field Name", description = "Endpoint to delete extra field name")
   @DeleteMapping("/deleteExtraFieldName/{id}")
   @PreAuthorize("@appSecurity.canDelete(authentication, #companyId, 'customers')")
   public void deleteExtraFieldName(
@@ -209,6 +226,7 @@ public class CompanyCustomerAPI {
     companyCustomerService.deleteCompanyCustomerExtraField(id);
   }
 
+  @Operation(summary = "Add New Fields", description = "Endpoint to add new fields")
   @PostMapping("/addfields")
   @PreAuthorize("@appSecurity.canCreate(authentication, #companyId, 'customers')")
   public void addNewFields(
@@ -217,18 +235,21 @@ public class CompanyCustomerAPI {
     companyCustomerService.addExtraFields(extraFieldsDTO);
   }
 
+  @Operation(summary = "Get Extra Fields", description = "Endpoint to get extra fields")
   @GetMapping("/getExtraFields/{id}")
   @PreAuthorize("@appSecurity.canViewAny(authentication, 'customers')")
   public List<CompanyCustomerExtraFieldsDTO> getExtraFields(@PathVariable String id) {
     return companyCustomerService.getExtraFields(id);
   }
 
+  @Operation(summary = "Delete Extra Field", description = "Endpoint to delete extra field")
   @DeleteMapping("/deleteExtraFields/{id}")
   @PreAuthorize("@appSecurity.canDeleteAny(authentication, 'customers')")
   public void deleteExtraField(@PathVariable String id, Long companyId) throws Exception {
     companyCustomerService.deleteExtraFields(id);
   }
 
+  @Operation(summary = "Delete Company Customer Extra Fields", description = "Endpoint to delete company customer extra fields")
   @DeleteMapping("/deleteCompanyCustomerExtraFields/{id}")
   @PreAuthorize("@appSecurity.canDelete(authentication, #companyId, 'customers')")
   public void deleteCompanyCustomerExtraFields(
@@ -237,12 +258,14 @@ public class CompanyCustomerAPI {
     companyCustomerService.deleteExtraFieldByCompanyCustomer(id);
   }
 
+  @Operation(summary = "Get Extra Field Name Value", description = "Endpoint to get extra field name value")
   @GetMapping("/getExtraFieldNameValue/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
   public Map<String, Map<String, String>> getExtraFieldNameValue(@PathVariable Long companyId) {
     return companyCustomerService.getextraFieldList(companyId);
   }
 
+  @Operation(summary = "Update Extra Field Name", description = "Endpoint to update extra field name")
   @PutMapping("/extraFieldName")
   @PreAuthorize("@appSecurity.canEdit(authentication, #extraFieldNameUpdateDTO.companyId, 'customers')")
   public ResponseEntity<CompanyCustomerExtraFieldName> updateExtraFieldName(
@@ -253,6 +276,7 @@ public class CompanyCustomerAPI {
 
   // ─── Mandatory & Show Fields ──────────────────────────────────────────────
 
+  @Operation(summary = "Mandatory Fields", description = "Endpoint to mandatory fields")
   @PostMapping("/mandatoryFields")
   @PreAuthorize("@appSecurity.canEdit(authentication, #companyId, 'customers')")
   public void mandatoryFields(
@@ -261,6 +285,7 @@ public class CompanyCustomerAPI {
     companyCustomerService.updateMandatoryFields(mandatoryFields);
   }
 
+  @Operation(summary = "Show Fields", description = "Endpoint to show fields")
   @PostMapping("/showFields")
   @PreAuthorize("@appSecurity.canEdit(authentication, #companyId, 'customers')")
   public void showFields(
@@ -269,6 +294,7 @@ public class CompanyCustomerAPI {
     companyCustomerService.updateShowFields(showFields);
   }
 
+  @Operation(summary = "Get Mandatory Fields", description = "Endpoint to get mandatory fields")
   @GetMapping("/getMandatoryFields/{name}/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
   public ResponseEntity<CompanyCustomerMandatoryFields> getMandatoryFields(
@@ -276,6 +302,7 @@ public class CompanyCustomerAPI {
     return ResponseEntity.ok(companyCustomerService.getMandatoryFields(name, companyId));
   }
 
+  @Operation(summary = "Get Show Fields", description = "Endpoint to get show fields")
   @GetMapping("/getShowFields/{name}/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
   public ResponseEntity<CompanyCustomerShowFields> getShowFields(
@@ -283,6 +310,7 @@ public class CompanyCustomerAPI {
     return ResponseEntity.ok(companyCustomerService.getShowFields(name, companyId));
   }
 
+  @Operation(summary = "Get All Mandatory Fields", description = "Endpoint to get all mandatory fields")
   @GetMapping("/getAllMandatoryFields/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
   public ResponseEntity<List<CompanyCustomerMandatoryFields>> getAllMandatoryFields(
@@ -290,6 +318,7 @@ public class CompanyCustomerAPI {
     return ResponseEntity.ok(companyCustomerService.getAllMandatoryFields(companyId));
   }
 
+  @Operation(summary = "Get All Show Fields", description = "Endpoint to get all show fields")
   @GetMapping("/getAllShowFields/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
   public ResponseEntity<List<CompanyCustomerShowFields>> getAllShowFields(
@@ -297,6 +326,7 @@ public class CompanyCustomerAPI {
     return ResponseEntity.ok(companyCustomerService.getAllShowFields(companyId));
   }
 
+  @Operation(summary = "Delete Show And Mandatory Field", description = "Endpoint to delete show and mandatory field")
   @DeleteMapping("/deleteShowAndMandatoryField/{name}/{companyId}")
   @PreAuthorize("@appSecurity.canDelete(authentication, #companyId, 'customers')")
   public void deleteShowAndMandatoryField(
@@ -307,6 +337,7 @@ public class CompanyCustomerAPI {
 
   // ─── All Customers with Extra Fields ─────────────────────────────────────
 
+  @Operation(summary = "All Company Customer With Extra Fields", description = "Endpoint to all company customer with extra fields")
   @GetMapping("/allCompanyCustomerWithExtraFields/{id}")
   @PreAuthorize("@appSecurity.canView(authentication, #id, 'customers')")
   public List<String> allCompanyCustomerWithExtraFields(@PathVariable Long id) {
@@ -315,6 +346,7 @@ public class CompanyCustomerAPI {
 
   // ─── File Management ──────────────────────────────────────────────────────
 
+  @Operation(summary = "Add Company Customer File", description = "Endpoint to add company customer file")
   @PostMapping("/addFile/{companyCustomerId}")
   @PreAuthorize("@appSecurity.canCreate(authentication, #companyId, 'customers')")
   public ResponseEntity<ResponseMessageDTO> addCompanyCustomerFile(
@@ -333,12 +365,14 @@ public class CompanyCustomerAPI {
     }
   }
 
+  @Operation(summary = "Get Company Customer File", description = "Endpoint to get company customer file")
   @GetMapping("/getFile/{companyCustomerId}")
   @PreAuthorize("@appSecurity.canViewAny(authentication, 'customers')")
   public List<CompanyCustomerFileDTO> getCompanyCustomerFile(@PathVariable String companyCustomerId) {
     return companyCustomerService.getCompanyCustomerFile(companyCustomerId);
   }
 
+  @Operation(summary = "Download File", description = "Endpoint to download file")
   @GetMapping("/getFile/download/{id}")
   @PreAuthorize("@appSecurity.canViewAny(authentication, 'customers')")
   public ResponseEntity<?> downloadFile(@PathVariable String id) {
@@ -348,6 +382,7 @@ public class CompanyCustomerAPI {
             .body(companyCustomerFileDTO.getFile());
   }
 
+  @Operation(summary = "Delete File", description = "Endpoint to delete file")
   @DeleteMapping("deleteFile/{id}")
   @PreAuthorize("@appSecurity.canDelete(authentication, #companyId, 'customers')")
   public void deleteFile(
@@ -358,6 +393,7 @@ public class CompanyCustomerAPI {
 
   // ─── Advance Filter ───────────────────────────────────────────────────────
 
+  @Operation(summary = "Advance Filter", description = "Endpoint to advance filter")
   @PostMapping("/advanceFilter/{pageNumber}/{pageSize}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
   public PaginatedResultDTO<String> advanceFilter(
@@ -382,6 +418,7 @@ public class CompanyCustomerAPI {
 
   // ─── Category ─────────────────────────────────────────────────────────────
 
+  @Operation(summary = "Add Category", description = "Endpoint to add category")
   @PostMapping(value = "/addCategory")
   @PreAuthorize("@appSecurity.canCreate(authentication, #companyId, 'customers')")
   public void addCategory(
@@ -390,18 +427,21 @@ public class CompanyCustomerAPI {
     companyCustomerService.addCategory(categoryDTO);
   }
 
+  @Operation(summary = "Get Category List", description = "Endpoint to get category list")
   @GetMapping(value = "/getCategoryList/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
   public List<CompanyCustomerCategory> getCategoryList(@PathVariable Long companyId) {
     return companyCustomerService.getCategoryList(companyId);
   }
 
+  @Operation(summary = "Get Category Active List", description = "Endpoint to get category active list")
   @GetMapping(value = "/getCategoryActiveList/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
   public List<CompanyCustomerCategory> getCategoryActiveList(@PathVariable Long companyId) {
     return companyCustomerService.getActiveCategoryList(companyId);
   }
 
+  @Operation(summary = "Get Category By Id", description = "Endpoint to get category by id")
   @GetMapping(value = "/getCategoryListById/{companyId}/{id}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
   public CompanyCustomerCategory getCategoryById(
@@ -411,12 +451,14 @@ public class CompanyCustomerAPI {
 
   // ─── Template / Download ─────────────────────────────────────────────────
 
+  @Operation(summary = "Get Template Fields", description = "Endpoint to get template fields")
   @GetMapping("/template-fields/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
   public CompanyCustomerTemplateFieldsDTO getTemplateFields(@PathVariable Long companyId) {
     return companyCustomerService.getTemplateFields(companyId);
   }
 
+  @Operation(summary = "Download Template", description = "Endpoint to download template")
   @GetMapping(value = "/template-download/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
   public ResponseEntity<byte[]> downloadTemplate(@PathVariable Long companyId) {
@@ -435,6 +477,7 @@ public class CompanyCustomerAPI {
 
   // ─── Import ───────────────────────────────────────────────────────────────
 
+  @Operation(summary = "Import File", description = "Endpoint to import file")
   @PostMapping("/import/{companyId}/{email}")
   @PreAuthorize("@appSecurity.canCreate(authentication, #companyId, 'customers')")
   public void importFile(
@@ -1125,6 +1168,7 @@ public class CompanyCustomerAPI {
     log.info("Import History {}", importHistoryDTO);
   }
 
+  @Operation(summary = "Import Updation", description = "Endpoint to import updation")
   @PostMapping("/importUpdation/{companyId}/{email}")
   @PreAuthorize("@appSecurity.canEdit(authentication, #companyId, 'customers')")
   public void importUpdation(
@@ -1506,6 +1550,7 @@ public class CompanyCustomerAPI {
 
   // ─── Export ───────────────────────────────────────────────────────────────
 
+  @Operation(summary = "Export Company Customers", description = "Endpoint to export company customers")
   @GetMapping("/export-company-customer/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
   public ResponseEntity<byte[]> exportCompanyCustomers(@PathVariable Long companyId) throws IOException {
@@ -1611,6 +1656,7 @@ public class CompanyCustomerAPI {
 
   // ─── State List (public - no auth needed) ────────────────────────────────
 
+  @Operation(summary = "Statelist", description = "Endpoint to statelist")
   @GetMapping(value = "/statelist")
   public ResponseEntity<List<String>> statelist() {
     return ResponseEntity.ok(US_STATES);
@@ -1681,6 +1727,7 @@ public class CompanyCustomerAPI {
    * @param sortOrder Optional sort order (ASC or DESC). Default is DESC
    * @return List of company customers with their asset count, sorted by count
    */
+  @Operation(summary = "Get Asset Count By Company Customer", description = "Endpoint to get asset count by company customer")
   @GetMapping("/assetCountByCustomer")
 //  @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY_ADMIN')")
   public ResponseEntity<?> getAssetCountByCompanyCustomer(

@@ -1,5 +1,9 @@
 package com.quantumai.customer.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+
 
 import com.quantumai.customer.dto.InspectionCompletedCountPerDayDTO;
 import com.quantumai.customer.dto.UserInspectionAnalyticsDTO;
@@ -32,11 +36,13 @@ import java.util.*;
 )
 @RestController
 @RequestMapping("inspection/")
+@Tag(name = "AssetInspection", description = "AssetInspection Management API")
 public class AssetInspectionAPI {
 
         @Autowired
         private AssetInspectionService assetInspectionService;
 
+        @Operation(summary = "User Inspection Analytics", description = "Endpoint to user inspection analytics")
         @GetMapping("/user-inspection-analytics/{companyId}")
         @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
         public List<UserInspectionAnalyticsDTO> userInspectionAnalytics(
@@ -47,6 +53,7 @@ public class AssetInspectionAPI {
                 return assetInspectionService.getUserInspectionAnalytics(companyId, startDate, endDate);
         }
 
+        @Operation(summary = "Status Distribution", description = "Endpoint to status distribution")
         @GetMapping("/status-distribution/{companyId}")
         @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
         public Map<InspectionInstanceStatus, Long> statusDistribution(
@@ -57,6 +64,7 @@ public class AssetInspectionAPI {
                 return assetInspectionService.getStatusDistribution(companyId, startDate, endDate);
         }
 
+        @Operation(summary = "Inspection Type Completion", description = "Endpoint to inspection type completion")
         @GetMapping("/inspection-type-completion/{companyId}")
         @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
         public Map<String, Long> inspectionTypeCompletion(
@@ -66,6 +74,7 @@ public class AssetInspectionAPI {
                 return assetInspectionService.getInspectionTypeCompletion(companyId, startDate, endDate);
         }
 
+        @Operation(summary = "Lead Inspector", description = "Endpoint to lead inspector")
         @GetMapping("/lead-inspector/{companyId}")
         @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
         public Map<String, Long> leadInspector(
@@ -75,12 +84,14 @@ public class AssetInspectionAPI {
                 return assetInspectionService.getLeadInspector(companyId, startDate, endDate);
         }
 
+        @Operation(summary = "Inspection Details", description = "Endpoint to inspection details")
         @GetMapping("/inspection-details/{companyId}")
         @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
         public Map<String, Long> inspectionDetails(@PathVariable Long companyId) {
                 return assetInspectionService.getAssetInspectionDetails(companyId);
         }
 
+        @Operation(summary = "Inspection Complete Per Day", description = "Endpoint to inspection complete per day")
         @GetMapping("/inspection-complete-per-day/{companyId}")
         @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
         public List<InspectionCompletedCountPerDayDTO> inspectionCompletePerDay(
@@ -90,6 +101,7 @@ public class AssetInspectionAPI {
                 return assetInspectionService.getInspectionCompletionPerDay(companyId, startDate, endDate);
         }
 
+        @Operation(summary = "Inspection Detailed Export", description = "Endpoint to inspection detailed export")
         @GetMapping("/inspection-detailed-export/{companyId}/{assetId}")
         @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
         public ResponseEntity<byte[]> inspectionDetailedExport(
@@ -99,6 +111,7 @@ public class AssetInspectionAPI {
         }
 
 
+        @Operation(summary = "Inspection Overview Export", description = "Endpoint to inspection overview export")
         @GetMapping("/inspection-overview-export/{companyId}/{assetId}")
         public ResponseEntity<byte[]> inspectionOverviewExport(@PathVariable Long companyId,@PathVariable String assetId) throws Exception {
 //                return assetInspectionService.getInspectionCompletionPerDay(companyId, startDate, endDate);

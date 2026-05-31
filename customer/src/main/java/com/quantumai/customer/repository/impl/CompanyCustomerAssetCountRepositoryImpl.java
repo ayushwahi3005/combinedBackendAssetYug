@@ -3,7 +3,9 @@ package com.quantumai.customer.repository.impl;
 import com.quantumai.customer.dto.AssetCountByCompanyCustomerDTO;
 import com.quantumai.customer.repository.CompanyCustomerAssetCountRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
@@ -12,6 +14,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.springframework.data.mongodb.core.aggregation.Aggregation.*;
@@ -28,48 +31,61 @@ public class CompanyCustomerAssetCountRepositoryImpl implements CompanyCustomerA
         try {
             log.info("Fetching asset count by company customer for companyId: {}, sortOrder: {}", companyId, sortOrder);
 
-            // Build aggregation pipeline
             List<AggregationOperation> operations = new ArrayList<>();
 
-            // Stage 1: Match - Filter assets by companyId
+            // Stage 1: Match by companyId only (include ALL assets, even without customerId)
             operations.add(match(Criteria.where("companyId").is(companyId)));
 
-            // Stage 2: Group - Group by customerId and count assets
-            operations.add(group("$customerId")
-                    .count().as("assetCount"));
+            // Stage 2: Group by customerId (null customerId will be grouped under _id: null)
+            operations.add(group("$customerId").count().as("assetCount"));
 
-            // Stage 3: Lookup - Join with CompanyCustomer collection to get customer details
-            // Join on _id (which is the customerId from Stage 2 grouping) with CompanyCustomer.id
-            operations.add(lookup("companyCustomer", "_id", "id", "customerDetails"));
+            // Stage 3: Safely convert String customerId to ObjectId only if valid 24-char hex
+            operations.add(context -> new Document("$addFields",
+                    new Document("customerObjectId",
+                            new Document("$cond", new Document()
+                                    .append("if", new Document("$regexMatch", new Document()
+                                            .append("input", new Document("$ifNull", Arrays.asList("$_id", "")))
+                                            .append("regex", "^[0-9a-fA-F]{24}$")
+                                    ))
+                                    .append("then", new Document("$toObjectId", "$_id"))
+                                    .append("else", null)
+                            ))));
 
-            // Stage 4: Unwind - Unwind the customerDetails array
+            // Stage 4: Lookup companyCustomer by ObjectId (returns empty array if null)
+            operations.add(context -> new Document("$lookup",
+                    new Document("from", "companyCustomer")
+                            .append("localField", "customerObjectId")
+                            .append("foreignField", "_id")
+                            .append("as", "customerDetails")));
+
+            // Stage 5: Unwind with preserveNullAndEmptyArrays = true (keep unassigned assets)
             operations.add(unwind("$customerDetails", true));
 
-            // Stage 4.5: Match - Filter out records where customerDetails is empty/null
-            operations.add(match(Criteria.where("customerDetails").exists(true).ne(null)));
+            // Stage 6: Project final fields with null-safe fallbacks
+            operations.add(context -> new Document("$project",
+                    new Document("companyCustomerId",
+                            new Document("$ifNull", Arrays.asList(
+                                    new Document("$toString", new Document("$ifNull", Arrays.asList("$customerDetails.companyCustomerId", ""))),
+                                    null
+                            )))
+                            .append("companyCustomerName",
+                                    new Document("$ifNull", Arrays.asList("$customerDetails.name", "Unassigned")))
+                            .append("email",
+                                    new Document("$ifNull", Arrays.asList("$customerDetails.email", null)))
+                            .append("assetCount", 1L)));
 
-            // Stage 5: Project - Select and rename fields
-            operations.add(project()
-                    .and("customerDetails.companyCustomerId").as("companyCustomerId")
-                    .and("customerDetails.name").as("companyCustomerName")
-                    .and("customerDetails.email").as("email")
-                    .and("assetCount").as("assetCount"));
-
-            // Stage 6: Sort - Sort by assetCount
+            // Stage 7: Sort by assetCount
             String sortOrderUpper = sortOrder != null ? sortOrder.toUpperCase() : "DESC";
             if ("ASC".equals(sortOrderUpper)) {
-                operations.add(sort(org.springframework.data.domain.Sort.by(
-                        org.springframework.data.domain.Sort.Order.asc("assetCount"))));
+                operations.add(sort(Sort.by(Sort.Order.asc("assetCount"))));
             } else {
-                operations.add(sort(org.springframework.data.domain.Sort.by(
-                        org.springframework.data.domain.Sort.Order.desc("assetCount"))));
+                operations.add(sort(Sort.by(Sort.Order.desc("assetCount"))));
             }
 
-            // Create and execute aggregation
             Aggregation aggregation = newAggregation(operations);
             AggregationResults<AssetCountByCompanyCustomerDTO> results = mongoTemplate.aggregate(
                     aggregation,
-                    "assets", // Source collection name (lowercase)
+                    "assets",
                     AssetCountByCompanyCustomerDTO.class
             );
 

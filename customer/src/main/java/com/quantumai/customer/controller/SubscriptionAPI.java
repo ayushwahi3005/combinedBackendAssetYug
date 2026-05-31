@@ -1,5 +1,9 @@
 package com.quantumai.customer.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+
 import com.quantumai.customer.dto.SubscriptionDTO;
 import com.quantumai.customer.entity.*;
 import com.quantumai.customer.repository.CompanyInformationRepository;
@@ -26,6 +30,7 @@ import org.springframework.web.bind.annotation.*;
 )
 @RestController
 @RequestMapping("/subscription")
+@Tag(name = "Subscription", description = "Subscription Management API")
 public class SubscriptionAPI {
 
     private static final Logger log = LoggerFactory.getLogger(SubscriptionAPI.class);
@@ -36,18 +41,21 @@ public class SubscriptionAPI {
   @Autowired private SubscriptionRepository subscriptionRepository;
   @Autowired private UsersRepository usersRepository;
 
+  @Operation(summary = "Add Subscription", description = "Endpoint to add subscription")
   @PostMapping("/add")
   public void addSubscription(@RequestBody SubscriptionDTO subscriptionDTO) {
     //        System.out.println("----------->"+subscriptionDTO);
     subscriptionService.addSubscription(subscriptionDTO);
   }
 
+  @Operation(summary = "Update Subscription", description = "Endpoint to update subscription")
   @PostMapping("/update")
   public void updateSubscription(@RequestBody SubscriptionDTO subscriptionDTO) {
     //        System.out.println("----------->"+subscriptionDTO);
     subscriptionService.updateSubscription(subscriptionDTO);
   }
 
+  @Operation(summary = "Current Subscription", description = "Endpoint to current subscription")
   @GetMapping("/currentSubscription/{companyId}")
   public Subscription currentSubscription(@PathVariable Long companyId) {
     //
@@ -58,6 +66,7 @@ public class SubscriptionAPI {
     return subscriptionService.getCurrentSubscription(companyId);
   }
 
+  @Operation(summary = "Get All Subscription", description = "Endpoint to get all subscription")
   @GetMapping("/getAllSubscription/{companyId}")
   public List<Subscription> getAllSubscription(@PathVariable Long companyId) {
     //
@@ -68,6 +77,7 @@ public class SubscriptionAPI {
     return subscriptionService.getAllSubscription(companyId);
   }
 
+  @Operation(summary = "Delete Upcoming Subscription", description = "Endpoint to delete upcoming subscription")
   @DeleteMapping("/deleteUpcomingSubscription/{companyId}/{email}")
   public void deleteUpcomingSubscription(
       @PathVariable Long companyId, @PathVariable String email)
@@ -88,6 +98,7 @@ public class SubscriptionAPI {
 
   }
 
+  @Operation(summary = "Start Upcoming Subscription", description = "Endpoint to start upcoming subscription")
   @GetMapping("/startUpcomingSubscription/{companyId}/{email}")
   public void startUpcomingSubscription(
       @PathVariable Long companyId, @PathVariable String email)
@@ -106,6 +117,7 @@ public class SubscriptionAPI {
     });
 
   }
+    @Operation(summary = "Is Subscription Valid", description = "Endpoint to is subscription valid")
     @GetMapping("/subscription-valid/{companyId}")
     public boolean isSubscriptionValid(
             @PathVariable Long companyId)

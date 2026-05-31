@@ -1,5 +1,9 @@
 package com.quantumai.customer.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.quantumai.customer.entity.Payment;
 import com.quantumai.customer.entity.SubscriptionPlan;
@@ -26,6 +30,7 @@ import org.springframework.web.bind.annotation.*;
         },
         allowedHeaders = {"device-id", "Content-Type", "Authorization"}
 )
+@Tag(name = "Payment", description = "Payment Management API")
 public class PaymentAPI {
 
   @Autowired private SubscriptionService subscriptionService;
@@ -38,6 +43,7 @@ public class PaymentAPI {
     this.stripeService = stripeService;
   }
 
+  @Operation(summary = "Create Payment Intent", description = "Endpoint to create payment intent")
   @PostMapping("/create-intent")
 
   public ResponseEntity<Map<String, String>> createPaymentIntent(@RequestBody JsonNode obj) {
@@ -62,6 +68,7 @@ public class PaymentAPI {
     }
   }
 
+  @Operation(summary = "Create Subscription", description = "Endpoint to create subscription")
   @PostMapping("/create-subscription")
 
   public ResponseEntity<Map<String, String>> createSubscription(@RequestBody JsonNode obj)
@@ -103,6 +110,7 @@ public class PaymentAPI {
     }
   }
 
+  @Operation(summary = "Add Payment", description = "Endpoint to add payment")
   @PostMapping("/add")
 
   public void addPayment(@RequestBody Payment payment) {
@@ -114,6 +122,7 @@ public class PaymentAPI {
     subscriptionService.addPayment(payment);
   }
 
+  @Operation(summary = "Update Payment", description = "Endpoint to update payment")
   @PutMapping("/update")
 
   public void updatePayment(@RequestBody Payment Payment) {
@@ -121,6 +130,7 @@ public class PaymentAPI {
     subscriptionService.updatePayment(Payment);
   }
 
+  @Operation(summary = "Get All Invoice", description = "Endpoint to get all invoice")
   @GetMapping("/get-invoices/{companyId}")
 
   public List<Payment> getAllInvoice(@PathVariable Long companyId) {
@@ -128,6 +138,7 @@ public class PaymentAPI {
     return subscriptionService.getAllPayment(companyId);
   }
 
+  @Operation(summary = "Check Cred", description = "Endpoint to check cred")
   @GetMapping("/checkCred")
 
   public ResponseEntity<Boolean> checkCred() {
@@ -135,6 +146,7 @@ public class PaymentAPI {
     return ResponseEntity.ok(true);
   }
 
+  @Operation(summary = "Save Card", description = "Endpoint to save card")
   @PostMapping("/stripe-save-card")
 
   public void saveCard(@RequestBody Map<String, String> request) throws StripeException {
@@ -147,6 +159,7 @@ public class PaymentAPI {
     stripeService.saveCard(paymentMethodId, customerEmail, cardholderName, companyId);
   }
 
+  @Operation(summary = "Get Customer Cards", description = "Endpoint to get customer cards")
   @GetMapping("/stripe-get-cards/{customerId}")
 
   public List<Map<String, Object>> getCustomerCards(@PathVariable Long customerId)
@@ -154,6 +167,7 @@ public class PaymentAPI {
     return stripeService.getCustomerCards(customerId);
   }
 
+  @Operation(summary = "Remove Card", description = "Endpoint to remove card")
   @DeleteMapping("/stripe-delete-cards/{paymentMethodId}")
 
   public void removeCard(@PathVariable String paymentMethodId) throws StripeException {
@@ -162,6 +176,7 @@ public class PaymentAPI {
 
     stripeService.removeCard(paymentMethodId);
   }
+  @Operation(summary = "Get Payment Intent Details", description = "Endpoint to get payment intent details")
   @GetMapping("/payment-intent/{paymentIntentId}")
 
   public ResponseEntity<Map<String, Object>> getPaymentIntentDetails(

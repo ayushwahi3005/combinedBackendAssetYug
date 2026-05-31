@@ -1,5 +1,9 @@
 package com.quantumai.customer.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+
 import com.quantumai.customer.service.CountryStateService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,6 +15,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/country")
+@Tag(name = "CountryState", description = "CountryState Management API")
 public class CountryStateAPI {
     private final CountryStateService countryStateService;
 
@@ -18,6 +23,7 @@ public class CountryStateAPI {
         this.countryStateService = countryStateService;
     }
 
+    @Operation(summary = "Get States", description = "Endpoint to get states")
     @GetMapping("/states/{country}")
     public ResponseEntity<List<String>> getStates(@PathVariable String country) {
         List<String> states = countryStateService.getStates(country);

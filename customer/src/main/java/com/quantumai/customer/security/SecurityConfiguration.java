@@ -70,6 +70,10 @@ public class SecurityConfiguration {
             .requestMatchers("/admin/authenticate/**", "/admin/login/**", "/admin/send-otp/**")
             .permitAll()
 
+            // Swagger and OpenAPI docs
+            .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/swagger-resources/**", "/webjars/**")
+            .permitAll()
+
             // Protected paths for customers
             .requestMatchers(
                     "/customer/**",

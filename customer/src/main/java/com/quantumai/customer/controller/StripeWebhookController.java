@@ -1,5 +1,9 @@
 package com.quantumai.customer.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.JsonObject;
@@ -30,6 +34,7 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/stripe")
 @Slf4j
+@Tag(name = "StripeWebhook", description = "StripeWebhook Management API")
 public class StripeWebhookController {
 
     // Must not be static; Spring does not inject into static fields.
@@ -47,6 +52,7 @@ public class StripeWebhookController {
     @Autowired private UserActivationService userActivationService;
 
     @Transactional
+    @Operation(summary = "Handle Stripe Webhook", description = "Endpoint to handle stripe webhook")
     @PostMapping("/webhook")
     @PreAuthorize("@appSecurity.isAuthenticated(authentication)")
     public ResponseEntity<String> handleStripeWebhook(
