@@ -218,14 +218,19 @@ public class AssetCategoryInspectionInstanceRepositoryImpl implements AssetCateg
             }
         }
 
-        // Filter by inspection due date range
+        // Filter by due date range (stored as dueDate in MongoDB; may be date or datetime)
         if (filter.getDueDateFrom() != null || filter.getDueDateTo() != null) {
-            if (filter.getDueDateFrom() != null && filter.getDueDateTo() != null) {
-                criteria.and("inspectionDueDate").gte(filter.getDueDateFrom()).lte(filter.getDueDateTo());
-            } else if (filter.getDueDateFrom() != null) {
-                criteria.and("inspectionDueDate").gte(filter.getDueDateFrom());
+            LocalDateTime fromDateTime = filter.getDueDateFrom() != null
+                    ? filter.getDueDateFrom().atStartOfDay() : null;
+            LocalDateTime toDateTime = filter.getDueDateTo() != null
+                    ? filter.getDueDateTo().atTime(LocalTime.MAX) : null;
+
+            if (fromDateTime != null && toDateTime != null) {
+                criteria.and("dueDate").gte(fromDateTime).lte(toDateTime);
+            } else if (fromDateTime != null) {
+                criteria.and("dueDate").gte(fromDateTime);
             } else {
-                criteria.and("inspectionDueDate").lte(filter.getDueDateTo());
+                criteria.and("dueDate").lte(toDateTime);
             }
         }
 

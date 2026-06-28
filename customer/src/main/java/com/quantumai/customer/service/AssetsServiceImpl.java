@@ -34,10 +34,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
-import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
-import org.springframework.data.mongodb.core.aggregation.UnwindOperation;
 import org.springframework.data.mongodb.core.query.Criteria;
-import org.bson.Document;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
@@ -1837,136 +1834,34 @@ public class AssetsServiceImpl implements AssetsService {
     }
   }
   public List<AssetCheckInOutData> findAllCheckInOutData(Long companyId) {
-    String assetsCollection = mongoTemplate.getCollectionName(Assets.class);
-    String companyCustomerCollection = mongoTemplate.getCollectionName(CompanyCustomer.class);
-    String checkInOutCollection = mongoTemplate.getCollectionName(AssetCheckInOut.class);
-
-    Aggregation aggregation = Aggregation.newAggregation(
-            Aggregation.match(Criteria.where("companyId").is(companyId)),
-            Aggregation.unwind("detailsList"),
-            assetLookupOperation(assetsCollection),
-            Aggregation.unwind("assetDetails", true),
-            customerLookupOperation(companyCustomerCollection),
-            Aggregation.unwind("customerDetails", true),
-            Aggregation.project()
-                    .and("assetDetails.assetId").as("assetId")
-                    .and("assetDetails.name").as("assetName")
-                    .and("assetDetails.status").as("assetStatus")
-                    .and("customerDetails.companyCustomerId").as("companyCustomerId")
-                    .and("customerDetails.name").as("customerName")
-                    .and("detailsList.status").as("action")
-                    .and("detailsList.date").as("date")
-                    .and("detailsList.updateTime").as("updateTime")
-                    .and("detailsList.employee").as("username")
-                    .and("detailsList.location").as("location"),
-            Aggregation.sort(Sort.Direction.DESC, "date")
-    );
-
-    List<AssetCheckInOutData> results = mongoTemplate.aggregate(aggregation, checkInOutCollection, AssetCheckInOutData.class)
-            .getMappedResults();
-    enrichCheckInOutData(results);
-    return results;
-  }
-
-  private AggregationOperation assetLookupOperation(String assetsCollection) {
-    return context -> new Document("$lookup",
-            new Document("from", assetsCollection)
-                    .append("let", new Document("checkInAssetId", "$assetId"))
-                    .append("pipeline", List.of(
-                            new Document("$match", new Document("$expr",
-                                    new Document("$eq", List.of(
-                                            new Document("$toString", "$_id"),
-                                            new Document("$toString", "$$checkInAssetId")
-                                    ))
-                            ))
-                    ))
-                    .append("as", "assetDetails")
-    );
-  }
-
-  private AggregationOperation customerLookupOperation(String companyCustomerCollection) {
-    return context -> new Document("$lookup",
-            new Document("from", companyCustomerCollection)
-                    .append("let", new Document("custId", "$assetDetails.customerId"))
-                    .append("pipeline", List.of(
-                            new Document("$match", new Document("$expr",
-                                    new Document("$eq", List.of(
-                                            new Document("$toString", "$_id"),
-                                            new Document("$toString", "$$custId")
-                                    ))
-                            ))
-                    ))
-                    .append("as", "customerDetails")
-    );
-  }
-
-  private void enrichCheckInOutData(List<AssetCheckInOutData> dataList) {
-    dataList.forEach(data -> {
-      if (data.getUpdateTime() != null) {
-        data.setTime(data.getUpdateTime().toLocalTime().withNano(0));
-      } else if (data.getDate() != null) {
-        data.setTime(data.getDate().toLocalTime().withNano(0));
-      }
-      if (data.getCompanyCustomerId() != null) {
-        data.setCustomerId(String.valueOf(data.getCompanyCustomerId()));
-      }
-      data.setUpdateTime(null);
-      data.setCompanyCustomerId(null);
-    });
+    return buildAssetCheckInOutDataList(companyId);
   }
 
   @Override
   public PaginatedResultCheckInOutDTO<AssetCheckInOutData> getAssetCheckInOutData(Long companyId, Long pageNumber, Long pageSize) {
+    List<AssetCheckInOutData> assetCheckInOutDataList = buildAssetCheckInOutDataList(companyId);
 
-    String assetsCollection = mongoTemplate.getCollectionName(Assets.class);
-    String companyCustomerCollection = mongoTemplate.getCollectionName(CompanyCustomer.class);
-    String checkInOutCollection = mongoTemplate.getCollectionName(AssetCheckInOut.class);
+    long totalCheckedIn = 0;
+    long totalCheckedOut = 0;
+    List<Assets> assetsList = assetsRepository.findByCompanyId(companyId);
+    for (Assets asset : assetsList) {
+      if (asset.getStatus() == null || !"active".equalsIgnoreCase(asset.getStatus())) {
+        continue;
+      }
+      Optional<AssetCheckInOut> checkInOutOptional = checkInOutRepository.findByAssetId(asset.getId());
+      if (checkInOutOptional.isPresent()) {
+        String status = checkInOutOptional.get().getStatus();
+        if ("Checked In".equalsIgnoreCase(status)) {
+          totalCheckedIn++;
+        } else if ("Checked Out".equalsIgnoreCase(status)) {
+          totalCheckedOut++;
+        }
+      } else {
+        totalCheckedIn++;
+      }
+    }
 
-    Aggregation aggregation = Aggregation.newAggregation(
-            Aggregation.match(Criteria.where("companyId").is(companyId)),
-            Aggregation.unwind("detailsList"),
-            assetLookupOperation(assetsCollection),
-            Aggregation.unwind("assetDetails", true),
-            customerLookupOperation(companyCustomerCollection),
-            Aggregation.unwind("customerDetails", true),
-            Aggregation.project()
-                    .and("assetDetails.assetId").as("assetId")
-                    .and("assetDetails.name").as("assetName")
-                    .and("assetDetails.status").as("assetStatus")
-                    .and("customerDetails.companyCustomerId").as("companyCustomerId")
-                    .and("customerDetails.name").as("customerName")
-                    .and("detailsList.status").as("action")
-                    .and("detailsList.date").as("date")
-                    .and("detailsList.updateTime").as("updateTime")
-                    .and("detailsList.location").as("location")
-                    .and("detailsList.employee").as("username")
-                    .and("status").as("checkInOutStatus"),
-            Aggregation.sort(Sort.Direction.DESC, "date")
-    );
-
-    List<AssetCheckInOutData> allData = mongoTemplate.aggregate(
-            aggregation,
-            checkInOutCollection,
-            AssetCheckInOutData.class
-    ).getMappedResults();
-
-    enrichCheckInOutData(allData);
-
-    log.info("All CheckInOut Data Size: {}", allData.size());
-
-    // ✅ Count from ACTIVE assets only
-    long totalCheckedIn = allData.stream()
-            .filter(d -> "active".equalsIgnoreCase(d.getAssetStatus()))
-            .filter(d -> "Checked In".equalsIgnoreCase(d.getAction()))
-            .count();
-
-    long totalCheckedOut = allData.stream()
-            .filter(d -> "active".equalsIgnoreCase(d.getAssetStatus()))
-            .filter(d -> "Checked Out".equalsIgnoreCase(d.getAction()))
-            .count();
-
-    // Pagination
-    int totalRecords = allData.size();
+    int totalRecords = assetCheckInOutDataList.size();
     int startIndex = (int) (pageNumber * pageSize);
     int endIndex = (int) Math.min(startIndex + pageSize, totalRecords);
 
@@ -1980,11 +1875,101 @@ public class AssetsServiceImpl implements AssetsService {
     }
 
     return new PaginatedResultCheckInOutDTO<>(
-            allData.subList(startIndex, endIndex),
+            assetCheckInOutDataList.subList(startIndex, endIndex),
             totalRecords,
             totalCheckedIn,
             totalCheckedOut
     );
+  }
+
+  /**
+   * Build check-in/out history rows from assets + details, with batch customer lookup.
+   */
+  private List<AssetCheckInOutData> buildAssetCheckInOutDataList(Long companyId) {
+    List<Assets> assetsList = assetsRepository.findByCompanyId(companyId);
+    List<AssetCheckInOutData> assetCheckInOutDataList = new ArrayList<>();
+
+    Set<String> customerIds = assetsList.stream()
+            .map(Assets::getCustomerId)
+            .filter(Objects::nonNull)
+            .filter(id -> !id.isEmpty())
+            .collect(Collectors.toSet());
+
+    final Map<String, CompanyCustomer> customerMap;
+    if (!customerIds.isEmpty()) {
+      Query customerQuery = new Query(Criteria.where("_id").in(new ArrayList<>(customerIds)));
+      List<CompanyCustomer> customers = mongoTemplate.find(customerQuery, CompanyCustomer.class);
+      customerMap = customers.stream()
+              .collect(Collectors.toMap(CompanyCustomer::getId, c -> c, (c1, c2) -> c1));
+    } else {
+      customerMap = Collections.emptyMap();
+    }
+
+    for (Assets asset : assetsList) {
+      Optional<AssetCheckInOut> assetCheckInOutOptional = checkInOutRepository.findByAssetId(asset.getId());
+      if (assetCheckInOutOptional.isPresent()) {
+        AssetCheckInOut assetCheckInOut = assetCheckInOutOptional.get();
+        assetCheckInOut.getDetailsList().stream()
+                .sorted(Comparator.comparing(AssetCheckInOutDetails::getDate, Comparator.nullsLast(Comparator.reverseOrder())))
+                .forEach(detail -> assetCheckInOutDataList.add(
+                        toAssetCheckInOutData(asset, detail, customerMap)));
+      } else {
+        AssetCheckInOutData assetCheckInOutData = new AssetCheckInOutData();
+        assetCheckInOutData.setAssetId(asset.getAssetId());
+        assetCheckInOutData.setAssetName(asset.getName());
+        assetCheckInOutData.setAssetStatus(asset.getStatus());
+        assetCheckInOutData.setAction("Checked In");
+        if (asset.getUpdatedAt() != null) {
+          LocalDateTime date = LocalDateTime.parse(asset.getUpdatedAt());
+          assetCheckInOutData.setDate(date);
+          assetCheckInOutData.setTime(date.toLocalTime().withNano(0));
+        }
+        assetCheckInOutData.setLocation("NA");
+        assetCheckInOutData.setUsername("NA");
+        assetCheckInOutData.setCustomerName(asset.getCustomer());
+        populateCustomerId(asset, assetCheckInOutData, customerMap);
+        assetCheckInOutDataList.add(assetCheckInOutData);
+      }
+    }
+
+    assetCheckInOutDataList.sort(
+            Comparator.comparing(AssetCheckInOutData::getDate, Comparator.nullsLast(Comparator.reverseOrder()))
+                    .thenComparing(AssetCheckInOutData::getTime, Comparator.nullsLast(Comparator.reverseOrder()))
+    );
+
+    return assetCheckInOutDataList;
+  }
+
+  private AssetCheckInOutData toAssetCheckInOutData(
+          Assets asset, AssetCheckInOutDetails detail, Map<String, CompanyCustomer> customerMap) {
+    AssetCheckInOutData data = new AssetCheckInOutData();
+    data.setAssetId(asset.getAssetId());
+    data.setAssetName(asset.getName());
+    data.setAssetStatus(asset.getStatus());
+    data.setAction(detail.getStatus());
+    data.setDate(detail.getDate());
+    if (detail.getUpdateTime() != null) {
+      data.setTime(detail.getUpdateTime().toLocalTime().withNano(0));
+    } else if (detail.getDate() != null) {
+      data.setTime(detail.getDate().toLocalTime().withNano(0));
+    }
+    data.setLocation(detail.getLocation());
+    data.setUsername(detail.getEmployee());
+    data.setCustomerName(asset.getCustomer());
+    populateCustomerId(asset, data, customerMap);
+    return data;
+  }
+
+  private void populateCustomerId(
+          Assets asset, AssetCheckInOutData data, Map<String, CompanyCustomer> customerMap) {
+    if (asset.getCustomerId() != null && !asset.getCustomerId().isEmpty()) {
+      CompanyCustomer companyCustomer = customerMap.get(asset.getCustomerId());
+      if (companyCustomer != null) {
+        data.setCustomerId(String.valueOf(companyCustomer.getCompanyCustomerId()));
+      } else {
+        data.setCustomerId(asset.getCustomerId());
+      }
+    }
   }
 
 //    @Override
