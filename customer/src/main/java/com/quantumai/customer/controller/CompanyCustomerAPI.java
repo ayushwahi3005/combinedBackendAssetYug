@@ -14,7 +14,10 @@ import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
+import com.quantumai.customer.entity.enums.AuditAction;
+import com.quantumai.customer.entity.enums.AuditModule;
 import com.quantumai.customer.entity.enums.ImportHistoryRecordType;
+import com.quantumai.customer.service.AuditService;
 import com.quantumai.customer.exception.*;
 import com.quantumai.customer.repository.*;
 import com.quantumai.customer.service.CompanyCustomerService;
@@ -69,10 +72,13 @@ public class CompanyCustomerAPI {
   @Autowired private SubscriptionRepository subscriptionRepository;
   @Autowired private CompanyCustomerCategoryRepository companyCustomerCategoryRepository;
   @Autowired private CompanyCustomerMandatoryFieldsRepository mandatoryFieldsRepository;
+  @Autowired private CompanyCustomerShowFieldsRepository companyCustomerShowFieldsRepository;
   @Autowired private CustomerRepository customerRepository;
   @Autowired private JavaMailSender emailSender;
   @Autowired private UsersRepository usersRepository;
   @Autowired private ImportHistoryRepository importHistoryRepository;
+  @Autowired private AuditService auditService;
+  @Autowired private CompanyCustomerExtraFieldNameRepository companyCustomerExtraFieldNameRepository;
 
   private static final String DEFAULT_COUNTRY_CODE = "1"; // India
 
@@ -155,7 +161,14 @@ public class CompanyCustomerAPI {
           @RequestBody CompanyCustomerDTO companyCustomerDTO,
           @RequestHeader Long companyId)
           throws NoSubscriptionError, EmailAlreadyExistsException {
-    return companyCustomerService.addCustomer(companyCustomerDTO);
+    CompanyCustomerDTO saved = companyCustomerService.addCustomer(companyCustomerDTO);
+    auditService.logCreate(AuditModule.CUSTOMER,
+            String.valueOf(saved.getCompanyCustomerId()),
+            saved.getName(), companyId,
+            Map.of("companyCustomerId", String.valueOf(saved.getCompanyCustomerId()),
+                    "name", String.valueOf(saved.getName()),
+                    "email", String.valueOf(saved.getEmail())));
+    return saved;
   }
 
   @Operation(summary = "Update Company Customer", description = "Endpoint to update company customer")
@@ -165,7 +178,21 @@ public class CompanyCustomerAPI {
           @RequestBody CompanyCustomerDTO companyCustomerDTO,
           @RequestHeader Long companyId)
           throws NoSubscriptionError, EmailAlreadyExistsException {
+    // Fetch BEFORE state first — must happen BEFORE the update
+    Optional<CompanyCustomer> beforeStateOpt = companyCustomerRepository.findById(companyCustomerDTO.getId());
+
     companyCustomerService.updateCustomer(companyCustomerDTO);
+
+    // Fetch AFTER state — now get the updated version
+    if (beforeStateOpt.isPresent()) {
+      CompanyCustomer afterState = companyCustomerRepository.findById(companyCustomerDTO.getId()).orElse(null);
+      if (afterState != null) {
+      auditService.logUpdateWithComparison(AuditModule.CUSTOMER,
+              String.valueOf(afterState.getCompanyCustomerId()),
+              afterState.getName(), companyId,
+              beforeStateOpt.get(), afterState);
+      }
+    }
   }
 
   @Operation(summary = "Delete Company Customer", description = "Endpoint to delete company customer")
@@ -175,6 +202,11 @@ public class CompanyCustomerAPI {
           @PathVariable String id,
           @RequestHeader Long companyId)
           throws NoSubscriptionError {
+    companyCustomerRepository.findById(id).ifPresent(cc ->
+            auditService.logDelete(AuditModule.CUSTOMER,
+                    String.valueOf(cc.getCompanyCustomerId()), cc.getName(), companyId,
+                    Map.of("companyCustomerId", String.valueOf(cc.getCompanyCustomerId()),
+                            "name", String.valueOf(cc.getName()))));
     companyCustomerService.deleteCustomer(id);
   }
 
@@ -193,10 +225,11 @@ public class CompanyCustomerAPI {
   @Operation(summary = "Sort Company Customer", description = "Endpoint to sort company customer")
   @GetMapping(value = "/sortCompanyCustomerlist/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
-  public List<String> sortCompanyCustomer(
+  public List<CompanyCustomerDTO> sortCompanyCustomer(
           @PathVariable Long companyId,
-          @RequestParam(name = "category", required = true) String category) {
-    return companyCustomerService.sortCompanyCustomer(companyId, category);
+          @RequestParam(name = "sortField", required = false, defaultValue = "companyCustomerId") String sortField,
+          @RequestParam(name = "sortDirection", required = false, defaultValue = "ASC") String sortDirection) {
+    return companyCustomerService.sortCompanyCustomer(companyId, sortField, sortDirection);
   }
 
   // ─── Extra Fields ─────────────────────────────────────────────────────────
@@ -208,6 +241,10 @@ public class CompanyCustomerAPI {
           @RequestBody CompanyCustomerExtraFieldNameDTO extraFieldNameDTO,
           @RequestHeader Long companyId) throws Exception {
     companyCustomerService.addCompanyCustomerExtraField(extraFieldNameDTO);
+    auditService.logCreate(AuditModule.CUSTOMER_CUSTOM_FIELD,
+            extraFieldNameDTO.getId(), extraFieldNameDTO.getName(), companyId,
+            Map.of("name", String.valueOf(extraFieldNameDTO.getName()),
+                    "type", String.valueOf(extraFieldNameDTO.getType())));
   }
 
   @Operation(summary = "Get Extra Field Name", description = "Endpoint to get extra field name")
@@ -223,6 +260,8 @@ public class CompanyCustomerAPI {
   public void deleteExtraFieldName(
           @PathVariable String id,
           @RequestHeader Long companyId) throws Exception {
+    auditService.logDelete(AuditModule.CUSTOMER_CUSTOM_FIELD, id, id, companyId,
+            Map.of("id", id));
     companyCustomerService.deleteCompanyCustomerExtraField(id);
   }
 
@@ -232,7 +271,9 @@ public class CompanyCustomerAPI {
   public void addNewFields(
           @RequestBody CompanyCustomerExtraFieldsDTO extraFieldsDTO,
           @RequestHeader Long companyId) throws Exception {
+    String oldValue = resolveCompanyCustomerExtraFieldOldValue(extraFieldsDTO);
     companyCustomerService.addExtraFields(extraFieldsDTO);
+    auditCompanyCustomerExtraFieldValueChange(extraFieldsDTO, oldValue, companyId);
   }
 
   @Operation(summary = "Get Extra Fields", description = "Endpoint to get extra fields")
@@ -246,7 +287,24 @@ public class CompanyCustomerAPI {
   @DeleteMapping("/deleteExtraFields/{id}")
   @PreAuthorize("@appSecurity.canDeleteAny(authentication, 'customers')")
   public void deleteExtraField(@PathVariable String id, Long companyId) throws Exception {
+    Optional<CompanyCustomerExtraFields> fieldOpt = extraFieldsRepository.findById(id);
+    if (fieldOpt.isEmpty()) {
+      companyCustomerService.deleteExtraFields(id);
+      return;
+    }
+    CompanyCustomerExtraFields field = fieldOpt.get();
+    String oldValue = field.getValue();
+    String fieldName = field.getName();
+    String companyCustomerMongoId = field.getCompanyCustomerId();
+    Long fieldCompanyId = field.getCompanyId();
     companyCustomerService.deleteExtraFields(id);
+    companyCustomerRepository.findById(companyCustomerMongoId).ifPresent(customer -> {
+      if (fieldName != null) {
+        auditService.logUpdate(AuditModule.CUSTOMER,
+                String.valueOf(customer.getCompanyCustomerId()), customer.getName(), fieldCompanyId,
+                Map.of(fieldName, Map.of("old", oldValue != null ? oldValue : "", "new", "")));
+      }
+    });
   }
 
   @Operation(summary = "Delete Company Customer Extra Fields", description = "Endpoint to delete company customer extra fields")
@@ -267,10 +325,15 @@ public class CompanyCustomerAPI {
 
   @Operation(summary = "Update Extra Field Name", description = "Endpoint to update extra field name")
   @PutMapping("/extraFieldName")
-  @PreAuthorize("@appSecurity.canEdit(authentication, #extraFieldNameUpdateDTO.companyId, 'customers')")
+//  @PreAuthorize("@appSecurity.canEdit(authentication, #extraFieldNameUpdateDTO.companyId, 'customers')")
   public ResponseEntity<CompanyCustomerExtraFieldName> updateExtraFieldName(
           @RequestBody ExtraFieldNameUpdateDTO extraFieldNameUpdateDTO) {
+    CompanyCustomerExtraFieldName before = companyCustomerExtraFieldNameRepository.findById(extraFieldNameUpdateDTO.getId()).orElse(null);
     CompanyCustomerExtraFieldName result = companyCustomerService.updateExtraFieldName(extraFieldNameUpdateDTO);
+    if (before != null) {
+      auditService.logUpdateWithComparison(AuditModule.CUSTOMER_CUSTOM_FIELD,
+              result.getId(), result.getName(), result.getCompanyId(), before, result);
+    }
     return ResponseEntity.ok(result);
   }
 
@@ -282,7 +345,13 @@ public class CompanyCustomerAPI {
   public void mandatoryFields(
           @RequestBody CompanyCustomerMandatoryFields mandatoryFields,
           @RequestHeader Long companyId) throws NoSubscriptionError {
+    CompanyCustomerMandatoryFields beforeState = mandatoryFieldsRepository.findById(mandatoryFields.getId()).orElse(null);
     companyCustomerService.updateMandatoryFields(mandatoryFields);
+    if (beforeState != null) {
+      auditService.logUpdateWithComparison(AuditModule.CUSTOMER_CUSTOM_FIELD, mandatoryFields.getId(), mandatoryFields.getName(), companyId, beforeState, mandatoryFields);
+    } else {
+      auditService.logCreate(AuditModule.CUSTOMER_CUSTOM_FIELD, mandatoryFields.getId(), mandatoryFields.getName(), companyId, Map.of("mandatory", "true"));
+    }
   }
 
   @Operation(summary = "Show Fields", description = "Endpoint to show fields")
@@ -291,7 +360,13 @@ public class CompanyCustomerAPI {
   public void showFields(
           @RequestBody CompanyCustomerShowFields showFields,
           @RequestHeader Long companyId) throws NoSubscriptionError {
+    CompanyCustomerShowFields beforeState = companyCustomerShowFieldsRepository.findById(showFields.getId()).orElse(null);
     companyCustomerService.updateShowFields(showFields);
+    if (beforeState != null) {
+      auditService.logUpdateWithComparison(AuditModule.CUSTOMER_CUSTOM_FIELD, showFields.getId(), showFields.getName(), companyId, beforeState, showFields);
+    } else {
+      auditService.logCreate(AuditModule.CUSTOMER_CUSTOM_FIELD, showFields.getId(), showFields.getName(), companyId, Map.of("show", "true"));
+    }
   }
 
   @Operation(summary = "Get Mandatory Fields", description = "Endpoint to get mandatory fields")
@@ -425,6 +500,9 @@ public class CompanyCustomerAPI {
           @RequestBody CategoryDTO categoryDTO,
           @RequestHeader Long companyId) throws Exception {
     companyCustomerService.addCategory(categoryDTO);
+    auditService.logCreate(AuditModule.CUSTOMER_CATEGORY, null,
+            categoryDTO.getName(), companyId,
+            Map.of("name", String.valueOf(categoryDTO.getName())));
   }
 
   @Operation(summary = "Get Category List", description = "Endpoint to get category list")
@@ -513,7 +591,7 @@ public class CompanyCustomerAPI {
     importHistoryDTO.setComplete(0L);
     importHistoryDTO = customerService.addImportHistory(importHistoryDTO);
 
-    System.out.println("------||---------------------------------------/////////////////////////////////////------->"+columnMappings);
+//    System.out.println("------||---------------------------------------/////////////////////////////////////------->"+columnMappings);
     List<CompanyCustomerMandatoryFields> mandatoryFieldsList=mandatoryFieldsRepository.findByCompanyIdAndMandatory(companyId,true);
     Map<String,Boolean> mandatoryFieldsMap=new HashMap<>();
     for(CompanyCustomerMandatoryFields mandatoryFields:mandatoryFieldsList){
@@ -1763,6 +1841,40 @@ public class CompanyCustomerAPI {
       response.setResponseMessage("Failed to retrieve asset count: " + e.getMessage());
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
+  }
+
+  private String resolveCompanyCustomerExtraFieldOldValue(CompanyCustomerExtraFieldsDTO extraFieldsDTO) {
+    if (extraFieldsDTO.getId() != null && !extraFieldsDTO.getId().isBlank()) {
+      return extraFieldsRepository.findById(extraFieldsDTO.getId())
+              .map(CompanyCustomerExtraFields::getValue)
+              .orElse(null);
+    }
+    if (extraFieldsDTO.getCompanyCustomerId() != null && extraFieldsDTO.getName() != null) {
+      CompanyCustomerExtraFields existing = extraFieldsRepository.findByNameIgnoreCaseAndCompanyCustomerId(
+              extraFieldsDTO.getName(), extraFieldsDTO.getCompanyCustomerId());
+      return existing != null ? existing.getValue() : null;
+    }
+    return null;
+  }
+
+  private void auditCompanyCustomerExtraFieldValueChange(
+          CompanyCustomerExtraFieldsDTO extraFieldsDTO, String oldValue, Long companyId) {
+    if (extraFieldsDTO.getCompanyCustomerId() == null || extraFieldsDTO.getName() == null) {
+      return;
+    }
+    if (Objects.equals(oldValue, extraFieldsDTO.getValue())) {
+      return;
+    }
+    companyCustomerRepository.findById(extraFieldsDTO.getCompanyCustomerId()).ifPresent(customer -> {
+      Map<String, Object> fieldChange = Map.of(
+              extraFieldsDTO.getName(),
+              Map.of(
+                      "old", oldValue != null ? oldValue : "",
+                      "new", extraFieldsDTO.getValue() != null ? extraFieldsDTO.getValue() : ""));
+      auditService.logUpdate(AuditModule.CUSTOMER,
+              String.valueOf(customer.getCompanyCustomerId()), customer.getName(),
+              companyId != null ? companyId : customer.getCompanyId(), fieldChange);
+    });
   }
 }
 

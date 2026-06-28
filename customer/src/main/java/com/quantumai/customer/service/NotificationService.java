@@ -2,6 +2,7 @@ package com.quantumai.customer.service;
 
 
 import com.quantumai.customer.dto.UserNotificationDTO;
+import com.quantumai.customer.dto.PaginatedNotificationDTO;
 import com.quantumai.customer.entity.*;
 import com.quantumai.customer.repository.*;
 import org.checkerframework.checker.units.qual.A;
@@ -34,6 +35,53 @@ public class NotificationService {
 
     @Autowired
     UserNotificationRepositoryImpl userNotificationRepositoryImpl;
+
+    /**
+     * ✅ Get paginated notifications for a user
+     * @param email - User email ID
+     * @param pageNumber - Page number (0-based, default 0)
+     * @param pageSize - Number of notifications per page (default 10)
+     * @return Paginated notification response with metadata
+     */
+    public PaginatedNotificationDTO getPaginatedNotifications(String email, int pageNumber, int pageSize) {
+        // ✅ Default page size is 10 if not specified
+        if (pageSize <= 0) {
+            pageSize = 10;
+        }
+        if (pageNumber < 0) {
+            pageNumber = 0;
+        }
+
+//        try {
+//            Thread.sleep(3000);
+//        } catch (InterruptedException e) {
+//            throw new RuntimeException(e);
+//        }
+
+        // ✅ Get total count of notifications
+        long totalCount = userNotificationRepositoryImpl.countUserNotifications(email);
+
+        // ✅ Calculate total pages
+        int totalPages = (int) Math.ceil((double) totalCount / pageSize);
+
+        // ✅ Get notifications for current page
+        List<UserNotification> notifications = userNotificationRepositoryImpl.findPaginatedNotifications(
+                email, pageNumber, pageSize);
+
+        // ✅ Check if there are more notifications
+        boolean hasMore = pageNumber < (totalPages - 1);
+
+        // ✅ Build and return paginated response
+        PaginatedNotificationDTO paginatedResponse = new PaginatedNotificationDTO();
+        paginatedResponse.setNotifications(notifications);
+        paginatedResponse.setPageNumber(pageNumber);
+        paginatedResponse.setPageSize(pageSize);
+        paginatedResponse.setTotalCount(totalCount);
+        paginatedResponse.setTotalPages(totalPages);
+        paginatedResponse.setHasMore(hasMore);
+
+        return paginatedResponse;
+    }
 
     public void sendNotificationToCompany(Long companyId, Notification notification) {
         // Sends notification to a specific company

@@ -5,5 +5,6 @@ public enum CustomRoleType {
   view,
   create,
   edit,
-  full
+  full,
+  full_with_performedby
 }

@@ -14,6 +14,7 @@ public class UserNotificationRepositoryImpl {
 
     @Autowired
     MongoTemplate mongoTemplate;
+
     public List<UserNotification> findRecentNotificationsWithDetails(String email){
         Query query=new Query();
 //        query.addCriteria(Criteria.where("isRead").is(false).and("deliveredAt").gte(LocalDateTime.now().minusMonths(1)).and("userId").is(email));
@@ -29,6 +30,60 @@ public class UserNotificationRepositoryImpl {
                         )));
         List<UserNotification> notificationList=mongoTemplate.find(query, UserNotification.class);
         return notificationList;
+    }
 
+    /**
+     * ✅ Fetch notifications with pagination support (lazy loading)
+     * @param email - User email ID
+     * @param pageNumber - Page number (0-based)
+     * @param pageSize - Number of notifications per page (default 10)
+     * @return List of notifications for the given page
+     */
+    public List<UserNotification> findPaginatedNotifications(String email, int pageNumber, int pageSize) {
+        Query query = new Query();
+        query.addCriteria(Criteria.where("userId").is(email)
+                .orOperator(
+                        new Criteria().andOperator(
+                                Criteria.where("isRead").is(false),
+                                Criteria.where("deliveredAt").gte(LocalDateTime.now().minusMonths(1))
+                        ),
+                        new Criteria().andOperator(
+                                Criteria.where("isRead").is(true),
+                                Criteria.where("deliveredAt").gte(LocalDateTime.now().minusWeeks(1))
+                        )));
+
+        // ✅ Sort by deliveredAt in descending order (newest first)
+        query.with(org.springframework.data.domain.Sort.by(
+                org.springframework.data.domain.Sort.Direction.DESC, "deliveredAt"));
+
+        // ✅ Skip and limit for pagination
+        int skip = pageNumber * pageSize;
+        query.skip(skip).limit(pageSize);
+
+        return mongoTemplate.find(query, UserNotification.class);
+    }
+
+    /**
+     * ✅ Get total count of notifications for a user
+     * @param email - User email ID
+     * @return Total count of notifications
+     */
+    public long countUserNotifications(String email) {
+        Query query = new Query();
+        query.addCriteria(Criteria.where("userId").is(email)
+                .orOperator(
+                        new Criteria().andOperator(
+                                Criteria.where("isRead").is(false),
+                                Criteria.where("deliveredAt").gte(LocalDateTime.now().minusMonths(1))
+                        ),
+                        new Criteria().andOperator(
+                                Criteria.where("isRead").is(true),
+                                Criteria.where("deliveredAt").gte(LocalDateTime.now().minusWeeks(1))
+                        )));
+
+        return mongoTemplate.count(query, UserNotification.class);
     }
 }
+
+
+

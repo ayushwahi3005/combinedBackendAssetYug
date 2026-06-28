@@ -74,6 +74,14 @@ public class PaymentService {
         subscriptionRepository.findByCompanyId(companyId);
     String priceAmountTag;
 
+    // ✅ Check if subscription is PENDING - don't allow new subscription
+    Optional<com.quantumai.customer.entity.Subscription> pendingSubscriptionOptional =
+        subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.PENDING);
+
+    if (pendingSubscriptionOptional.isPresent()) {
+      throw new Exception("❌ Cannot create new subscription while a PENDING subscription exists. Please wait for the current subscription to be processed.");
+    }
+
     if (planSelected == SubscriptionPlan.MONTHLY) {
       priceAmountTag = "price_1Qs970DbrtjFAyfvny0ecIQz"; // Monthly plan price ID
     } else {
@@ -373,15 +381,50 @@ public class PaymentService {
 
   public void saveCard(
       String paymentMethodId, String customerEmail, String cardholderName, Long companyId)
-      throws StripeException {
+      throws Exception {
     Stripe.apiKey = secretKey;
-    // To remove before saved card
-    Optional<CustomerStripeDetails> optionalCustomerStripeDetails =
+
+    // ✅ STEP 1: Check if a card already exists for this company
+    Optional<CustomerStripeDetails> existingCardOptional =
         customerStripeDetailsRepository.findByCompanyId(companyId);
-    if (optionalCustomerStripeDetails.isPresent()) {
-      stripeService.removeCard(optionalCustomerStripeDetails.get().getPaymentMethodId());
+
+    if (existingCardOptional.isPresent()) {
+      // ✅ Card already exists, check subscription status
+      Optional<com.quantumai.customer.entity.Subscription> subscriptionOptional =
+          subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
+
+//      if (subscriptionOptional.isPresent()) {
+//        // ✅ Active subscription exists - don't allow card change
+//        throw new Exception("❌ Cannot change card while subscription is ACTIVE. Please cancel the subscription first.");
+//      }
+
+      // ✅ Check if subscription is PENDING
+      Optional<com.quantumai.customer.entity.Subscription> pendingSubscriptionOptional =
+          subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.PENDING);
+
+      if (pendingSubscriptionOptional.isPresent()) {
+        // ✅ Pending subscription exists - don't allow card change
+        throw new Exception("❌ Cannot change card while subscription is PENDING. Please wait for the subscription to be processed.");
+      }
+
+      // ✅ Only allow card change if subscription is FAILED
+      Optional<com.quantumai.customer.entity.Subscription> failedSubscriptionOptional =
+          subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.FAILED);
+
+//      if (failedSubscriptionOptional.isEmpty()) {
+//        // ✅ No failed subscription - don't allow card change unless there's no subscription at all
+//        List<com.quantumai.customer.entity.Subscription> allSubscriptions =
+//            subscriptionRepository.findByCompanyId(companyId);
+//        if (!allSubscriptions.isEmpty()) {
+//          throw new Exception("Card can only be changed when subscription is FAILED. Current status: " + allSubscriptions.get(0).getStatus());
+//        }
+//      }
+
+      // ✅ Remove old card before saving new one
+      stripeService.removeCard(existingCardOptional.get().getPaymentMethodId());
     }
 
+    // ✅ STEP 2: Save the new card
     Customer customer =
         stripeService.findCustomerByEmail(customerEmail); // ✅ Check for existing customer
     String myCustomerId = null;
@@ -393,8 +436,6 @@ public class PaymentService {
       customer = Customer.create(customerParams);
     } else {
       // ✅ If customer exists, update name (optional)
-      //      myCustomerId
-      //       customerStripeDetailsRepository.save(customerStripeDetails);
       Optional<CustomerStripeDetails> optionalcustomerStripeDetails =
           customerStripeDetailsRepository.findByCompanyId(companyId);
       if (optionalcustomerStripeDetails.isPresent()) {
@@ -416,8 +457,7 @@ public class PaymentService {
     updatePaymentParams.put("billing_details", billingDetails);
     paymentMethod.update(updatePaymentParams);
 
-    // ✅ Store in MongoDB
-
+    // ✅ Store in MongoDB (Only one card per company)
     CustomerStripeDetails customerStripeDetails = new CustomerStripeDetails();
     customerStripeDetails.setId(myCustomerId);
     customerStripeDetails.setCompanyId(companyId);
@@ -427,7 +467,7 @@ public class PaymentService {
     customerStripeDetails.setEmail(customerEmail);
     customerStripeDetailsRepository.save(customerStripeDetails);
 
-    System.out.println("Card saved successfully for customer ID: " + customer.getId());
+    System.out.println("✅ Card saved successfully for customer ID: " + customer.getId());
   }
 
   private Invoice createInvoice(String customerId, Long amount, String currency, String description)

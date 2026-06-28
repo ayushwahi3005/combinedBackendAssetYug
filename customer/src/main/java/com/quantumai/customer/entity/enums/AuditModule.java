@@ -1,0 +1,23 @@
+package com.quantumai.customer.entity.enums;
+
+public enum AuditModule {
+    ASSET,
+    ASSET_CATEGORY,
+    ASSET_INSPECTION,
+    ASSET_INSPECTION_INSTANCE,
+    ASSET_CUSTOM_FIELD,
+    ASSET_CHECK_IN_OUT,
+    ASSET_QR,
+    CUSTOMER,
+    CUSTOMER_CATEGORY,
+    CUSTOMER_CUSTOM_FIELD,
+    USER,
+    ROLE,
+    SUBSCRIPTION,
+    PAYMENT,
+    LOCATION,
+    BIN,
+    NOTIFICATION,
+    IMPORT,
+    ADMIN
+}

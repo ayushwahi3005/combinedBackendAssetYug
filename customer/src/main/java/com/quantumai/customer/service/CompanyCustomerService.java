@@ -26,7 +26,7 @@ public interface CompanyCustomerService {
 
   public List<String> searchedCompanyCustomer(Long companyId, String search, String category);
 
-  public List<String> sortCompanyCustomer(Long companyId, String category);
+  public List<CompanyCustomerDTO> sortCompanyCustomer(Long companyId, String sortField, String sortDirection);
 
   public void addCompanyCustomerExtraField(CompanyCustomerExtraFieldNameDTO extraFieldNameDTO)
       throws ExtraFieldAlreadyPresentException;

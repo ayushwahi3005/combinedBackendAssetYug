@@ -9,9 +9,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
+import com.quantumai.customer.entity.enums.AuditAction;
+import com.quantumai.customer.entity.enums.AuditModule;
 import com.quantumai.customer.exception.*;
 import com.quantumai.customer.repository.CustomerRepository;
+import com.quantumai.customer.repository.BinRepository;
+import com.quantumai.customer.repository.CustomRoleRepository;
+import com.quantumai.customer.repository.LocationRepository;
 import com.quantumai.customer.service.ActiveSessionService;
+import com.quantumai.customer.service.AuditService;
 import com.quantumai.customer.service.CustomerService;
 import com.quantumai.customer.service.TrialService;
 import java.util.HashMap;
@@ -41,6 +47,10 @@ public class CustomerAPI {
   @Autowired private CustomerService customerService;
   @Autowired private ActiveSessionService activeSessionService;
   @Autowired private TrialService trialService;
+  @Autowired private AuditService auditService;
+  @Autowired private CustomRoleRepository customRoleRepository;
+  @Autowired private LocationRepository locationRepository;
+  @Autowired private BinRepository binRepository;
 
   // ─── Public endpoints (no auth needed) ───────────────────────────────────
   // These are called before login so cannot require authentication
@@ -247,16 +257,27 @@ public class CustomerAPI {
 
   @Operation(summary = "Add Role And Permission", description = "Endpoint to add role and permission")
   @PostMapping(value = "/roleAndPermission/add")
-
   public void addRoleAndPermission(@RequestBody CustomRoleDTO customRoleDTO) {
     customerService.addRoleAndPermission(customRoleDTO);
+    auditService.logCreate(AuditModule.ROLE, String.valueOf(customRoleDTO.getCustomRoleId()),
+            customRoleDTO.getName(), customRoleDTO.getCompanyId(),
+            Map.of("name", String.valueOf(customRoleDTO.getName()),
+                    "type", String.valueOf(customRoleDTO.getType())));
   }
 
   @Operation(summary = "Update Role And Permission", description = "Endpoint to update role and permission")
   @PutMapping(value = "/roleAndPermission/update")
-
   public void updateRoleAndPermission(@RequestBody CustomRoleDTO customRoleDTO) {
+    CustomRole before = customRoleRepository.findById(customRoleDTO.getId()).orElse(null);
     customerService.addRoleAndPermission(customRoleDTO);
+    if (before != null) {
+      CustomRole after = customRoleRepository.findById(customRoleDTO.getId()).orElse(null);
+      if (after != null) {
+        auditService.logUpdateWithComparison(AuditModule.ROLE,
+                String.valueOf(after.getCustomRoleId()), after.getName(),
+                after.getCompanyId(), before, after);
+      }
+    }
   }
 
   @Operation(summary = "Get Role And Permission By Name", description = "Endpoint to get role and permission by name")
@@ -277,8 +298,12 @@ public class CustomerAPI {
 
   @Operation(summary = "Delete Role And Permission", description = "Endpoint to delete role and permission")
   @DeleteMapping(value = "/roleAndPermission/{id}")
-
   public void deleteRoleAndPermission(@PathVariable String id) throws Exception {
+    customRoleRepository.findById(id).ifPresent(role ->
+            auditService.logDelete(AuditModule.ROLE, String.valueOf(role.getCustomRoleId()),
+                    role.getName(), role.getCompanyId(),
+                    Map.of("name", String.valueOf(role.getName()),
+                            "type", String.valueOf(role.getType()))));
     customerService.deleteRoleAndPermission(id);
   }
 
@@ -302,17 +327,29 @@ public class CustomerAPI {
 
   @Operation(summary = "Add Location", description = "Endpoint to add location")
   @PostMapping(value = "/addlocation")
-
   public ResponseEntity<Location> addLocation(@RequestBody Location location)
           throws LocationAlreadyPresentException {
-    return ResponseEntity.ok(customerService.addLocation(location));
+    Location saved = customerService.addLocation(location);
+    auditService.logCreate(AuditModule.LOCATION, String.valueOf(saved.getLocationId()),
+            saved.getName(), saved.getCompanyId(),
+            Map.of("locationId", String.valueOf(saved.getLocationId()),
+                    "name", String.valueOf(saved.getName()),
+                    "city", String.valueOf(saved.getCity()),
+                    "address", String.valueOf(saved.getAddress())));
+    return ResponseEntity.ok(saved);
   }
 
   @Operation(summary = "Update Location", description = "Endpoint to update location")
   @PutMapping(value = "/addlocation")
-
   public ResponseEntity<Location> updateLocation(@RequestBody Location location) {
-    return ResponseEntity.ok(customerService.updateLocation(location));
+    Location before = locationRepository.findById(location.getId()).orElse(null);
+    Location saved = customerService.updateLocation(location);
+    if (before != null) {
+      auditService.logUpdateWithComparison(AuditModule.LOCATION,
+              String.valueOf(saved.getLocationId()), saved.getName(),
+              saved.getCompanyId(), before, saved);
+    }
+    return ResponseEntity.ok(saved);
   }
 
   @Operation(summary = "Get All Location", description = "Endpoint to get all location")
@@ -330,23 +367,36 @@ public class CustomerAPI {
 
   @Operation(summary = "Delete Location", description = "Endpoint to delete location")
   @DeleteMapping(value = "/deleteLocation/{id}")
-
   public void deleteLocation(@PathVariable String id) throws LocationDeletionException {
+    locationRepository.findById(id).ifPresent(loc ->
+            auditService.logDelete(AuditModule.LOCATION, String.valueOf(loc.getLocationId()),
+                    loc.getName(), loc.getCompanyId(),
+                    Map.of("locationId", String.valueOf(loc.getLocationId()),
+                            "name", String.valueOf(loc.getName()))));
     customerService.deleteLocation(id);
   }
 
   @Operation(summary = "Add Bin", description = "Endpoint to add bin")
   @PostMapping(value = "/addbin")
-
   public ResponseEntity<Bin> addBin(@RequestBody BinDTO bindDto) throws BinAlreadyPresentException {
-    return ResponseEntity.ok(customerService.addBin(bindDto));
+    Bin saved = customerService.addBin(bindDto);
+    auditService.logCreate(AuditModule.BIN, String.valueOf(saved.getBinId()),
+            saved.getBinNumber(), saved.getCompanyId(),
+            Map.of("binId", String.valueOf(saved.getBinId()),
+                    "binNumber", String.valueOf(saved.getBinNumber())));
+    return ResponseEntity.ok(saved);
   }
 
   @Operation(summary = "Update Bin", description = "Endpoint to update bin")
   @PutMapping(value = "/addbin")
-
   public ResponseEntity<Bin> updateBin(@RequestBody BinDTO bindDto) {
-    return ResponseEntity.ok(customerService.updateBin(bindDto));
+    Bin saved = customerService.updateBin(bindDto);
+    auditService.logUpdate(AuditModule.BIN, String.valueOf(saved.getBinId()),
+            saved.getBinNumber(), saved.getCompanyId(),
+            Map.of("binId", String.valueOf(saved.getBinId()),
+                    "binNumber", String.valueOf(saved.getBinNumber()),
+                    "status", String.valueOf(saved.getStatus())));
+    return ResponseEntity.ok(saved);
   }
 
   @Operation(summary = "Get All Bin", description = "Endpoint to get all bin")
@@ -366,8 +416,15 @@ public class CustomerAPI {
 
   @Operation(summary = "Delete Bin", description = "Endpoint to delete bin")
   @DeleteMapping(value = "/deleteBin/{id}")
-
   public void deleteBin(@PathVariable String id) throws LocationDeletionException {
+    // Fetch before deletion for audit snapshot
+    Bin bin = binRepository.findById(id).orElse(null);
+    if (bin != null) {
+      auditService.logDelete(AuditModule.BIN, String.valueOf(bin.getBinId()),
+              bin.getBinNumber(), bin.getCompanyId(),
+              Map.of("binId", String.valueOf(bin.getBinId()),
+                      "binNumber", String.valueOf(bin.getBinNumber())));
+    }
     customerService.deleteBin(id);
   }
 

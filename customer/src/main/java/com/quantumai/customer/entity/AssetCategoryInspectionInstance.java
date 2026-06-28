@@ -1,5 +1,6 @@
 package com.quantumai.customer.entity;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -17,12 +18,14 @@ public class AssetCategoryInspectionInstance {
   private Long companyId;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
+  private LocalDate dueDate;
   private String createdBy;
   private String actionPerformedBy;
   private String notes;
   private InspectionInstanceStatus status;
   private String assetCategoryInspectionId;
   private String assetCategoryInspectionName;
+  private LocalDate inspectionDueDate;
   private List<InspectionStepValues> stepValues;
   private List<InspectionTemplateResult> inspectionTemplates;
 

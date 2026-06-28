@@ -33,7 +33,11 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
+import org.springframework.data.mongodb.core.aggregation.UnwindOperation;
 import org.springframework.data.mongodb.core.query.Criteria;
+import org.bson.Document;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
@@ -191,29 +195,16 @@ public class AssetsServiceImpl implements AssetsService {
     Assets savedAsset = assetsRepository.save(assets);
     log.info("Asset Saved with ID: {}", savedAsset.getId());
 
-    // Step 4: Save extra fields
+    // Step 4: Save extra fields (create new or update existing — audit only actual changes)
     if (assetsDTO.getExtraFields() != null && !assetsDTO.getExtraFields().isEmpty()) {
       for (Map.Entry<String, String> entry : assetsDTO.getExtraFields().entrySet()) {
-        String fieldName = entry.getKey();
-        String fieldValue = entry.getValue();
-
-        if (fieldValue == null || fieldValue.trim().isEmpty()) {
-          continue;
-        }
-
-        AssetExtraFieldsDTO extraFieldDTO = new AssetExtraFieldsDTO();
-        extraFieldDTO.setName(fieldName);
-        extraFieldDTO.setValue(fieldValue);
-        extraFieldDTO.setAssetId(savedAsset.getId());
-        extraFieldDTO.setCompanyId(assetsDTO.getCompanyId());
-        extraFieldDTO.setEmail(assetsDTO.getEmail());
-
-        long assetExtraFieldId = getAndIncrementSequence(assetsDTO.getCompanyId());
-        extraFieldDTO.setAssetExtraFieldId(assetExtraFieldId);
-
-        AssetExtraFields extraFields = modelMapper.map(extraFieldDTO, AssetExtraFields.class);
-        extraFieldsRepository.save(extraFields);
-        log.info("Extra field {} saved for asset {}", fieldName, savedAsset.getId());
+        upsertAssetExtraField(
+                savedAsset.getId(),
+                assetsDTO.getCompanyId(),
+                assetsDTO.getEmail(),
+                entry.getKey(),
+                entry.getValue(),
+                null);
       }
     }
 
@@ -310,11 +301,15 @@ public class AssetsServiceImpl implements AssetsService {
     if (asset.getLocation()!=null&&asset.getLocation().startsWith("bin")) {
       Optional<Bin> binOptional = binRepository.findById(asset.getLocation().substring(4));
       binOptional.ifPresent(bin -> {
-        assetDTO.setLocation(bin.getBinNumber());
-        // Get the location name directly from the bin's locationId (which is a DBRef Location object)
+        // ✅ Get full hierarchy for bin: Location Hierarchy -> Bin
         if (bin.getLocationId() != null) {
-          assetDTO.setLocationName(bin.getLocationId().getName());
-          log.info("Bin found with location name: {}", bin.getLocationId().getName());
+          String hierarchyPath = buildLocationHierarchyPath(bin.getLocationId());
+          String fullPath = hierarchyPath + " -> " + bin.getBinNumber();
+          assetDTO.setLocation(fullPath);
+          assetDTO.setLocationName(fullPath);
+          log.info("Bin found with full hierarchy path: {}", fullPath);
+        } else {
+          assetDTO.setLocation(bin.getBinNumber());
         }
       });
 
@@ -322,8 +317,11 @@ public class AssetsServiceImpl implements AssetsService {
       Optional<Location> locationOptional =
               locationRepository.findById(asset.getLocation().substring(9));
       locationOptional.ifPresent(loc -> {
-        assetDTO.setLocation(loc.getName());
-        assetDTO.setLocationName(loc.getName());
+        // ✅ Get full hierarchy for location: Parent -> Parent -> Current
+        String hierarchyPath = buildLocationHierarchyPath(loc);
+        assetDTO.setLocation(hierarchyPath);
+        assetDTO.setLocationName(hierarchyPath);
+        log.info("Location found with full hierarchy path: {}", hierarchyPath);
       });
     }
 
@@ -331,21 +329,99 @@ public class AssetsServiceImpl implements AssetsService {
 
   }
 
+  /**
+   * ✅ Build the full hierarchical path for a location
+   * Example: "Building A -> Floor 2 -> Conference Room"
+   * Recursively gets parent locations and builds the complete path
+   */
+  private String buildLocationHierarchyPath(Location location) {
+    if (location == null) {
+      return "";
+    }
+
+    // ✅ If location has no parent, return just its name
+    if (location.getParentLocation() == null || location.getParentLocation().isEmpty()) {
+      return location.getName();
+    }
+
+    // ✅ Recursively build hierarchy by getting parent location
+    Optional<Location> parentLocationOptional = locationRepository.findById(location.getParentLocation());
+
+    if (parentLocationOptional.isPresent()) {
+      Location parentLocation = parentLocationOptional.get();
+      // ✅ Build: ParentHierarchy -> CurrentLocation
+      String parentPath = buildLocationHierarchyPath(parentLocation);
+      return parentPath + " -> " + location.getName();
+    } else {
+      // ✅ If parent not found, just return current location name
+      return location.getName();
+    }
+  }
+
   private static final Object idGeneratorLock = new Object();
 
   @Override
   public void addExtraFields(AssetExtraFieldsDTO extraFieldsDTO) throws Exception {
     extraFieldsDTO.setName(extraFieldsDTO.getName());
+    log.info("Saving extra field with name: {} for companyId: {}", extraFieldsDTO.getName(), extraFieldsDTO.getCompanyId());
 
-    log.info("Adding extra field with name: "+extraFieldsDTO.getName()+" for companyId: "+extraFieldsDTO.getCompanyId());
+    if (extraFieldsDTO.getId() != null && !extraFieldsDTO.getId().isBlank()) {
+      Optional<AssetExtraFields> byId = extraFieldsRepository.findById(extraFieldsDTO.getId());
+      if (byId.isPresent()) {
+        updateAssetExtraFieldIfChanged(byId.get(), extraFieldsDTO.getValue(), extraFieldsDTO.getType());
+        return;
+      }
+    }
 
-    // Get and increment sequence atomically (inside synchronized block)
-    long assetExtraFieldId = getAndIncrementSequence(extraFieldsDTO.getCompanyId());
-    extraFieldsDTO.setAssetExtraFieldId(assetExtraFieldId);
-    log.info("Assigned assetExtraFieldId: "+assetExtraFieldId+" for companyId: "+extraFieldsDTO.getCompanyId());
+    upsertAssetExtraField(
+            extraFieldsDTO.getAssetId(),
+            extraFieldsDTO.getCompanyId(),
+            extraFieldsDTO.getEmail(),
+            extraFieldsDTO.getName(),
+            extraFieldsDTO.getValue(),
+            extraFieldsDTO.getType());
+  }
 
-    AssetExtraFields extraFields = modelMapper.map(extraFieldsDTO, AssetExtraFields.class);
+  private void upsertAssetExtraField(
+          String assetId,
+          Long companyId,
+          String email,
+          String fieldName,
+          String fieldValue,
+          String type) throws Exception {
+    if (fieldValue == null || fieldValue.trim().isEmpty()) {
+      return;
+    }
+
+    Optional<AssetExtraFields> existingOpt = extraFieldsRepository.findByNameAndAssetId(fieldName, assetId);
+    if (existingOpt.isPresent()) {
+      updateAssetExtraFieldIfChanged(existingOpt.get(), fieldValue, type);
+      return;
+    }
+
+    long assetExtraFieldId = getAndIncrementSequence(companyId);
+    AssetExtraFields extraFields = new AssetExtraFields();
+    extraFields.setName(fieldName);
+    extraFields.setValue(fieldValue);
+    extraFields.setAssetId(assetId);
+    extraFields.setCompanyId(companyId);
+    extraFields.setEmail(email);
+    extraFields.setType(type);
+    extraFields.setAssetExtraFieldId(assetExtraFieldId);
     extraFieldsRepository.save(extraFields);
+    log.info("Extra field {} created for asset {}", fieldName, assetId);
+  }
+
+  private void updateAssetExtraFieldIfChanged(AssetExtraFields existing, String newValue, String type) {
+    if (Objects.equals(existing.getValue(), newValue)) {
+      return;
+    }
+    existing.setValue(newValue);
+    if (type != null) {
+      existing.setType(type);
+    }
+    extraFieldsRepository.save(existing);
+    log.info("Extra field {} updated for asset {}", existing.getName(), existing.getAssetId());
   }
 
   /**
@@ -434,7 +510,6 @@ public class AssetsServiceImpl implements AssetsService {
 
   @Override
   public void deleteExtraFields(String id) throws Exception {
-    // TODO Auto-generated method stub
     Optional<AssetExtraFields> extraFields = extraFieldsRepository.findById(id);
     if (extraFields.isEmpty()) {
       throw new Exception("No such extra Field");
@@ -1165,7 +1240,7 @@ public class AssetsServiceImpl implements AssetsService {
     assetsList.stream()
         .forEach(
             x -> {
-              x.setStatus("inActive");
+              x.setStatus("inactive");
               assetsRepository.save(x);
             });
   }
@@ -1541,7 +1616,7 @@ public class AssetsServiceImpl implements AssetsService {
     assetList.stream()
         .forEach(
             (ele) -> {
-              if (ele.getStatus().equals("active")) {
+              if (ele.getStatus()!=null&&ele.getStatus().equals("active")) {
                 AssetsDTO assetsDTO = modelMapper.map(ele, AssetsDTO.class);
 
                 filteredList.add(assetsDTO);
@@ -1761,94 +1836,279 @@ public class AssetsServiceImpl implements AssetsService {
       return null;
     }
   }
+  public List<AssetCheckInOutData> findAllCheckInOutData(Long companyId) {
+    String assetsCollection = mongoTemplate.getCollectionName(Assets.class);
+    String companyCustomerCollection = mongoTemplate.getCollectionName(CompanyCustomer.class);
+    String checkInOutCollection = mongoTemplate.getCollectionName(AssetCheckInOut.class);
 
-    @Override
-    public PaginatedResultCheckInOutDTO<AssetCheckInOutData> getAssetCheckInOutData(Long companyId,Long pageNumber,Long pageSize) {
-        List<Assets> assetsList = assetsRepository.findByCompanyId(companyId);
-        List<AssetCheckInOutData> assetCheckInOutDataList = new ArrayList<>();
-        AtomicLong totalCheckedIn = new AtomicLong();
-        AtomicLong totalCheckedOut = new AtomicLong();
-        assetsList.stream().forEach((asset) -> {
-//            AssetCheckInOutData assetCheckInOutData = new AssetCheckInOutData();
-//            assetCheckInOutData.setAssetId(asset.getAssetId());
-//            assetCheckInOutData.setAssetName(asset.getName());
-            Optional<AssetCheckInOut> assetCheckInOutOptional = checkInOutRepository.findByAssetId(asset.getId());
-            if(assetCheckInOutOptional.isPresent()){
-                AssetCheckInOut assetCheckInOut = assetCheckInOutOptional.get();
-                if(assetCheckInOut.getStatus().equalsIgnoreCase("Checked In")){
-                    totalCheckedIn.getAndIncrement();
-                }
-                else if(assetCheckInOut.getStatus().equalsIgnoreCase("Checked Out")){
-                    totalCheckedOut.getAndIncrement();
-                }
-                assetCheckInOut.getDetailsList().stream()
-                        .sorted(Comparator.comparing(AssetCheckInOutDetails::getDate).reversed())
-                        .forEach(detail -> {
-                            // process each detail
-                            AssetCheckInOutData assetCheckInOutData = new AssetCheckInOutData();
-                            assetCheckInOutData.setAssetId(asset.getAssetId());
-                            assetCheckInOutData.setAssetName(asset.getName());
-                            assetCheckInOutData.setAction(detail.getStatus());
-                            assetCheckInOutData.setDate(detail.getDate());
-                            assetCheckInOutData.setTime(detail.getUpdateTime().toLocalTime().withNano(0));
-                            assetCheckInOutData.setLocation(detail.getLocation());
-                            assetCheckInOutData.setUsername(detail.getEmployee());
-                            assetCheckInOutDataList.add(assetCheckInOutData);
-                        });
-            }
-            else{
-                totalCheckedIn.getAndIncrement();
-                AssetCheckInOutData assetCheckInOutData = new AssetCheckInOutData();
-                assetCheckInOutData.setAssetId(asset.getAssetId());
-                assetCheckInOutData.setAssetName(asset.getName());
-                assetCheckInOutData.setAction("Checked In");
-                LocalDateTime date = LocalDateTime.parse(asset.getUpdatedAt());
+    Aggregation aggregation = Aggregation.newAggregation(
+            Aggregation.match(Criteria.where("companyId").is(companyId)),
+            Aggregation.unwind("detailsList"),
+            assetLookupOperation(assetsCollection),
+            Aggregation.unwind("assetDetails", true),
+            customerLookupOperation(companyCustomerCollection),
+            Aggregation.unwind("customerDetails", true),
+            Aggregation.project()
+                    .and("assetDetails.assetId").as("assetId")
+                    .and("assetDetails.name").as("assetName")
+                    .and("assetDetails.status").as("assetStatus")
+                    .and("customerDetails.companyCustomerId").as("companyCustomerId")
+                    .and("customerDetails.name").as("customerName")
+                    .and("detailsList.status").as("action")
+                    .and("detailsList.date").as("date")
+                    .and("detailsList.updateTime").as("updateTime")
+                    .and("detailsList.employee").as("username")
+                    .and("detailsList.location").as("location"),
+            Aggregation.sort(Sort.Direction.DESC, "date")
+    );
 
-              LocalTime timeOnly = LocalDateTime.parse(asset.getUpdatedAt()).toLocalTime().withNano(0);
-                assetCheckInOutData.setTime(timeOnly);
-                assetCheckInOutData.setDate(date);
-//                assetCheckInOutData.setTime(dateTime);
-                assetCheckInOutData.setLocation("NA");
-                assetCheckInOutData.setUsername("NA");
-                assetCheckInOutDataList.add(assetCheckInOutData);
-            }
+    List<AssetCheckInOutData> results = mongoTemplate.aggregate(aggregation, checkInOutCollection, AssetCheckInOutData.class)
+            .getMappedResults();
+    enrichCheckInOutData(results);
+    return results;
+  }
 
+  private AggregationOperation assetLookupOperation(String assetsCollection) {
+    return context -> new Document("$lookup",
+            new Document("from", assetsCollection)
+                    .append("let", new Document("checkInAssetId", "$assetId"))
+                    .append("pipeline", List.of(
+                            new Document("$match", new Document("$expr",
+                                    new Document("$eq", List.of(
+                                            new Document("$toString", "$_id"),
+                                            new Document("$toString", "$$checkInAssetId")
+                                    ))
+                            ))
+                    ))
+                    .append("as", "assetDetails")
+    );
+  }
 
+  private AggregationOperation customerLookupOperation(String companyCustomerCollection) {
+    return context -> new Document("$lookup",
+            new Document("from", companyCustomerCollection)
+                    .append("let", new Document("custId", "$assetDetails.customerId"))
+                    .append("pipeline", List.of(
+                            new Document("$match", new Document("$expr",
+                                    new Document("$eq", List.of(
+                                            new Document("$toString", "$_id"),
+                                            new Document("$toString", "$$custId")
+                                    ))
+                            ))
+                    ))
+                    .append("as", "customerDetails")
+    );
+  }
 
-        });
+  private void enrichCheckInOutData(List<AssetCheckInOutData> dataList) {
+    dataList.forEach(data -> {
+      if (data.getUpdateTime() != null) {
+        data.setTime(data.getUpdateTime().toLocalTime().withNano(0));
+      } else if (data.getDate() != null) {
+        data.setTime(data.getDate().toLocalTime().withNano(0));
+      }
+      if (data.getCompanyCustomerId() != null) {
+        data.setCustomerId(String.valueOf(data.getCompanyCustomerId()));
+      }
+      data.setUpdateTime(null);
+      data.setCompanyCustomerId(null);
+    });
+  }
 
+  @Override
+  public PaginatedResultCheckInOutDTO<AssetCheckInOutData> getAssetCheckInOutData(Long companyId, Long pageNumber, Long pageSize) {
 
-        // Sort by date (descending) and then by time (descending)
-        assetCheckInOutDataList.sort(
-                Comparator.comparing(AssetCheckInOutData::getDate, Comparator.nullsLast(Comparator.reverseOrder()))
-                        .thenComparing(AssetCheckInOutData::getTime, Comparator.nullsLast(Comparator.reverseOrder()))
-        );
+    String assetsCollection = mongoTemplate.getCollectionName(Assets.class);
+    String companyCustomerCollection = mongoTemplate.getCollectionName(CompanyCustomer.class);
+    String checkInOutCollection = mongoTemplate.getCollectionName(AssetCheckInOut.class);
 
+    Aggregation aggregation = Aggregation.newAggregation(
+            Aggregation.match(Criteria.where("companyId").is(companyId)),
+            Aggregation.unwind("detailsList"),
+            assetLookupOperation(assetsCollection),
+            Aggregation.unwind("assetDetails", true),
+            customerLookupOperation(companyCustomerCollection),
+            Aggregation.unwind("customerDetails", true),
+            Aggregation.project()
+                    .and("assetDetails.assetId").as("assetId")
+                    .and("assetDetails.name").as("assetName")
+                    .and("assetDetails.status").as("assetStatus")
+                    .and("customerDetails.companyCustomerId").as("companyCustomerId")
+                    .and("customerDetails.name").as("customerName")
+                    .and("detailsList.status").as("action")
+                    .and("detailsList.date").as("date")
+                    .and("detailsList.updateTime").as("updateTime")
+                    .and("detailsList.location").as("location")
+                    .and("detailsList.employee").as("username")
+                    .and("status").as("checkInOutStatus"),
+            Aggregation.sort(Sort.Direction.DESC, "date")
+    );
 
+    List<AssetCheckInOutData> allData = mongoTemplate.aggregate(
+            aggregation,
+            checkInOutCollection,
+            AssetCheckInOutData.class
+    ).getMappedResults();
 
+    enrichCheckInOutData(allData);
 
-//        for (AssetCheckInOutData data : assetCheckInOutDataList) {
-//            if (data.getAction().equalsIgnoreCase("Checked In")) {
-//                totalCheckedIn++;
-//            } else if (data.getAction().equalsIgnoreCase("Checked Out")) {
-//                totalCheckedOut++;
-//            }
-//        }
+    log.info("All CheckInOut Data Size: {}", allData.size());
 
-        // Pagination logic
+    // ✅ Count from ACTIVE assets only
+    long totalCheckedIn = allData.stream()
+            .filter(d -> "active".equalsIgnoreCase(d.getAssetStatus()))
+            .filter(d -> "Checked In".equalsIgnoreCase(d.getAction()))
+            .count();
 
-        int totalRecords = assetCheckInOutDataList.size();
-        int startIndex = (int) (pageNumber * pageSize);
-        int endIndex = (int) Math.min(startIndex + pageSize, totalRecords);
+    long totalCheckedOut = allData.stream()
+            .filter(d -> "active".equalsIgnoreCase(d.getAssetStatus()))
+            .filter(d -> "Checked Out".equalsIgnoreCase(d.getAction()))
+            .count();
 
-        // Handle edge cases
+    // Pagination
+    int totalRecords = allData.size();
+    int startIndex = (int) (pageNumber * pageSize);
+    int endIndex = (int) Math.min(startIndex + pageSize, totalRecords);
 
-        if (startIndex >= totalRecords) {
-            return new PaginatedResultCheckInOutDTO<>(new ArrayList<>(),totalRecords, totalCheckedIn.get(), totalCheckedOut.get()); // Return empty list if pageNumber is out of bounds
-        }
-        return new PaginatedResultCheckInOutDTO<>(assetCheckInOutDataList.subList(startIndex, endIndex),totalRecords, totalCheckedIn.get(), totalCheckedOut.get());
-//        return assetCheckInOutDataList;
+    if (startIndex >= totalRecords) {
+      return new PaginatedResultCheckInOutDTO<>(
+              new ArrayList<>(),
+              totalRecords,
+              totalCheckedIn,
+              totalCheckedOut
+      );
     }
+
+    return new PaginatedResultCheckInOutDTO<>(
+            allData.subList(startIndex, endIndex),
+            totalRecords,
+            totalCheckedIn,
+            totalCheckedOut
+    );
+  }
+
+//    @Override
+//    public PaginatedResultCheckInOutDTO<AssetCheckInOutData> getAssetCheckInOutData(Long companyId,Long pageNumber,Long pageSize) {
+//        List<Assets> assetsList = assetsRepository.findByCompanyId(companyId);
+//
+//        List<AssetCheckInOutData> assetCheckInOutDataList = new ArrayList<>();
+//        AtomicLong totalCheckedIn = new AtomicLong();
+//        AtomicLong totalCheckedOut = new AtomicLong();
+//
+//        // Batch fetch all unique customerIds to avoid N+1 problem
+//        Set<String> customerIds = assetsList.stream()
+//                .map(Assets::getCustomerId)
+//                .filter(Objects::nonNull)
+//                .collect(Collectors.toSet());
+//
+//        // Fetch all CompanyCustomers in one query
+//        Query customerQuery = new Query(Criteria.where("id").in(new ArrayList<>(customerIds)));
+//        List<CompanyCustomer> customers = mongoTemplate.find(customerQuery, CompanyCustomer.class);
+//        Map<String, CompanyCustomer> customerMap = customers.stream()
+//                .collect(Collectors.toMap(CompanyCustomer::getId, c -> c, (c1, c2) -> c1));
+//
+//        assetsList.stream().forEach((asset) -> {
+////            AssetCheckInOutData assetCheckInOutData = new AssetCheckInOutData();
+////            assetCheckInOutData.setAssetId(asset.getAssetId());
+////            assetCheckInOutData.setAssetName(asset.getName());
+//            Optional<AssetCheckInOut> assetCheckInOutOptional = checkInOutRepository.findByAssetId(asset.getId());
+//            if(assetCheckInOutOptional.isPresent()){
+//                AssetCheckInOut assetCheckInOut = assetCheckInOutOptional.get();
+//                if(assetCheckInOut.getStatus().equalsIgnoreCase("Checked In")){
+//                    totalCheckedIn.getAndIncrement();
+//                }
+//                else if(assetCheckInOut.getStatus().equalsIgnoreCase("Checked Out")){
+//                    totalCheckedOut.getAndIncrement();
+//                }
+//                assetCheckInOut.getDetailsList().stream()
+//                        .sorted(Comparator.comparing(AssetCheckInOutDetails::getDate).reversed())
+//                        .forEach(detail -> {
+//                            // process each detail
+//                            AssetCheckInOutData assetCheckInOutData = new AssetCheckInOutData();
+//                            assetCheckInOutData.setAssetId(asset.getAssetId());
+//                            assetCheckInOutData.setAssetName(asset.getName());
+//                            assetCheckInOutData.setAction(detail.getStatus());
+//                            assetCheckInOutData.setDate(detail.getDate());
+//                            assetCheckInOutData.setTime(detail.getUpdateTime().toLocalTime().withNano(0));
+//                            assetCheckInOutData.setLocation(detail.getLocation());
+//                            assetCheckInOutData.setUsername(detail.getEmployee());
+//                            assetCheckInOutData.setCustomerName(asset.getCustomer());
+//                            // Use pre-fetched customer map instead of individual queries
+//                            if (asset.getCustomerId() != null && !asset.getCustomerId().isEmpty()) {
+//                              CompanyCustomer companyCustomer = customerMap.get(asset.getCustomerId());
+//                              if (companyCustomer != null) {
+//                                assetCheckInOutData.setCustomerId(String.valueOf(companyCustomer.getCompanyCustomerId()));
+//                              } else {
+//                                assetCheckInOutData.setCustomerId(asset.getCustomerId());
+//                              }
+//                            }
+//                            assetCheckInOutDataList.add(assetCheckInOutData);
+//
+//                        });
+//            }
+//            else{
+//                totalCheckedIn.getAndIncrement();
+//                AssetCheckInOutData assetCheckInOutData = new AssetCheckInOutData();
+//                assetCheckInOutData.setAssetId(asset.getAssetId());
+//                assetCheckInOutData.setAssetName(asset.getName());
+//                assetCheckInOutData.setAction("Checked In");
+//                LocalDateTime date = LocalDateTime.parse(asset.getUpdatedAt());
+//
+//              LocalTime timeOnly = LocalDateTime.parse(asset.getUpdatedAt()).toLocalTime().withNano(0);
+//                assetCheckInOutData.setTime(timeOnly);
+//                assetCheckInOutData.setDate(date);
+////                assetCheckInOutData.setTime(dateTime);
+//                assetCheckInOutData.setLocation("NA");
+//                assetCheckInOutData.setUsername("NA");
+//                assetCheckInOutData.setCustomerName(asset.getCustomer());
+//                // Use pre-fetched customer map instead of individual queries
+//               if (asset.getCustomerId() != null && !asset.getCustomerId().isEmpty()) {
+//                 CompanyCustomer companyCustomer = customerMap.get(asset.getCustomerId());
+//                 if (companyCustomer != null) {
+//                   assetCheckInOutData.setCustomerId(String.valueOf(companyCustomer.getCompanyCustomerId()));
+//                 } else {
+//                   assetCheckInOutData.setCustomerId(asset.getCustomerId());
+//                 }
+//               }
+//                assetCheckInOutDataList.add(assetCheckInOutData);
+//            }
+//
+//
+//
+//        });
+//
+//
+//        // Sort by date (descending) and then by time (descending)
+//        assetCheckInOutDataList.sort(
+//                Comparator.comparing(AssetCheckInOutData::getDate, Comparator.nullsLast(Comparator.reverseOrder()))
+//                        .thenComparing(AssetCheckInOutData::getTime, Comparator.nullsLast(Comparator.reverseOrder()))
+//        );
+//
+//
+//
+//
+////        for (AssetCheckInOutData data : assetCheckInOutDataList) {
+////            if (data.getAction().equalsIgnoreCase("Checked In")) {
+////                totalCheckedIn++;
+////            } else if (data.getAction().equalsIgnoreCase("Checked Out")) {
+////                totalCheckedOut++;
+////            }
+////        }
+//
+//        // Pagination logic
+//
+//        int totalRecords = assetCheckInOutDataList.size();
+//        int startIndex = (int) (pageNumber * pageSize);
+//        int endIndex = (int) Math.min(startIndex + pageSize, totalRecords);
+//
+//        // Handle edge cases
+//
+//        if (startIndex >= totalRecords) {
+//            return new PaginatedResultCheckInOutDTO<>(new ArrayList<>(),totalRecords, totalCheckedIn.get(), totalCheckedOut.get()); // Return empty list if pageNumber is out of bounds
+//        }
+//        return new PaginatedResultCheckInOutDTO<>(assetCheckInOutDataList.subList(startIndex, endIndex),totalRecords, totalCheckedIn.get(), totalCheckedOut.get());
+////        return assetCheckInOutDataList;
+//    }
 
     /**
      * Fetch assets with advanced filtering on predefined and custom fields with pagination

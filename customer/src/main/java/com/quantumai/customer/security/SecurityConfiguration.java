@@ -82,7 +82,8 @@ public class SecurityConfiguration {
                     "/companycustomer/**",
                     "/payment/**",
                     "/subscription/**",
-                    "/chatbot/**")
+                    "/chatbot/**",
+                    "/audit/**")
             .authenticated()
 
             // Protected paths for admins

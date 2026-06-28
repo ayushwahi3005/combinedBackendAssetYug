@@ -6,12 +6,17 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 
 import com.quantumai.customer.dto.InspectionCompletedCountPerDayDTO;
+import com.quantumai.customer.dto.InspectionDetailFilterDTO;
+import com.quantumai.customer.dto.InspectionPerformerGroupDTO;
+import com.quantumai.customer.dto.InspectionStatusCountDTO;
+import com.quantumai.customer.dto.PaginatedInspectionDetailDTO;
 import com.quantumai.customer.dto.UserInspectionAnalyticsDTO;
 import com.quantumai.customer.entity.CompanyCustomer;
 import com.quantumai.customer.entity.CompanyCustomerExtraFieldName;
 import com.quantumai.customer.entity.CompanyCustomerExtraFields;
 import com.quantumai.customer.entity.enums.InspectionInstanceStatus;
 import com.quantumai.customer.service.AssetInspectionService;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -37,6 +42,7 @@ import java.util.*;
 @RestController
 @RequestMapping("inspection/")
 @Tag(name = "AssetInspection", description = "AssetInspection Management API")
+@Slf4j
 public class AssetInspectionAPI {
 
         @Autowired
@@ -118,6 +124,30 @@ public class AssetInspectionAPI {
                 return ResponseEntity.ok(assetInspectionService.exportInspectionOverviewExcel(companyId,assetId));
 
 
+        }
+
+        @Operation(summary = "Inspection Status Count", description = "Get all inspection instances count grouped by status and total count for a company")
+        @GetMapping("/status-count/{companyId}")
+//        @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
+        public InspectionStatusCountDTO getInspectionStatusCounts(@PathVariable Long companyId) {
+                log.info("Received request for inspection status counts for companyId: {}", companyId);
+                return assetInspectionService.getInspectionStatusCounts(companyId);
+        }
+
+        @Operation(summary = "Incomplete Inspections by Performer", description = "Get all incomplete (not completed and not cancelled) inspection instances grouped by actionPerformedBy")
+        @GetMapping("/incomplete-by-performer/{companyId}")
+        @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
+        public InspectionPerformerGroupDTO getIncompleteInspectionsByPerformer(@PathVariable Long companyId) {
+                return assetInspectionService.getIncompleteInspectionsByPerformer(companyId);
+        }
+
+        @Operation(summary = "Detailed Inspections with Filtering", description = "Get detailed inspection instances with advanced filtering, pagination, and sorting")
+        @PostMapping("/detailed/{companyId}")
+        @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
+        public PaginatedInspectionDetailDTO getDetailedInspections(
+                @PathVariable Long companyId,
+                @RequestBody InspectionDetailFilterDTO filter) {
+                return assetInspectionService.getDetailedInspections(companyId, filter);
         }
 
 }

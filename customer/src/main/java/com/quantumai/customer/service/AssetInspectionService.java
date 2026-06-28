@@ -1,6 +1,10 @@
 package com.quantumai.customer.service;
 
 import com.quantumai.customer.dto.InspectionCompletedCountPerDayDTO;
+import com.quantumai.customer.dto.InspectionDetailFilterDTO;
+import com.quantumai.customer.dto.InspectionPerformerGroupDTO;
+import com.quantumai.customer.dto.InspectionStatusCountDTO;
+import com.quantumai.customer.dto.PaginatedInspectionDetailDTO;
 import com.quantumai.customer.dto.UserInspectionAnalyticsDTO;
 import com.quantumai.customer.entity.enums.InspectionInstanceStatus;
 
@@ -27,4 +31,18 @@ public interface AssetInspectionService {
 
     public byte[] exportInspectionOverviewExcel(Long companyId, String assetId) throws Exception;
 
+    /**
+     * Get inspection count grouped by status with total count for a specific company
+     */
+    InspectionStatusCountDTO getInspectionStatusCounts(Long companyId);
+
+    /**
+     * Get incomplete (not completed and not cancelled) inspections grouped by actionPerformedBy
+     */
+    InspectionPerformerGroupDTO getIncompleteInspectionsByPerformer(Long companyId);
+
+    /**
+     * Get detailed inspections with advanced filtering, pagination, and sorting
+     */
+    PaginatedInspectionDetailDTO getDetailedInspections(Long companyId, InspectionDetailFilterDTO filter);
 }

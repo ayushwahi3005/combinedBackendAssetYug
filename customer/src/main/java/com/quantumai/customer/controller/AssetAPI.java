@@ -12,6 +12,8 @@ import com.opencsv.exceptions.CsvValidationException;
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
 import com.quantumai.customer.entity.Notification;
+import com.quantumai.customer.entity.enums.AuditAction;
+import com.quantumai.customer.entity.enums.AuditModule;
 import com.quantumai.customer.entity.enums.ImportHistoryRecordType;
 import com.quantumai.customer.exception.*;
 import com.quantumai.customer.repository.*;
@@ -69,6 +71,7 @@ public class AssetAPI {
   @Autowired private NotificationService notificationService;
   @Autowired private CompanyCustomerMandatoryFieldsRepository companyCustomerMandatoryFieldsRepository;
   @Autowired private AssetMandatoryFieldsRepository assetMandatoryFieldsRepository;
+  @Autowired private AssetShowFieldsRepository assetShowFieldsRepository;
   @Autowired private UsersRepository usersRepository;
   @Autowired private CustomerRepository customerRepository;
   @Autowired private AssetCheckInOutRepository assetCheckInOutRepository;
@@ -76,6 +79,9 @@ public class AssetAPI {
   @Autowired private MongoTemplate mongoTemplate;
   @Autowired private ImportHistoryRepository importHistoryRepository;
   @Autowired private AssetUniqueFieldConfigurationRepository assetUniqueFieldConfigurationRepository;
+  @Autowired private AssetQRRepository qrRepository;
+  @Autowired private AuditService auditService;
+  @Autowired private AssetCategoryInspectionInstanceRepository assetCategoryInspectionInstanceRepository;;
 
   private final ModelMapper modelMapper = new ModelMapper();
 
@@ -426,7 +432,31 @@ public class AssetAPI {
   @PutMapping("/addassets")
   @PreAuthorize("@appSecurity.canEdit(authentication, #assestsDTO.companyId, 'assets')")
   public void addAssets(@RequestBody AssetsDTO assestsDTO) throws Exception {
-    assetsService.addAssets(assestsDTO);
+    Assets beforeState = null;
+    Map<String, String> beforeExtras = Collections.emptyMap();
+    if (assestsDTO.getId() != null) {
+      Optional<Assets> existing = assetsRepository.findById(assestsDTO.getId());
+      if (existing.isPresent()) {
+        beforeState = existing.get();
+        beforeExtras = toAssetExtraFieldsMap(beforeState.getId());
+      }
+    }
+
+    AssetsDTO saved = assetsService.addAssets(assestsDTO);
+
+    if (beforeState != null) {
+      Assets afterState = assetsRepository.findById(assestsDTO.getId()).orElse(null);
+      if (afterState != null) {
+        Map<String, Object> changes = AuditChangeCalculator.computeChanges(beforeState, afterState);
+        Map<String, String> afterExtras = toAssetExtraFieldsMap(afterState.getId());
+        changes.putAll(AuditChangeCalculator.computeExtraFieldValueChanges(beforeExtras, afterExtras));
+        if (!changes.isEmpty()) {
+          auditService.logUpdate(AuditModule.ASSET,
+                  String.valueOf(saved.getAssetId()), saved.getName(),
+                  saved.getCompanyId(), changes);
+        }
+      }
+    }
   }
 
   @Operation(summary = "Add New Assets", description = "Endpoint to add new assets")
@@ -434,7 +464,11 @@ public class AssetAPI {
   @PreAuthorize("@appSecurity.canCreate(authentication, #assestsDTO.companyId, 'assets')")
   public ResponseEntity<AssetsDTO> addNewAssets(@RequestBody AssetsDTO assestsDTO) throws Exception {
     log.info("NEW ASSET DATA: {}", assestsDTO);
-    return ResponseEntity.ok(assetsService.addAssets(assestsDTO));
+    AssetsDTO saved = assetsService.addAssets(assestsDTO);
+    auditService.logCreate(AuditModule.ASSET, String.valueOf(saved.getAssetId()), saved.getName(),
+            saved.getCompanyId(), Map.of("name", String.valueOf(saved.getName()),
+                    "companyId", String.valueOf(saved.getCompanyId())));
+    return ResponseEntity.ok(saved);
   }
 
   @Operation(summary = "Add Unique Field Config", description = "Endpoint to add unique field config")
@@ -442,7 +476,19 @@ public class AssetAPI {
   @PreAuthorize("@appSecurity.canCreate(authentication, #assetUniqueFieldConfigurationDTO.companyId, 'assets')")
   public ResponseEntity<AssetUniqueFieldConfigurationDTO> addUniqueFieldConfig(@RequestBody AssetUniqueFieldConfigurationDTO assetUniqueFieldConfigurationDTO) throws Exception {
 
-    return ResponseEntity.ok(assetsService.saveUniqueFieldConfiguration(assetUniqueFieldConfigurationDTO));
+    log.info("Adding/Updating Unique Field Configuration: {}", assetUniqueFieldConfigurationDTO);
+    AssetUniqueFieldConfiguration beforeState = null;
+    if(assetUniqueFieldConfigurationDTO.getId() != null) {
+      beforeState = assetUniqueFieldConfigurationRepository.findById(assetUniqueFieldConfigurationDTO.getId()).orElse(null);
+    }
+
+    AssetUniqueFieldConfigurationDTO result = assetsService.saveUniqueFieldConfiguration(assetUniqueFieldConfigurationDTO);
+    if (beforeState != null) {
+      auditService.logUpdateWithComparison(AuditModule.ASSET_CUSTOM_FIELD, assetUniqueFieldConfigurationDTO.getId(), assetUniqueFieldConfigurationDTO.getFieldName(), assetUniqueFieldConfigurationDTO.getCompanyId(), beforeState, result);
+    } else {
+      auditService.logCreate(AuditModule.ASSET_CUSTOM_FIELD, assetUniqueFieldConfigurationDTO.getId(), assetUniqueFieldConfigurationDTO.getFieldName(), assetUniqueFieldConfigurationDTO.getCompanyId(), Map.of("unique", "true"));
+    }
+    return ResponseEntity.ok(result);
   }
 
   @Operation(summary = "Import File", description = "Endpoint to import file")
@@ -1087,7 +1133,9 @@ public class AssetAPI {
   @PostMapping("/addfields")
   @PreAuthorize("@appSecurity.canCreateAny(authentication, 'assets')")
   public void addNewFields(@RequestBody AssetExtraFieldsDTO extraFieldsDTO) throws Exception {
+    String oldValue = resolveAssetExtraFieldOldValue(extraFieldsDTO);
     assetsService.addExtraFields(extraFieldsDTO);
+    auditAssetExtraFieldValueChange(extraFieldsDTO, oldValue);
   }
 
   @Operation(summary = "Add Extra Field Name", description = "Endpoint to add extra field name")
@@ -1095,6 +1143,10 @@ public class AssetAPI {
   @PreAuthorize("@appSecurity.canCreate(authentication, #extraFieldNameDTO.companyId, 'assets')")
   public void addExtraFieldName(@RequestBody AssetExtraFieldNameDTO extraFieldNameDTO) throws Exception {
     assetsService.addAssetExtraField(extraFieldNameDTO);
+    auditService.logCreate(AuditModule.ASSET_CUSTOM_FIELD, extraFieldNameDTO.getId(),
+            extraFieldNameDTO.getName(), extraFieldNameDTO.getCompanyId(),
+            Map.of("name", String.valueOf(extraFieldNameDTO.getName()),
+                    "type", String.valueOf(extraFieldNameDTO.getType())));
   }
 
   @Operation(summary = "Add Check In Out", description = "Endpoint to add check in out")
@@ -1102,6 +1154,9 @@ public class AssetAPI {
   @PreAuthorize("@appSecurity.canCreate(authentication, #checkInDTO.companyId, 'assets')")
   public void addCheckInOut(@RequestBody AssetCheckInDTO checkInDTO) throws NoSubscriptionError {
     assetsService.addCheckInOut(checkInDTO);
+    auditService.log(AuditModule.ASSET_CHECK_IN_OUT, AuditAction.CREATE,
+            checkInDTO.getAssetId(), checkInDTO.getAssetId(), checkInDTO.getCompanyId(),
+            "Asset check-in/out recorded", Map.of("assetId", String.valueOf(checkInDTO.getAssetId())));
   }
 
   @Operation(summary = "Add Asset File", description = "Endpoint to add asset file")
@@ -1132,21 +1187,43 @@ public class AssetAPI {
   @PostMapping("/mandatoryFields")
   @PreAuthorize("@appSecurity.canEdit(authentication, #mandatoryFields.companyId, 'assets')")
   public void mandatoryFields(@RequestBody AssetMandatoryFields mandatoryFields) throws NoSubscriptionError {
+    AssetMandatoryFields beforeState = assetMandatoryFieldsRepository.findById(mandatoryFields.getId()).orElse(null);
     assetsService.updateMandatoryFields(mandatoryFields);
+    if (beforeState != null) {
+      auditService.logUpdateWithComparison(AuditModule.ASSET_CUSTOM_FIELD, mandatoryFields.getId(), mandatoryFields.getName(), mandatoryFields.getCompanyId(), beforeState, mandatoryFields);
+    } else {
+      auditService.logCreate(AuditModule.ASSET_CUSTOM_FIELD, mandatoryFields.getId(), mandatoryFields.getName(), mandatoryFields.getCompanyId(), Map.of("mandatory", "true"));
+    }
   }
 
   @Operation(summary = "Show Fields", description = "Endpoint to show fields")
   @PostMapping("/showFields")
   @PreAuthorize("@appSecurity.canEdit(authentication, #showFields.companyId, 'assets')")
   public void showFields(@RequestBody AssetShowFields showFields) throws NoSubscriptionError {
+    AssetShowFields beforeState = assetShowFieldsRepository.findById(showFields.getId()).orElse(null);
     assetsService.updateShowFields(showFields);
+    if (beforeState != null) {
+      auditService.logUpdateWithComparison(AuditModule.ASSET_CUSTOM_FIELD, showFields.getId(), showFields.getName(), showFields.getCompanyId(), beforeState, showFields);
+    } else {
+      auditService.logCreate(AuditModule.ASSET_CUSTOM_FIELD, showFields.getId(), showFields.getName(), showFields.getCompanyId(), Map.of("show", "true"));
+    }
   }
 
   @Operation(summary = "Save Qrdata", description = "Endpoint to save qrdata")
   @PostMapping("/saveQRData")
   @PreAuthorize("@appSecurity.canCreateAny(authentication, 'assets')")
   public void saveQRData(@RequestBody AssetQR qr) {
+    // Check if existing config exists to determine CREATE vs UPDATE
+    AssetQR before = qrRepository.findByCompanyId(qr.getCompanyId()).orElse(null);
     assetsService.qrDataUpdation(qr);
+    if (before == null) {
+      auditService.logCreate(AuditModule.ASSET_QR, null, "QR Configuration",
+              qr.getCompanyId(), Map.of("type", String.valueOf(qr.getType()),
+                      "custom", String.valueOf(qr.getCustom())));
+    } else {
+      auditService.logUpdateWithComparison(AuditModule.ASSET_QR,
+              before.getId(), "QR Configuration", qr.getCompanyId(), before, qr);
+    }
   }
 
   @Operation(summary = "Update Assets With In Active", description = "Endpoint to update assets with in active")
@@ -1161,6 +1238,8 @@ public class AssetAPI {
   @PreAuthorize("@appSecurity.canCreate(authentication, #categoryDTO.companyId, 'assets')")
   public void addCategory(@RequestBody CategoryDTO categoryDTO) throws Exception {
     assetsService.addCategory(categoryDTO);
+    auditService.logCreate(AuditModule.ASSET_CATEGORY, null, categoryDTO.getName(),
+            categoryDTO.getCompanyId(), Map.of("name", String.valueOf(categoryDTO.getName())));
   }
 
   @Operation(summary = "Add Asset Inspection", description = "Endpoint to add asset inspection")
@@ -1168,6 +1247,12 @@ public class AssetAPI {
   @PreAuthorize("@appSecurity.canCreate(authentication, #assetCategoryInspection.companyId, 'assets')")
   public void addAssetInspection(@RequestBody AssetCategoryInspection assetCategoryInspection) throws NoSubscriptionError {
     assetsService.addAssetInspection(assetCategoryInspection);
+    // Service mutates the object: assetCategoryInspectionId is set after save
+    auditService.logCreate(AuditModule.ASSET_INSPECTION,
+            String.valueOf(assetCategoryInspection.getAssetCategoryInspectionId()),
+            assetCategoryInspection.getName(), assetCategoryInspection.getCompanyId(),
+            Map.of("inspectionId", String.valueOf(assetCategoryInspection.getAssetCategoryInspectionId()),
+                    "name", String.valueOf(assetCategoryInspection.getName())));
   }
 
   @Operation(summary = "Add Asset Inspection Instance", description = "Endpoint to add asset inspection instance")
@@ -1175,30 +1260,77 @@ public class AssetAPI {
   @PreAuthorize("@appSecurity.canCreateAny(authentication, 'assets')")
   public void addAssetInspectionInstance(@RequestBody AssetCategoryInspectionInstance assetCategoryInspection) {
     assetsService.addAssetInspectionInstance(assetCategoryInspection);
+    // Service mutates the object: assetCategoryInspectionInstanceId is set after save
+    auditService.logCreate(AuditModule.ASSET_INSPECTION_INSTANCE,
+            String.valueOf(assetCategoryInspection.getAssetCategoryInspectionInstanceId()),
+            assetCategoryInspection.getAssetCategoryInspectionName(),
+            assetCategoryInspection.getCompanyId(),
+            Map.of("instanceId", String.valueOf(assetCategoryInspection.getAssetCategoryInspectionInstanceId()),
+                    "assetId", String.valueOf(assetCategoryInspection.getAssetId()),
+                    "inspectionName", String.valueOf(assetCategoryInspection.getAssetCategoryInspectionName()),
+                    "status", String.valueOf(assetCategoryInspection.getStatus()),
+                    "dueDate", String.valueOf(assetCategoryInspection.getInspectionDueDate())));
   }
 
   // ─── Update endpoints ─────────────────────────────────────────────────────
 
-  @Operation(summary = "Add Asset Inspection", description = "Endpoint to add asset inspection")
+  @Operation(summary = "Update Asset Inspection Instance", description = "Endpoint to update asset inspection instance")
   @PutMapping(value = "/addAssetInspectionInstance")
   @PreAuthorize("@appSecurity.canEdit(authentication, #assetCategoryInspection.companyId, 'assets')")
-  public void addAssetInspection(@RequestBody AssetCategoryInspectionInstance assetCategoryInspection) throws NoSubscriptionError {
+  public void updateAssetInspectionInstance(@RequestBody AssetCategoryInspectionInstance assetCategoryInspection) throws NoSubscriptionError {
+    // Fetch current state before update
+    AssetCategoryInspectionInstance beforeState = assetCategoryInspectionInstanceRepository
+            .findById(assetCategoryInspection.getId()).orElse(null);
+    
     assetsService.updateAssetInspectionInstance(assetCategoryInspection);
+    
+    if (beforeState != null) {
+      // Log with detailed field comparison
+      auditService.logUpdateWithComparison(AuditModule.ASSET_INSPECTION_INSTANCE,
+              String.valueOf(assetCategoryInspection.getAssetCategoryInspectionInstanceId()),
+              assetCategoryInspection.getAssetCategoryInspectionName(),
+              assetCategoryInspection.getCompanyId(), beforeState, assetCategoryInspection);
+    }
   }
 
   @Operation(summary = "Update Asset Inspection", description = "Endpoint to update asset inspection")
   @PutMapping(value = "/updateAssetInspection")
   @PreAuthorize("@appSecurity.canCreate(authentication, #assetCategoryInspection.companyId, 'assets')")
   public void updateAssetInspection(@RequestBody AssetCategoryInspection assetCategoryInspection) throws NoSubscriptionError {
+    // Fetch current state before update
+    AssetCategoryInspection beforeState = assetCategoryInspectionRepository
+            .findById(assetCategoryInspection.getId()).orElse(null);
+    
     assetsService.updateAssetInspection(assetCategoryInspection);
     log.info("Update Asset Inspection");
+    
+    if (beforeState != null) {
+      // Log with detailed field comparison
+      auditService.logUpdateWithComparison(AuditModule.ASSET_INSPECTION,
+              String.valueOf(assetCategoryInspection.getAssetCategoryInspectionId()),
+              assetCategoryInspection.getName(), assetCategoryInspection.getCompanyId(),
+              beforeState, assetCategoryInspection);
+    }
   }
 
   @Operation(summary = "Update Category", description = "Endpoint to update category")
   @PutMapping(value = "/updateCategory")
   @PreAuthorize("@appSecurity.canEdit(authentication, #categoryDTO.companyId, 'assets')")
   public void updateCategory(@RequestBody CategoryDTO categoryDTO) throws NoSubscriptionError {
+    // Fetch current state before update
+    Optional<AssetCategory> beforeStateOpt = assetCategoryRepository.findById(categoryDTO.getId());
+    
     assetsService.updateCategory(categoryDTO);
+    
+    if (beforeStateOpt.isPresent()) {
+      // Fetch updated state for comparison
+      AssetCategory afterState = assetCategoryRepository.findById(categoryDTO.getId()).orElse(null);
+      if (afterState != null) {
+        auditService.logUpdateWithComparison(AuditModule.ASSET_CATEGORY,
+                categoryDTO.getId(), categoryDTO.getName(), categoryDTO.getCompanyId(),
+                beforeStateOpt.get(), afterState);
+      }
+    }
   }
 
   @Operation(summary = "Update Extra Field Name", description = "Endpoint to update extra field name")
@@ -1206,7 +1338,13 @@ public class AssetAPI {
   @PreAuthorize("@appSecurity.canEditAny(authentication, 'assets')")
   public ResponseEntity<AssetExtraFieldName> updateExtraFieldName(
           @RequestBody ExtraFieldNameUpdateDTO extraFieldNameUpdateDTO) {
-    return ResponseEntity.ok(assetsService.updateExtraFieldName(extraFieldNameUpdateDTO));
+    AssetExtraFieldName before = extraFieldNameRepository.findById(extraFieldNameUpdateDTO.getId()).orElse(null);
+    AssetExtraFieldName saved = assetsService.updateExtraFieldName(extraFieldNameUpdateDTO);
+    if (before != null) {
+      auditService.logUpdateWithComparison(AuditModule.ASSET_CUSTOM_FIELD,
+              saved.getId(), saved.getName(), saved.getCompanyId(), before, saved);
+    }
+    return ResponseEntity.ok(saved);
   }
 
   // ─── Delete endpoints ─────────────────────────────────────────────────────
@@ -1215,6 +1353,11 @@ public class AssetAPI {
   @PostMapping("/removeAsset")
   @PreAuthorize("@appSecurity.canDeleteAny(authentication, 'assets')")
   public void removeAsset(@RequestBody String id) throws Exception {
+    assetsRepository.findById(id).ifPresent(asset ->
+            auditService.logDelete(AuditModule.ASSET,
+                    String.valueOf(asset.getAssetId()), asset.getName(),
+                    asset.getCompanyId(), Map.of("assetId", String.valueOf(asset.getAssetId()),
+                            "name", String.valueOf(asset.getName()))));
     assetsService.removeAsset(id);
   }
 
@@ -1222,13 +1365,34 @@ public class AssetAPI {
   @DeleteMapping("/deleteExtraFields/{id}")
   @PreAuthorize("@appSecurity.canDeleteAny(authentication, 'assets')")
   public void deleteExtraField(@PathVariable String id) throws Exception {
+    Optional<AssetExtraFields> fieldOpt = extraFieldsRepository.findById(id);
+    if (fieldOpt.isEmpty()) {
+      assetsService.deleteExtraFields(id);
+      return;
+    }
+    AssetExtraFields field = fieldOpt.get();
+    String oldValue = field.getValue();
+    String fieldName = field.getName();
+    String assetMongoId = field.getAssetId();
+    Long companyId = field.getCompanyId();
     assetsService.deleteExtraFields(id);
+    assetsRepository.findById(assetMongoId).ifPresent(asset -> {
+      if (fieldName != null) {
+        auditService.logUpdate(AuditModule.ASSET,
+                String.valueOf(asset.getAssetId()), asset.getName(), companyId,
+                Map.of(fieldName, Map.of("old", oldValue != null ? oldValue : "", "new", "")));
+      }
+    });
   }
 
   @Operation(summary = "Delete Extra Field Name", description = "Endpoint to delete extra field name")
   @DeleteMapping("/deleteExtraFieldName/{id}")
   @PreAuthorize("@appSecurity.canDeleteAny(authentication, 'assets')")
   public void deleteExtraFieldName(@PathVariable String id) throws Exception {
+    extraFieldNameRepository.findById(id).ifPresent(field ->
+            auditService.logDelete(AuditModule.ASSET_CUSTOM_FIELD, id, field.getName(),
+                    field.getCompanyId(), Map.of("name", String.valueOf(field.getName()),
+                            "type", String.valueOf(field.getType()))));
     assetsService.deleteAssetExtraField(id);
   }
 
@@ -1243,6 +1407,12 @@ public class AssetAPI {
   @DeleteMapping(value = "/deleteCategory/{id}")
   @PreAuthorize("@appSecurity.canDeleteAny(authentication, 'assets')")
   public void deleteCategory(@PathVariable String id) throws NoSubscriptionError {
+    assetCategoryRepository.findById(id).ifPresent(cat ->
+            auditService.logDelete(AuditModule.ASSET_CATEGORY,
+                    String.valueOf(cat.getAssetCategoryId()), cat.getName(),
+                    cat.getCompanyId(), Map.of(
+                            "categoryId", String.valueOf(cat.getAssetCategoryId()),
+                            "name", String.valueOf(cat.getName()))));
     assetsService.deleteCategory(id);
   }
 
@@ -1250,6 +1420,12 @@ public class AssetAPI {
   @DeleteMapping(value = "/deleteAssetInspection/{id}")
   @PreAuthorize("@appSecurity.canDeleteAny(authentication, 'assets')")
   public void deleteAssetInspection(@PathVariable String id) throws NoSubscriptionError {
+    assetCategoryInspectionRepository.findById(id).ifPresent(insp ->
+            auditService.logDelete(AuditModule.ASSET_INSPECTION,
+                    String.valueOf(insp.getAssetCategoryInspectionId()), insp.getName(),
+                    insp.getCompanyId(), Map.of(
+                            "inspectionId", String.valueOf(insp.getAssetCategoryInspectionId()),
+                            "name", String.valueOf(insp.getName()))));
     assetsService.deleteAssetInspection(id);
   }
 
@@ -1727,6 +1903,51 @@ public class AssetAPI {
     errorStyle.setFillForegroundColor(IndexedColors.RED.getIndex());
     errorStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
     return errorStyle;
+  }
+
+  private Map<String, String> toAssetExtraFieldsMap(String assetId) {
+    List<AssetExtraFields> fields = extraFieldsRepository.findByAssetId(assetId);
+    if (fields == null || fields.isEmpty()) {
+      return Collections.emptyMap();
+    }
+    return fields.stream()
+            .collect(Collectors.toMap(
+                    AssetExtraFields::getName,
+                    f -> f.getValue() != null ? f.getValue() : "",
+                    (a, b) -> b));
+  }
+
+  private String resolveAssetExtraFieldOldValue(AssetExtraFieldsDTO extraFieldsDTO) {
+    if (extraFieldsDTO.getId() != null && !extraFieldsDTO.getId().isBlank()) {
+      return extraFieldsRepository.findById(extraFieldsDTO.getId())
+              .map(AssetExtraFields::getValue)
+              .orElse(null);
+    }
+    if (extraFieldsDTO.getAssetId() != null && extraFieldsDTO.getName() != null) {
+      return extraFieldsRepository.findByNameAndAssetId(extraFieldsDTO.getName(), extraFieldsDTO.getAssetId())
+              .map(AssetExtraFields::getValue)
+              .orElse(null);
+    }
+    return null;
+  }
+
+  private void auditAssetExtraFieldValueChange(AssetExtraFieldsDTO extraFieldsDTO, String oldValue) {
+    if (extraFieldsDTO.getAssetId() == null || extraFieldsDTO.getName() == null) {
+      return;
+    }
+    if (Objects.equals(oldValue, extraFieldsDTO.getValue())) {
+      return;
+    }
+    assetsRepository.findById(extraFieldsDTO.getAssetId()).ifPresent(asset -> {
+      Map<String, Object> fieldChange = Map.of(
+              extraFieldsDTO.getName(),
+              Map.of(
+                      "old", oldValue != null ? oldValue : "",
+                      "new", extraFieldsDTO.getValue() != null ? extraFieldsDTO.getValue() : ""));
+      auditService.logUpdate(AuditModule.ASSET,
+              String.valueOf(asset.getAssetId()), asset.getName(),
+              asset.getCompanyId(), fieldChange);
+    });
   }
 }
 

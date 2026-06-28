@@ -7,7 +7,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
+import com.quantumai.customer.entity.enums.AuditAction;
+import com.quantumai.customer.entity.enums.AuditModule;
 import com.quantumai.customer.exception.*;
+import com.quantumai.customer.service.AuditService;
 import com.quantumai.customer.repository.CustomRoleRepository;
 import com.quantumai.customer.repository.CustomerRepository;
 import com.quantumai.customer.repository.SubscriptionRepository;
@@ -63,6 +66,7 @@ public class UsersAPI {
   @Autowired private JwtService jwtService;
 
   @Autowired SubscriptionRepository subscriptionRepository;
+  @Autowired private AuditService auditService;
 
 
   private void checkUserDetailsPermissionFromSpringContext(CustomRoleType customRoleType) throws UserAccessException {
@@ -103,7 +107,15 @@ public class UsersAPI {
         throw new NoSubscriptionError("No Active Subscription");
       }
     }
-    return userService.registerUser(users);
+    Users registered = userService.registerUser(users);
+    auditService.logCreate(AuditModule.USER,
+            String.valueOf(registered.getUserId()),
+            registered.getFirstName() + " " + registered.getLastName(),
+            registered.getCompanyId(),
+            Map.of("userId", String.valueOf(registered.getUserId()),
+                    "email", String.valueOf(registered.getEmail()),
+                    "companyId", String.valueOf(registered.getCompanyId())));
+    return registered;
   }
 
   @Operation(summary = "Send Email", description = "Endpoint to send email")
@@ -241,7 +253,21 @@ public class UsersAPI {
       }
     }
 
+    // Fetch current state before update
+    Optional<Users> beforeStateOpt = usersRepository.findById(usersDTO.getId());
+    
     userService.updateUser(usersDTO);
+    
+    if (beforeStateOpt.isPresent()) {
+      // Fetch updated state for comparison
+      Users afterState = usersRepository.findById(usersDTO.getId()).orElse(null);
+      if (afterState != null) {
+        auditService.logUpdateWithComparison(AuditModule.USER,
+                String.valueOf(usersDTO.getUserId()),
+                usersDTO.getFirstName() + " " + usersDTO.getLastName(),
+                usersDTO.getCompanyId(), beforeStateOpt.get(), afterState);
+      }
+    }
     return ResponseEntity.ok("Status Updated Successfully");
   }
   @Operation(summary = "User Status Update", description = "Endpoint to user status update")
@@ -262,6 +288,19 @@ public class UsersAPI {
       }
     }
     userService.updateUserStatus(usersDTO);
+    
+    // Fetch updated state for audit comparison
+    Optional<Users> afterStateOpt = usersRepository.findById(usersDTO.getId());
+    if (afterStateOpt.isPresent()) {
+      // For status update, capture the before state if available via email lookup
+      Optional<Users> beforeStateOpt = usersRepository.findByEmail(usersDTO.getEmail());
+      if (beforeStateOpt.isPresent()) {
+        auditService.logUpdateWithComparison(AuditModule.USER,
+                String.valueOf(usersDTO.getUserId()),
+                usersDTO.getEmail(), usersDTO.getCompanyId(),
+                beforeStateOpt.get(), afterStateOpt.get());
+      }
+    }
     return ResponseEntity.ok("Status Updated Successfully");
   }
 
@@ -287,18 +326,21 @@ public class UsersAPI {
       throw new RuntimeException("Invalid or missing Authorization header");
     }
 
+    // Fetch before state for audit
+    Optional<Users> beforeStateOpt = usersRepository.findByEmail(usersDTO.getEmail());
+
     // Extract token (remove "Bearer " prefix)
     String token = authorizationHeader.substring(7);
 
     // Decode token to extract claims
     Claims claims =
         Jwts.parser()
-            .setSigningKey(secretKey) // Replace with your actual secret key
+            .setSigningKey(secretKey)
             .parseClaimsJws(token)
             .getBody();
 
     // Extract email from claims
-    String email = claims.getSubject(); // Assuming email is set as the 'sub' (subject) claim
+    String email = claims.getSubject();
 
     // Log or use the email
     System.out.println("Extracted Email: " + email);
@@ -336,6 +378,17 @@ public class UsersAPI {
         customerRepository.save(customerOptional.get());
       }
 
+      // Log audit after update
+      if (beforeStateOpt.isPresent()) {
+        Optional<Users> afterStateOpt = usersRepository.findByEmail(usersDTO.getEmail());
+        if (afterStateOpt.isPresent()) {
+          auditService.logUpdateWithComparison(AuditModule.USER,
+                  String.valueOf(afterStateOpt.get().getUserId()),
+                  usersDTO.getEmail(), myUsers.get().getCompanyId(),
+                  beforeStateOpt.get(), afterStateOpt.get());
+        }
+      }
+
     } else {
       throw new Exception("Unkown Email");
     }
@@ -361,6 +414,8 @@ public class UsersAPI {
         throw new NoSubscriptionError("No Active Subscription");
       }
     }
+    auditService.logDelete(AuditModule.USER, null, email, companyId,
+            Map.of("email", email, "companyId", String.valueOf(companyId)));
     userService.deleteUser(companyId, email, authHeader);
   }
 

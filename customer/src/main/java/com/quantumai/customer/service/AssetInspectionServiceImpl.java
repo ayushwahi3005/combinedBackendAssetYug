@@ -1,6 +1,10 @@
 package com.quantumai.customer.service;
 
 import com.quantumai.customer.dto.InspectionCompletedCountPerDayDTO;
+import com.quantumai.customer.dto.InspectionDetailFilterDTO;
+import com.quantumai.customer.dto.InspectionPerformerGroupDTO;
+import com.quantumai.customer.dto.InspectionStatusCountDTO;
+import com.quantumai.customer.dto.PaginatedInspectionDetailDTO;
 import com.quantumai.customer.dto.UserInspectionAnalyticsDTO;
 import com.quantumai.customer.entity.Assets;
 import com.quantumai.customer.entity.InspectionStepValues;
@@ -594,6 +598,25 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
             workbook.write(out);
             return out.toByteArray();
         }
+    }
+
+    @Override
+    public com.quantumai.customer.dto.InspectionStatusCountDTO getInspectionStatusCounts(Long companyId) {
+        log.info("Getting inspection status counts for companyId: {}", companyId);
+        return assetCategoryInspectionInstanceRepository.getStatusCountByCompanyId(companyId);
+    }
+
+    @Override
+    public com.quantumai.customer.dto.InspectionPerformerGroupDTO getIncompleteInspectionsByPerformer(Long companyId) {
+        log.info("Getting incomplete inspections grouped by performer for companyId: {}", companyId);
+        List<Map<String, Object>> performerCounts = assetCategoryInspectionInstanceRepository.getIncompleteNotCancelledByPerformer(companyId);
+        return new com.quantumai.customer.dto.InspectionPerformerGroupDTO(performerCounts);
+    }
+
+    @Override
+    public com.quantumai.customer.dto.PaginatedInspectionDetailDTO getDetailedInspections(Long companyId, com.quantumai.customer.dto.InspectionDetailFilterDTO filter) {
+        log.info("Getting detailed inspections for companyId: {} with filters", companyId);
+        return assetCategoryInspectionInstanceRepository.getDetailedInspectionsWithFiltering(companyId, filter);
     }
 
 

@@ -4,5 +4,6 @@ public enum SubscriptionEnum {
   ACTIVE,
   EXPIRED,
   PENDING,
-  UPCOMING;
+  UPCOMING,
+  FAILED
 }

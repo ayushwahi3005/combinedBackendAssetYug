@@ -267,6 +267,27 @@ public class CustomerServiceImpl implements CustomerService {
 
         // Update the user in Firebase
         UserRecord updatedUser = FirebaseAuth.getInstance().updateUser(request);
+
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(email);
+        message.setSubject("Password Successfully Updated - AssetYug");
+        message.setText(
+                "Hi " + customer.get().getFirstName() + ",\n" +
+                        "\n" +
+                        "Your AssetYug account password has been successfully updated.\n" +
+                        "\n" +
+                        "If you made this change, no further action is required.\n" +
+                        "\n" +
+                        "If you did NOT make this change, your account may be at risk. Please contact us immediately so we can secure your account.\n" +
+
+
+                        "\n" +
+                        "For security reasons, we recommend changing your password immediately if you did not authorize this update.\n" +
+                        "\n" +
+                        "Best regards,\n" +
+                        "AssetYug Team"
+        );
+        mailSender.send(message);
         customerOtpStorage.remove(email);
       } else {
         throw new NoEmailFoundException("No such Email");

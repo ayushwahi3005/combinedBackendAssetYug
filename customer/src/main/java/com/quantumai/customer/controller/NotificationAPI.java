@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 
+import com.quantumai.customer.dto.PaginatedNotificationDTO;
 import com.quantumai.customer.entity.Notification;
 import com.quantumai.customer.entity.UserNotification;
 import com.quantumai.customer.service.NotificationService;
@@ -44,6 +45,19 @@ public class NotificationAPI {
     public void globalNotification(@RequestBody Notification notification){
         notificationService.broadcastNotification(notification);
     }
+
+    @Operation(summary = "Get Paginated User Notifications", description = "Endpoint to get user notifications with pagination (lazy loading) - 10 per page")
+    @GetMapping("/user/{email}/paginated")
+    @PreAuthorize("@appSecurity.isEmailSame(authentication,#email)")
+    public ResponseEntity<PaginatedNotificationDTO> getPaginatedUserNotifications(
+            @PathVariable String email,
+            @RequestParam(defaultValue = "0") int pageNumber,
+            @RequestParam(defaultValue = "10") int pageSize) {
+        PaginatedNotificationDTO paginatedNotifications = notificationService.getPaginatedNotifications(
+                email, pageNumber, pageSize);
+        return ResponseEntity.ok(paginatedNotifications);
+    }
+
     @Operation(summary = "Company Notification", description = "Endpoint to company notification")
     @PostMapping("/company/{companyId}")
     @PreAuthorize("@appSecurity.isSameCompany(authentication,#companyId)")

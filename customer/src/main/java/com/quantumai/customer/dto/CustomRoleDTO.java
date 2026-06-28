@@ -20,5 +20,6 @@ public class CustomRoleDTO {
   private CustomRoleType imports;
   private CustomRoleType category;
   private CustomRoleType inventory;
+  private CustomRoleType inspections;
   private Long companyId;
 }

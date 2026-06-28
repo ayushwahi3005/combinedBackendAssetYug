@@ -149,8 +149,8 @@ public class UserServiceImpl implements UserService {
     } catch (MailException ex) {
       // Log the error or handle it in any appropriate way
       // You can throw a custom exception to provide more context
-      System.out.println(
-          "--------------------------------Mail Exception------------------------------------------------->");
+//      System.out.println(
+//          "--------------------------------Mail Exception------------------------------------------------->");
       throw new TheMailException("Failed to send email: " + ex.getMessage(), ex);
     }
   }
@@ -159,9 +159,9 @@ public class UserServiceImpl implements UserService {
   public AuthenticationResponseDTO generateToken(Mail mail) {
 
     var token = jwtService.generateTokenForInvite(mail);
-    System.out.println(
-        "--------------------------------token created------------------------------------------------->"
-            + token);
+//    System.out.println(
+//        "--------------------------------token created------------------------------------------------->"
+//            + token);
     return AuthenticationResponseDTO.builder().token(token).build();
   }
 

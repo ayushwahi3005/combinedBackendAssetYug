@@ -68,27 +68,21 @@ public class PaymentAPI {
     }
   }
 
-  @Operation(summary = "Create Subscription", description = "Endpoint to create subscription")
+  @Operation(summary = "Create Subscription", description = "Endpoint to create subscription - Cannot create if PENDING subscription exists")
   @PostMapping("/create-subscription")
-
-  public ResponseEntity<Map<String, String>> createSubscription(@RequestBody JsonNode obj)
-      throws Exception {
-    //    System.out.println("===>Create subscription"+obj.get("subscriptionPlan").toString());
+  public ResponseEntity<Map<String, String>> createSubscription(@RequestBody JsonNode obj) {
     try {
       SubscriptionPlan plan;
       String planString = obj.get("subscriptionPlan").asText().trim();
       if (planString.equalsIgnoreCase("MONTHLY")) {
-
         plan = SubscriptionPlan.MONTHLY;
         System.out.println(
             "===>Create subscription" + planString.equalsIgnoreCase("MONTHLY") + " " + plan);
       } else {
-        //        System.out.println("===>Create subscription"+planString);
         plan = SubscriptionPlan.ANNUAL;
         System.out.println(
             "===>Create subscription" + planString.equalsIgnoreCase("ANNUAL") + " " + plan);
       }
-      //       = SubscriptionPlan.valueOf(obj.get("subscriptionPlan").toString().toUpperCase())
       com.stripe.model.Subscription stripeSubscription =
           paymentService.createSubscription(
               Long.parseLong(obj.get("companyId").asText()),
@@ -99,14 +93,14 @@ public class PaymentAPI {
               obj.get("quantity").asLong(),
               obj.get("amount").asDouble(),
               obj.get("cardHolderName").asText(),
-                  obj.get("currentPlanName").asText());
+              obj.get("currentPlanName").asText());
       Map<String, String> response = new HashMap<>();
-      //      response.put("clientSecret", clientSecret);
-      //      System.out.println("---Subscription-->>>>>>>>"+stripeSubscription.getCustomer());
+      response.put("message", "Subscription created successfully");
       return ResponseEntity.ok(response);
-    } catch (StripeException e) {
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(Collections.singletonMap("error", e.getMessage()));
+    } catch (Exception e) {
+      Map<String, String> errorResponse = new HashMap<>();
+      errorResponse.put("error", e.getMessage());
+      return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
   }
 
@@ -146,17 +140,26 @@ public class PaymentAPI {
     return ResponseEntity.ok(true);
   }
 
-  @Operation(summary = "Save Card", description = "Endpoint to save card")
+  @Operation(summary = "Save Card", description = "Endpoint to save card - Only one card allowed per company")
   @PostMapping("/stripe-save-card")
+  public ResponseEntity<Map<String, String>> saveCard(@RequestBody Map<String, String> request) {
+    try {
+      String paymentMethodId = request.get("paymentMethodId");
+      String customerEmail = request.get("email");
+      String cardholderName = request.get("cardholderName");
+      Long companyId = Long.parseLong(request.get("companyId"));
+      System.out.println(
+          paymentMethodId + " " + customerEmail + " " + cardholderName + " " + companyId);
+      paymentService.saveCard(paymentMethodId, customerEmail, cardholderName, companyId);
 
-  public void saveCard(@RequestBody Map<String, String> request) throws StripeException {
-    String paymentMethodId = request.get("paymentMethodId");
-    String customerEmail = request.get("email");
-    String cardholderName = request.get("cardholderName");
-    Long companyId = Long.parseLong(request.get("companyId"));
-    System.out.println(
-        paymentMethodId + " " + customerEmail + " " + cardholderName + " " + companyId);
-    stripeService.saveCard(paymentMethodId, customerEmail, cardholderName, companyId);
+      Map<String, String> response = new HashMap<>();
+      response.put("message", "Card saved successfully");
+      return ResponseEntity.ok(response);
+    } catch (Exception e) {
+      Map<String, String> errorResponse = new HashMap<>();
+      errorResponse.put("error", e.getMessage());
+      return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+    }
   }
 
   @Operation(summary = "Get Customer Cards", description = "Endpoint to get customer cards")

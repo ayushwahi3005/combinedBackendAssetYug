@@ -39,6 +39,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -157,8 +158,8 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   public List<CompanyCustomerDTO> getAllCustomer(Long companyId) {
     // TODO Auto-generated method stub
     List<CompanyCustomer> companyCustomerList = companyCustomerRepository.findByCompanyId(companyId);
-    System.out.println(
-        "-----------------------my list---------------->" + companyCustomerList.size());
+//    System.out.println(
+//        "-----------------------my list---------------->" + companyCustomerList.size());
     List<CompanyCustomerDTO> companyCustomerDTOList = new ArrayList<>();
     companyCustomerList.stream()
         .forEach(
@@ -274,9 +275,20 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   }
 
   @Override
-  public List<String> sortCompanyCustomer(Long companyId, String category) {
-    // TODO Auto-generated method stub
-    return null;
+  public List<CompanyCustomerDTO> sortCompanyCustomer(Long companyId, String sortField, String sortDirection) {
+    // Use MongoTemplate for flexible sorting
+    Sort.Direction direction = "DESC".equalsIgnoreCase(sortDirection)
+            ? Sort.Direction.DESC
+            : Sort.Direction.ASC;
+
+    Query query = new Query(Criteria.where("companyId").is(companyId));
+    query.with(Sort.by(direction, sortField));
+
+    List<CompanyCustomer> sortedCustomers = mongoTemplate.find(query, CompanyCustomer.class);
+
+    return sortedCustomers.stream()
+            .map(customer -> modelMapper.map(customer, CompanyCustomerDTO.class))
+            .collect(Collectors.toList());
   }
 
   @Override
@@ -466,21 +478,52 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   @Override
   public void addExtraFields(CompanyCustomerExtraFieldsDTO extraFieldsDTO) throws Exception {
     extraFieldsDTO.setName(extraFieldsDTO.getName());
+    log.info("Saving extra field with name: {} for companyId: {}", extraFieldsDTO.getName(), extraFieldsDTO.getCompanyId());
 
-    log.info("Adding extra field with name: "+extraFieldsDTO.getName()+" for companyId: "+extraFieldsDTO.getCompanyId());
-
-    // Validate companyId is not null
     if (extraFieldsDTO.getCompanyId() == null) {
       throw new Exception("CompanyId cannot be null");
     }
 
-    // Get and increment sequence atomically (inside synchronized block)
+    if (extraFieldsDTO.getId() != null && !extraFieldsDTO.getId().isBlank()) {
+      Optional<CompanyCustomerExtraFields> byId = extraFieldsRepository.findById(extraFieldsDTO.getId());
+      if (byId.isPresent()) {
+        updateCompanyCustomerExtraFieldIfChanged(byId.get(), extraFieldsDTO.getValue(), extraFieldsDTO.getType());
+        return;
+      }
+    }
+
+    upsertCompanyCustomerExtraField(extraFieldsDTO);
+  }
+
+  private void upsertCompanyCustomerExtraField(CompanyCustomerExtraFieldsDTO extraFieldsDTO) throws Exception {
+    if (extraFieldsDTO.getCompanyCustomerId() != null && extraFieldsDTO.getName() != null) {
+      CompanyCustomerExtraFields existing = extraFieldsRepository.findByNameIgnoreCaseAndCompanyCustomerId(
+              extraFieldsDTO.getName(), extraFieldsDTO.getCompanyCustomerId());
+      if (existing != null) {
+        updateCompanyCustomerExtraFieldIfChanged(existing, extraFieldsDTO.getValue(), extraFieldsDTO.getType());
+        return;
+      }
+    }
+
     long companyCustomerExtraFieldId = getAndIncrementCompanyCustomerSequence(extraFieldsDTO.getCompanyId());
     extraFieldsDTO.setCompanyCustomerExtraFieldId(companyCustomerExtraFieldId);
-    log.info("Assigned companyCustomerExtraFieldId: "+companyCustomerExtraFieldId+" for companyId: "+extraFieldsDTO.getCompanyId());
+    log.info("Assigned companyCustomerExtraFieldId: {} for companyId: {}", companyCustomerExtraFieldId, extraFieldsDTO.getCompanyId());
 
     CompanyCustomerExtraFields extraFields = modelMapper.map(extraFieldsDTO, CompanyCustomerExtraFields.class);
     extraFieldsRepository.save(extraFields);
+  }
+
+  private void updateCompanyCustomerExtraFieldIfChanged(
+          CompanyCustomerExtraFields existing, String newValue, String type) {
+    if (Objects.equals(existing.getValue(), newValue)) {
+      return;
+    }
+    existing.setValue(newValue);
+    if (type != null) {
+      existing.setType(type);
+    }
+    extraFieldsRepository.save(existing);
+    log.info("Extra field {} updated for company customer {}", existing.getName(), existing.getCompanyCustomerId());
   }
 
   /**
@@ -543,7 +586,6 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
 
   @Override
   public void deleteExtraFields(String id) throws Exception {
-    // TODO Auto-generated method stub
     Optional<CompanyCustomerExtraFields> extraFields = extraFieldsRepository.findById(id);
     if (extraFields.isEmpty()) {
       throw new Exception("No such extra Field");
