@@ -118,6 +118,10 @@ public class AppSecurityService {
             case "imports"            -> role.getImports();
             case "category"           -> role.getCategory();
             case "inventory"          -> role.getInventory();
+            case "inspections", "inspection" -> {
+                CustomRoleType inspectionsRole = role.getInspections();
+                yield inspectionsRole != null ? inspectionsRole : role.getAssets();
+            }
             default -> null;
         };
     }

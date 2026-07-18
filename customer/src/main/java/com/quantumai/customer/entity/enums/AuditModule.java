@@ -11,6 +11,7 @@ public enum AuditModule {
     CUSTOMER,
     CUSTOMER_CATEGORY,
     CUSTOMER_CUSTOM_FIELD,
+    COMPANY,
     USER,
     ROLE,
     SUBSCRIPTION,

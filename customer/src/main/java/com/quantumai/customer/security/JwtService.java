@@ -1,6 +1,7 @@
 package com.quantumai.customer.security;
 
 import com.quantumai.customer.entity.Mail;
+import com.quantumai.customer.dto.CustomRoleDTO;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -48,7 +49,7 @@ public class JwtService {
     //		  myMap.put("Role", userDetails.getAuthorities());
 
     Claims claims = Jwts.claims().setSubject(mail.getEmail());
-    claims.put("role", mail.getRole());
+    claims.put("role", resolveRoleClaim(mail));
     claims.put("email", mail.getEmail());
     claims.put("from", mail.getFrom());
 
@@ -56,6 +57,20 @@ public class JwtService {
         .setClaims(claims)
         .signWith(getSignInKey(), SignatureAlgorithm.HS256)
         .compact();
+  }
+
+  private String resolveRoleClaim(Mail mail) {
+    CustomRoleDTO role = mail.getRole();
+    if (role == null) {
+      return null;
+    }
+    if (role.getName() != null && !role.getName().isBlank()) {
+      return role.getName();
+    }
+    if (role.getCustomRoleId() != null) {
+      return String.valueOf(role.getCustomRoleId());
+    }
+    return null;
   }
 
   public String generateToken(

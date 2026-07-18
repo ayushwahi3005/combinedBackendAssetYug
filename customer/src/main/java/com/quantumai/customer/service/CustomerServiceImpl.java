@@ -524,6 +524,7 @@ public class CustomerServiceImpl implements CustomerService {
       customRole.setImports(CustomRoleType.full);
       customRole.setCategory(CustomRoleType.full);
       customRole.setInventory(CustomRoleType.full);
+      customRole.setInspections(CustomRoleType.full);
 
       customRoleRepository.save(customRole);
 

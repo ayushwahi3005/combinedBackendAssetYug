@@ -1,5 +1,6 @@
 package com.quantumai.customer.service;
 
+import com.quantumai.customer.entity.AssetUniqueFieldConfiguration;
 import lombok.extern.slf4j.Slf4j;
 import java.lang.reflect.Field;
 import java.util.*;
@@ -90,6 +91,53 @@ public class AuditChangeCalculator {
                 changeDetail.put("new", newValue != null ? newValue : "");
                 changes.put(key, changeDetail);
             }
+        }
+        return changes;
+    }
+
+    /**
+     * Compare a single boolean flag (mandatory/show) between field-setting records.
+     */
+    public static Map<String, Object> computeMandatoryShowChanges(
+            Object before, Object after, String fieldName) {
+        Map<String, Object> changes = new LinkedHashMap<>();
+        if (before == null || after == null) {
+            return changes;
+        }
+        try {
+            Field field = before.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            boolean oldValue = field.getBoolean(before);
+            boolean newValue = field.getBoolean(after);
+            if (oldValue != newValue) {
+                Map<String, Object> changeDetail = new LinkedHashMap<>();
+                changeDetail.put("old", String.valueOf(oldValue));
+                changeDetail.put("new", String.valueOf(newValue));
+                changes.put(fieldName, changeDetail);
+            }
+        } catch (ReflectiveOperationException e) {
+            log.warn("Could not compare {} field: {}", fieldName, e.getMessage());
+        }
+        return changes;
+    }
+
+    public static Map<String, Object> computeUniqueFieldChanges(
+            AssetUniqueFieldConfiguration before, AssetUniqueFieldConfiguration after) {
+        Map<String, Object> changes = new LinkedHashMap<>();
+        if (before == null || after == null) {
+            return changes;
+        }
+        if (!Objects.equals(before.getIsUnique(), after.getIsUnique())) {
+            Map<String, Object> changeDetail = new LinkedHashMap<>();
+            changeDetail.put("old", String.valueOf(before.getIsUnique()));
+            changeDetail.put("new", String.valueOf(after.getIsUnique()));
+            changes.put("isUnique", changeDetail);
+        }
+        if (!Objects.equals(before.getType(), after.getType())) {
+            Map<String, Object> changeDetail = new LinkedHashMap<>();
+            changeDetail.put("old", before.getType());
+            changeDetail.put("new", after.getType());
+            changes.put("type", changeDetail);
         }
         return changes;
     }

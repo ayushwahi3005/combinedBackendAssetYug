@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -330,8 +331,8 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
                         detailedRow.createCell(9).setCellValue(inspection.getNotes());
                         detailedRow.createCell(10).setCellValue("");
                         detailedRow.createCell(11).setCellValue(status);  // Inspection Status
-                        detailedRow.createCell(9).setCellValue(inspection.getCreatedBy());
-                        detailedRow.createCell(10).setCellValue(inspection.getActionPerformedBy());
+                        detailedRow.createCell(12).setCellValue(inspection.getCreatedBy());
+                        detailedRow.createCell(13).setCellValue(inspection.getActionPerformedBy());
                     }
 
                 } else {
@@ -503,19 +504,30 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
                         .stream()
                         .filter(i -> assetId.equals(i.getAssetId()))
                         .toList();
-        Optional<Assets> optionalAssets=assetsRepository.findById(assetId);
+        Optional<Assets> optionalAssets = assetsRepository.findById(assetId);
 
-        if(optionalAssets.isEmpty()){
+        if (optionalAssets.isEmpty()) {
             throw new Exception("No Asset Found");
         }
-        Assets myAsset=optionalAssets.get();
+        Assets myAsset = optionalAssets.get();
+
+        Map<String, AssetCategoryInspectionInstance> uniqueInspections = new LinkedHashMap<>();
+        for (AssetCategoryInspectionInstance inspection : inspections) {
+            String dedupeKey = inspection.getAssetCategoryInspectionInstanceId() != null
+                    ? String.valueOf(inspection.getAssetCategoryInspectionInstanceId())
+                    : inspection.getId();
+            if (dedupeKey != null) {
+                uniqueInspections.putIfAbsent(dedupeKey, inspection);
+            }
+        }
+
+        DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
         try (Workbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
             Sheet sheet = workbook.createSheet("Inspection Details");
 
-            // Header
             String[] headers = {
                     "Asset ID",
                     "Asset Name",
@@ -524,7 +536,8 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
                     "Date Started",
                     "Date Completed",
                     "Inspector",
-                    "Geo Location","Created By", "Modified By"
+                    "Geo Location",
+                    "Inspection Status", "Created By", "Modified By"
             };
 
             Row headerRow = sheet.createRow(0);
@@ -534,61 +547,30 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
 
             int rowIndex = 1;
 
-            for (AssetCategoryInspectionInstance inspection : inspections) {
+            for (AssetCategoryInspectionInstance inspection : uniqueInspections.values()) {
+                Row row = sheet.createRow(rowIndex++);
 
-                // If stepValues exist, create row per instruction
-                if (inspection.getStepValues() != null && !inspection.getStepValues().isEmpty()) {
+                row.createCell(0).setCellValue(myAsset.getAssetId());
+                row.createCell(1).setCellValue(myAsset.getName());
+                row.createCell(2).setCellValue(
+                        inspection.getAssetCategoryInspectionInstanceId() != null
+                                ? inspection.getAssetCategoryInspectionInstanceId().doubleValue()
+                                : 0);
+                row.createCell(3).setCellValue(
+                        inspection.getAssetCategoryInspectionName() != null
+                                ? inspection.getAssetCategoryInspectionName()
+                                : "");
+                row.createCell(4).setCellValue(formatInspectionDateTime(inspection.getCreatedAt(), dateTimeFormatter));
+                row.createCell(5).setCellValue(formatInspectionDateTime(inspection.getUpdatedAt(), dateTimeFormatter));
+                row.createCell(6).setCellValue(
+                        inspection.getActionPerformedBy() != null ? inspection.getActionPerformedBy() : "");
+                row.createCell(7).setCellValue("");
+                row.createCell(8).setCellValue(inspection.getStatus() != null ? inspection.getStatus().toString() : "");
 
-                    for (InspectionStepValues step : inspection.getStepValues()) {
-
-                        Row row = sheet.createRow(rowIndex++);
-
-                        row.createCell(0).setCellValue(myAsset.getAssetId());
-                        row.createCell(1).setCellValue(myAsset.getName()); // Asset Name (not available in entity)
-                        row.createCell(2).setCellValue(inspection.getAssetCategoryInspectionId());
-                        row.createCell(3).setCellValue(inspection.getAssetCategoryInspectionName());
-                        java.time.LocalDateTime createdAt = java.time.LocalDateTime.parse(
-                                inspection.getCreatedAt().toString(),
-                                java.time.format.DateTimeFormatter.ISO_DATE_TIME
-                        );
-
-                        row.createCell(4).setCellValue(
-                                inspection.getCreatedAt() != null ? createdAt.toLocalDate().toString() : ""
-                        );
-                        row.createCell(5).setCellValue(
-                                inspection.getUpdatedAt() != null ?
-                                        java.time.LocalDateTime.parse(
-                                                inspection.getUpdatedAt().toString(),
-                                                java.time.format.DateTimeFormatter.ISO_DATE_TIME
-                                        ).toLocalDate().toString() : ""
-                        );
-                        row.createCell(6).setCellValue(inspection.getActionPerformedBy());
-                        row.createCell(7).setCellValue(""); // Geo Location if available elsewhere
-                        row.createCell(8).setCellValue(inspection.getCreatedBy());
-                        row.createCell(9).setCellValue(inspection.getActionPerformedBy());
-                    }
-
-                } else {
-                    Row row = sheet.createRow(rowIndex++);
-
-                    row.createCell(0).setCellValue(inspection.getAssetId());
-                    row.createCell(1).setCellValue("");
-                    row.createCell(2).setCellValue(inspection.getAssetCategoryInspectionId());
-                    row.createCell(3).setCellValue(inspection.getAssetCategoryInspectionName());
-                    row.createCell(4).setCellValue(
-                            inspection.getCreatedAt() != null
-                                    ? inspection.getCreatedAt().toString()
-                                    : "");
-                    row.createCell(5).setCellValue(
-                            inspection.getUpdatedAt() != null
-                                    ? inspection.getUpdatedAt().toString()
-                                    : "");
-                    row.createCell(6).setCellValue(inspection.getActionPerformedBy());
-                    row.createCell(7).setCellValue("");
-                    row.createCell(8).setCellValue(inspection.getCreatedBy());
-                    row.createCell(9).setCellValue(inspection.getActionPerformedBy());
-
-                }
+                row.createCell(9).setCellValue(
+                        inspection.getCreatedBy() != null ? inspection.getCreatedBy() : "");
+                row.createCell(10).setCellValue(
+                        inspection.getActionPerformedBy() != null ? inspection.getActionPerformedBy() : "");
             }
 
             for (int i = 0; i < headers.length; i++) {
@@ -598,6 +580,10 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
             workbook.write(out);
             return out.toByteArray();
         }
+    }
+
+    private String formatInspectionDateTime(LocalDateTime dateTime, DateTimeFormatter formatter) {
+        return dateTime != null ? dateTime.format(formatter) : "";
     }
 
     @Override

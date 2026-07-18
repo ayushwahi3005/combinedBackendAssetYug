@@ -50,7 +50,7 @@ public class AssetInspectionAPI {
 
         @Operation(summary = "User Inspection Analytics", description = "Endpoint to user inspection analytics")
         @GetMapping("/user-inspection-analytics/{companyId}")
-        @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
+        @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'inspections')")
         public List<UserInspectionAnalyticsDTO> userInspectionAnalytics(
                 @PathVariable Long companyId,
                 @RequestParam LocalDate startDate,
@@ -61,7 +61,7 @@ public class AssetInspectionAPI {
 
         @Operation(summary = "Status Distribution", description = "Endpoint to status distribution")
         @GetMapping("/status-distribution/{companyId}")
-        @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
+        @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'inspections')")
         public Map<InspectionInstanceStatus, Long> statusDistribution(
                 @PathVariable Long companyId,
                 @RequestParam LocalDate startDate,
@@ -72,7 +72,7 @@ public class AssetInspectionAPI {
 
         @Operation(summary = "Inspection Type Completion", description = "Endpoint to inspection type completion")
         @GetMapping("/inspection-type-completion/{companyId}")
-        @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
+        @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'inspections')")
         public Map<String, Long> inspectionTypeCompletion(
                 @PathVariable Long companyId,
                 LocalDate startDate,
@@ -82,7 +82,7 @@ public class AssetInspectionAPI {
 
         @Operation(summary = "Lead Inspector", description = "Endpoint to lead inspector")
         @GetMapping("/lead-inspector/{companyId}")
-        @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
+        @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'inspections')")
         public Map<String, Long> leadInspector(
                 @PathVariable Long companyId,
                 LocalDate startDate,
@@ -92,14 +92,14 @@ public class AssetInspectionAPI {
 
         @Operation(summary = "Inspection Details", description = "Endpoint to inspection details")
         @GetMapping("/inspection-details/{companyId}")
-        @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
+        @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'inspections')")
         public Map<String, Long> inspectionDetails(@PathVariable Long companyId) {
                 return assetInspectionService.getAssetInspectionDetails(companyId);
         }
 
         @Operation(summary = "Inspection Complete Per Day", description = "Endpoint to inspection complete per day")
         @GetMapping("/inspection-complete-per-day/{companyId}")
-        @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
+        @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'inspections')")
         public List<InspectionCompletedCountPerDayDTO> inspectionCompletePerDay(
                 @PathVariable Long companyId,
                 @RequestParam LocalDate startDate,
@@ -109,7 +109,7 @@ public class AssetInspectionAPI {
 
         @Operation(summary = "Inspection Detailed Export", description = "Endpoint to inspection detailed export")
         @GetMapping("/inspection-detailed-export/{companyId}/{assetId}")
-        @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
+        @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'inspections')")
         public ResponseEntity<byte[]> inspectionDetailedExport(
                 @PathVariable Long companyId,
                 @PathVariable String assetId) throws Exception {
@@ -119,6 +119,7 @@ public class AssetInspectionAPI {
 
         @Operation(summary = "Inspection Overview Export", description = "Endpoint to inspection overview export")
         @GetMapping("/inspection-overview-export/{companyId}/{assetId}")
+        @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'inspections')")
         public ResponseEntity<byte[]> inspectionOverviewExport(@PathVariable Long companyId,@PathVariable String assetId) throws Exception {
 //                return assetInspectionService.getInspectionCompletionPerDay(companyId, startDate, endDate);
                 return ResponseEntity.ok(assetInspectionService.exportInspectionOverviewExcel(companyId,assetId));
@@ -128,7 +129,7 @@ public class AssetInspectionAPI {
 
         @Operation(summary = "Inspection Status Count", description = "Get all inspection instances count grouped by status and total count for a company")
         @GetMapping("/status-count/{companyId}")
-//        @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
+        @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'inspections')")
         public InspectionStatusCountDTO getInspectionStatusCounts(@PathVariable Long companyId) {
                 log.info("Received request for inspection status counts for companyId: {}", companyId);
                 return assetInspectionService.getInspectionStatusCounts(companyId);
@@ -136,14 +137,14 @@ public class AssetInspectionAPI {
 
         @Operation(summary = "Incomplete Inspections by Performer", description = "Get all incomplete (not completed and not cancelled) inspection instances grouped by actionPerformedBy")
         @GetMapping("/incomplete-by-performer/{companyId}")
-        @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
+        @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'inspections')")
         public InspectionPerformerGroupDTO getIncompleteInspectionsByPerformer(@PathVariable Long companyId) {
                 return assetInspectionService.getIncompleteInspectionsByPerformer(companyId);
         }
 
         @Operation(summary = "Detailed Inspections with Filtering", description = "Get detailed inspection instances with advanced filtering, pagination, and sorting")
         @PostMapping("/detailed/{companyId}")
-        @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
+        @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'inspections')")
         public PaginatedInspectionDetailDTO getDetailedInspections(
                 @PathVariable Long companyId,
                 @RequestBody InspectionDetailFilterDTO filter) {

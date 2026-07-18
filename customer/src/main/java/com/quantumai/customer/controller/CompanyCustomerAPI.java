@@ -18,6 +18,7 @@ import com.quantumai.customer.entity.enums.AuditAction;
 import com.quantumai.customer.entity.enums.AuditModule;
 import com.quantumai.customer.entity.enums.ImportHistoryRecordType;
 import com.quantumai.customer.service.AuditService;
+import com.quantumai.customer.service.AuditChangeCalculator;
 import com.quantumai.customer.exception.*;
 import com.quantumai.customer.repository.*;
 import com.quantumai.customer.service.CompanyCustomerService;
@@ -79,6 +80,7 @@ public class CompanyCustomerAPI {
   @Autowired private ImportHistoryRepository importHistoryRepository;
   @Autowired private AuditService auditService;
   @Autowired private CompanyCustomerExtraFieldNameRepository companyCustomerExtraFieldNameRepository;
+  @Autowired private CompanyCustomerFileRepository companyCustomerFileRepository;
 
   private static final String DEFAULT_COUNTRY_CODE = "1"; // India
 
@@ -131,6 +133,14 @@ public class CompanyCustomerAPI {
   public List<CompanyCustomerDTO> getCompanyCustomerList(@PathVariable Long companyId) {
     return companyCustomerService.getAllCustomer(companyId);
   }
+
+  @Operation(summary = "Get Active Company Customer List", description = "Endpoint to get company customer list")
+  @GetMapping("/allActiveCompanyCustomer/{companyId}")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'customers')")
+  public List<CompanyCustomerDTO> getActiveCompanyCustomerList(@PathVariable Long companyId) {
+    return companyCustomerService.getActiveAllCustomer(companyId);
+  }
+
 
   @Operation(summary = "Get Company Customer", description = "Endpoint to get company customer")
   @GetMapping("/getCompanyCustomer/{id}")
@@ -345,12 +355,22 @@ public class CompanyCustomerAPI {
   public void mandatoryFields(
           @RequestBody CompanyCustomerMandatoryFields mandatoryFields,
           @RequestHeader Long companyId) throws NoSubscriptionError {
-    CompanyCustomerMandatoryFields beforeState = mandatoryFieldsRepository.findById(mandatoryFields.getId()).orElse(null);
+    CompanyCustomerMandatoryFields beforeState = mandatoryFieldsRepository
+            .findByNameAndCompanyId(mandatoryFields.getName(), companyId)
+            .orElse(null);
     companyCustomerService.updateMandatoryFields(mandatoryFields);
+    CompanyCustomerMandatoryFields afterState = mandatoryFieldsRepository
+            .findByNameAndCompanyId(mandatoryFields.getName(), companyId)
+            .orElse(mandatoryFields);
     if (beforeState != null) {
-      auditService.logUpdateWithComparison(AuditModule.CUSTOMER_CUSTOM_FIELD, mandatoryFields.getId(), mandatoryFields.getName(), companyId, beforeState, mandatoryFields);
+      Map<String, Object> changes = AuditChangeCalculator.computeMandatoryShowChanges(beforeState, afterState, "mandatory");
+      if (!changes.isEmpty()) {
+        auditService.logUpdate(AuditModule.CUSTOMER_CUSTOM_FIELD, afterState.getId(), afterState.getName(),
+                companyId, changes);
+      }
     } else {
-      auditService.logCreate(AuditModule.CUSTOMER_CUSTOM_FIELD, mandatoryFields.getId(), mandatoryFields.getName(), companyId, Map.of("mandatory", "true"));
+      auditService.logCreate(AuditModule.CUSTOMER_CUSTOM_FIELD, afterState.getId(), afterState.getName(), companyId,
+              Map.of("name", afterState.getName(), "mandatory", String.valueOf(afterState.isMandatory())));
     }
   }
 
@@ -360,12 +380,22 @@ public class CompanyCustomerAPI {
   public void showFields(
           @RequestBody CompanyCustomerShowFields showFields,
           @RequestHeader Long companyId) throws NoSubscriptionError {
-    CompanyCustomerShowFields beforeState = companyCustomerShowFieldsRepository.findById(showFields.getId()).orElse(null);
+    CompanyCustomerShowFields beforeState = companyCustomerShowFieldsRepository
+            .findByNameAndCompanyId(showFields.getName(), companyId)
+            .orElse(null);
     companyCustomerService.updateShowFields(showFields);
+    CompanyCustomerShowFields afterState = companyCustomerShowFieldsRepository
+            .findByNameAndCompanyId(showFields.getName(), companyId)
+            .orElse(showFields);
     if (beforeState != null) {
-      auditService.logUpdateWithComparison(AuditModule.CUSTOMER_CUSTOM_FIELD, showFields.getId(), showFields.getName(), companyId, beforeState, showFields);
+      Map<String, Object> changes = AuditChangeCalculator.computeMandatoryShowChanges(beforeState, afterState, "show");
+      if (!changes.isEmpty()) {
+        auditService.logUpdate(AuditModule.CUSTOMER_CUSTOM_FIELD, afterState.getId(), afterState.getName(),
+                companyId, changes);
+      }
     } else {
-      auditService.logCreate(AuditModule.CUSTOMER_CUSTOM_FIELD, showFields.getId(), showFields.getName(), companyId, Map.of("show", "true"));
+      auditService.logCreate(AuditModule.CUSTOMER_CUSTOM_FIELD, afterState.getId(), afterState.getName(), companyId,
+              Map.of("name", afterState.getName(), "show", String.valueOf(afterState.isShow())));
     }
   }
 
@@ -429,7 +459,14 @@ public class CompanyCustomerAPI {
           @PathVariable String companyCustomerId,
           @RequestHeader Long companyId) throws NoSubscriptionError {
     try {
-      companyCustomerService.addCompanyCustomerFile(file, companyCustomerId);
+      CompanyCustomerFile savedFile = companyCustomerService.addCompanyCustomerFile(file, companyCustomerId);
+      companyCustomerRepository.findById(companyCustomerId).ifPresent(customer ->
+              auditService.log(AuditModule.CUSTOMER, AuditAction.CREATE,
+                      String.valueOf(customer.getCompanyCustomerId()), customer.getName(), companyId,
+                      "Uploaded file: " + file.getOriginalFilename(),
+                      Map.of("fileName", file.getOriginalFilename(),
+                              "fileId", savedFile.getId(),
+                              "action", "file_upload")));
       ResponseMessageDTO response = new ResponseMessageDTO();
       response.setResponseMessage("Uploaded the file successfully: " + file.getOriginalFilename());
       return new ResponseEntity<>(response, HttpStatus.ACCEPTED);
@@ -463,6 +500,14 @@ public class CompanyCustomerAPI {
   public void deleteFile(
           @PathVariable String id,
           @RequestHeader Long companyId) throws NoSubscriptionError {
+    companyCustomerFileRepository.findById(id).ifPresent(file -> {
+      companyCustomerRepository.findById(file.getCompanyCustomerId()).ifPresent(customer ->
+              auditService.logDelete(AuditModule.CUSTOMER,
+                      String.valueOf(customer.getCompanyCustomerId()), customer.getName(), companyId,
+                      Map.of("fileName", file.getFileName(),
+                              "fileId", file.getId(),
+                              "action", "file_delete")));
+    });
     companyCustomerService.deleteFile(id);
   }
 
@@ -500,9 +545,47 @@ public class CompanyCustomerAPI {
           @RequestBody CategoryDTO categoryDTO,
           @RequestHeader Long companyId) throws Exception {
     companyCustomerService.addCategory(categoryDTO);
-    auditService.logCreate(AuditModule.CUSTOMER_CATEGORY, null,
-            categoryDTO.getName(), companyId,
-            Map.of("name", String.valueOf(categoryDTO.getName())));
+    companyCustomerCategoryRepository.findByNameAndCompanyId(categoryDTO.getName(), companyId)
+            .ifPresent(cat -> auditService.logCreate(AuditModule.CUSTOMER_CATEGORY,
+                    String.valueOf(cat.getCompanyCustomerCategoryId()), cat.getName(), companyId,
+                    Map.of("categoryId", String.valueOf(cat.getCompanyCustomerCategoryId()),
+                            "name", cat.getName(),
+                            "status", cat.getStatus() != null ? cat.getStatus() : "")));
+  }
+
+  @Operation(summary = "Update Category", description = "Endpoint to update category")
+  @PutMapping(value = "/updateCategory")
+  @PreAuthorize("@appSecurity.canEdit(authentication, #companyId, 'customers')")
+  public void updateCategory(
+          @RequestBody CategoryDTO categoryDTO,
+          @RequestHeader Long companyId) throws NoSubscriptionError {
+    Optional<CompanyCustomerCategory> beforeStateOpt =
+            companyCustomerCategoryRepository.findById(categoryDTO.getId());
+    companyCustomerService.updateCategory(categoryDTO);
+    if (beforeStateOpt.isPresent()) {
+      CompanyCustomerCategory afterState =
+              companyCustomerCategoryRepository.findById(categoryDTO.getId()).orElse(null);
+      if (afterState != null) {
+        auditService.logUpdateWithComparison(AuditModule.CUSTOMER_CATEGORY,
+                String.valueOf(afterState.getCompanyCustomerCategoryId()), afterState.getName(),
+                companyId, beforeStateOpt.get(), afterState);
+      }
+    }
+  }
+
+  @Operation(summary = "Delete Category", description = "Endpoint to delete category")
+  @DeleteMapping(value = "/deleteCategory/{id}")
+  @PreAuthorize("@appSecurity.canDelete(authentication, #companyId, 'customers')")
+  public void deleteCategory(
+          @PathVariable String id,
+          @RequestHeader Long companyId) throws NoSubscriptionError {
+    companyCustomerCategoryRepository.findById(id).ifPresent(cat ->
+            auditService.logDelete(AuditModule.CUSTOMER_CATEGORY,
+                    String.valueOf(cat.getCompanyCustomerCategoryId()), cat.getName(),
+                    companyId,
+                    Map.of("categoryId", String.valueOf(cat.getCompanyCustomerCategoryId()),
+                            "name", cat.getName())));
+    companyCustomerService.deleteCategory(id);
   }
 
   @Operation(summary = "Get Category List", description = "Endpoint to get category list")

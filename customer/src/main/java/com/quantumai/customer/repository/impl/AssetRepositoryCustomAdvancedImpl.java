@@ -10,6 +10,7 @@ import com.quantumai.customer.entity.Assets;
 import com.quantumai.customer.entity.CheckInOutStatus;
 import com.quantumai.customer.repository.AssetCheckInOutAdvance;
 import com.quantumai.customer.repository.AssetCheckInOutRepository;
+import com.quantumai.customer.repository.AssetExtraFieldsRepository;
 import com.quantumai.customer.repository.AssetRepositoryCustomAdvanced;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,7 +22,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
-import com.quantumai.customer.repository.AssetExtraFieldsRepository;
+import com.quantumai.customer.util.AdvanceFilterUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -49,94 +50,14 @@ public class AssetRepositoryCustomAdvancedImpl implements AssetRepositoryCustomA
                 filter.getCompanyId(), filter.getSortField(), filter.getSortDirection());
 
         try {
-            // Build query for predefined fields
-            Query query = buildQuery(filter);
-
-            if (!filter.getCustomFields().isEmpty()) {
-                filter.getCustomFields().entrySet().removeIf(
-                        entry -> entry.getValue() == null || entry.getValue().trim().isEmpty()
-                );
-            }
-            log.info("Custom fields after{}",filter.getCustomFields().toString());
-            // Add custom field filter results (intersection)
-            if (filter.hasCustomFieldFilters()) {
-                Set<String> customFieldAssetIds = searchAssetbyCustomField(filter);
-                log.info("customFieldAssetIds : {}",customFieldAssetIds.toString());
-//                Set<String> customFieldAssetIds = customFieldResults.stream()
-//                        .map(Assets::getId)
-//                        .collect(Collectors.toSet());
-
-                if (customFieldAssetIds.isEmpty()) {
-                    // No assets match custom field criteria
-                    return new PaginatedAssetResponseDTO(
-                            new ArrayList<>(),
-                            0,
-                            0,
-                            filter.getPageNumber(),
-                            filter.getPageSize(),
-                            false,
-                            false
-                    );
-                }
-
-                // Add intersection criteria
-                query.addCriteria(Criteria.where("id").in(customFieldAssetIds));
-            }
-
-            String effectiveSortField = filter.getEffectiveSortField();
-            Sort.Direction direction = "DESC".equalsIgnoreCase(filter.getSortDirection())
-                    ? Sort.Direction.DESC
-                    : Sort.Direction.ASC;
-
-            Sort sort = Sort.by(direction, effectiveSortField);
-            query.with(sort);
-
-            // Get total count before pagination
+            Query query = buildFilteredQuery(filter);
             long totalCount = mongoTemplate.count(query, Assets.class);
 
-            // Apply pagination
             query.skip((long) filter.getPageNumber() * filter.getPageSize())
                     .limit(filter.getPageSize());
 
             List<Assets> assets = mongoTemplate.find(query, Assets.class);
-
-
-
-            List<CheckInOutStatus> listOfCheckInOutStatus = assetCheckInOutAdvance.getCheckInOutStatusByAssetIds(
-                    assets.stream().map(Assets::getId).collect(Collectors.toList())
-            );
-            Query checkInOutQuery=new Query(Criteria.where("assetId").in(assets.stream().map(Assets::getId).collect(Collectors.toList())));
-            List<AssetCheckInOut> assetCheckInOutDataList=mongoTemplate.find(checkInOutQuery,AssetCheckInOut.class);
-
-            // Batch fetch all custom fields at once
-            List<String> assetIds = assets.stream().map(Assets::getId).collect(Collectors.toList());
-            Map<String, List<AssetExtraFields>> customFieldsMap = fetchAllCustomFields(assetIds);
-
-            // Convert to DTO and add custom fields
-            List<AssetWithCustomFieldsDTO> assetDTOs = assets.stream()
-                    .map(asset -> convertToDTO(asset, filter, customFieldsMap))
-                    .toList();
-
-            List<AssetWithCustomFieldsDTO> assetDTOAfterAddingCheckInOut = assetDTOs.stream()
-                    .map(asset -> {
-                        Optional<CheckInOutStatus> statusOpt = listOfCheckInOutStatus.stream()
-                                .filter(status -> status.getAssetId().equals(asset.getId()))
-                                .findFirst();
-                        Optional<AssetCheckInOut> assetCheckInOutOptional = assetCheckInOutDataList.stream()
-                                .filter(status -> status.getAssetId().equals(asset.getId()))
-                                .findFirst();
-                        assetCheckInOutOptional.ifPresentOrElse(asset::setAssetCheckInOut,
-                                ()->asset.setAssetCheckInOut(null));
-
-                        statusOpt.ifPresentOrElse(
-                                status -> asset.setCheckedInOutStatus(status.getStatus()),
-                                () -> asset.setCheckedInOutStatus("Checked In")
-
-
-                        );
-                        return asset;
-                    })
-                    .toList();
+            List<AssetWithCustomFieldsDTO> assetDTOAfterAddingCheckInOut = mapAssetsToDtoList(assets);
 
             int totalPages = (int) Math.ceil((double) totalCount / filter.getPageSize());
 
@@ -152,16 +73,145 @@ public class AssetRepositoryCustomAdvancedImpl implements AssetRepositoryCustomA
 
         } catch (Exception e) {
             log.error("Error fetching assets with advanced filter", e);
-            return new PaginatedAssetResponseDTO(
-                    new ArrayList<>(),
-                    0,
-                    0,
-                    filter.getPageNumber(),
-                    filter.getPageSize(),
-                    false,
-                    false
+            return emptyPaginatedResponse(filter);
+        }
+    }
+
+    @Override
+    public List<AssetWithCustomFieldsDTO> findAllWithAdvancedFilter(AssetAdvancedFilterDTO filter) {
+        try {
+            Query query = buildFilteredQuery(filter);
+            List<Assets> assets = mongoTemplate.find(query, Assets.class);
+            return mapAssetsToDtoList(assets);
+        } catch (Exception e) {
+            log.error("Error fetching all assets with advanced filter", e);
+            return new ArrayList<>();
+        }
+    }
+
+    private Query buildFilteredQuery(AssetAdvancedFilterDTO filter) {
+        AdvanceFilterUtils.normalizeAssetAdvancedFilter(filter, null);
+        String searchTerm = AdvanceFilterUtils.normalizeSearch(filter.getSearch());
+        Query query = buildQuery(filter, !searchTerm.isEmpty());
+
+        if (filter.getCustomFields() != null && !filter.getCustomFields().isEmpty()) {
+            filter.getCustomFields().entrySet().removeIf(
+                    entry -> entry.getValue() == null
+                            || entry.getValue().trim().isEmpty()
+                            || AdvanceFilterUtils.isCustomFieldSearchKey(entry.getKey())
             );
         }
+        log.info("Custom fields after {}", filter.getCustomFields());
+
+        if (filter.hasCustomFieldFilters()) {
+            Set<String> customFieldAssetIds = searchAssetbyCustomField(filter);
+            log.info("customFieldAssetIds : {}", customFieldAssetIds);
+            if (customFieldAssetIds.isEmpty()) {
+                query.addCriteria(Criteria.where("id").in(Collections.emptyList()));
+                return query;
+            }
+            query.addCriteria(Criteria.where("id").in(customFieldAssetIds));
+        }
+
+        applyCheckInOutFilter(query, filter);
+
+        String effectiveSortField = filter.getEffectiveSortField();
+        Sort.Direction direction = "DESC".equalsIgnoreCase(filter.getSortDirection())
+                ? Sort.Direction.DESC
+                : Sort.Direction.ASC;
+        query.with(Sort.by(direction, effectiveSortField));
+        return query;
+    }
+
+    /**
+     * Filters assets by check-in/out status using a single query on assetCheckInOut.
+     * assetCheckInOut.assetId stores the Mongo _id of the asset document.
+     * Assets with no check-in/out record are treated as Checked In.
+     */
+    private void applyCheckInOutFilter(Query query, AssetAdvancedFilterDTO filter) {
+        String checkInOutStatus = AdvanceFilterUtils.resolveCheckedInOutFilter(filter.getCheckedInOut());
+        if (checkInOutStatus == null) {
+            return;
+        }
+
+        Set<String> checkedOutAssetIds = findCheckedOutAssetMongoIds(filter.getCompanyId());
+        log.info("Check-in/out filter: {}, checkedOutAssetCount: {}", checkInOutStatus, checkedOutAssetIds.size());
+
+        if ("Checked Out".equals(checkInOutStatus)) {
+            if (checkedOutAssetIds.isEmpty()) {
+                query.addCriteria(Criteria.where("id").in(Collections.emptyList()));
+            } else {
+                query.addCriteria(Criteria.where("id").in(checkedOutAssetIds));
+            }
+            return;
+        }
+
+        if (!checkedOutAssetIds.isEmpty()) {
+            query.addCriteria(Criteria.where("id").nin(checkedOutAssetIds));
+        }
+    }
+
+    private Set<String> findCheckedOutAssetMongoIds(Long companyId) {
+        Query checkOutQuery = new Query();
+        checkOutQuery.addCriteria(Criteria.where("companyId").is(companyId));
+        checkOutQuery.addCriteria(Criteria.where("status").regex("^Checked Out$", "i"));
+        checkOutQuery.fields().include("assetId");
+
+        return mongoTemplate.find(checkOutQuery, AssetCheckInOut.class).stream()
+                .map(AssetCheckInOut::getAssetId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+    }
+
+    private List<AssetWithCustomFieldsDTO> mapAssetsToDtoList(List<Assets> assets) {
+        if (assets.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<CheckInOutStatus> listOfCheckInOutStatus = assetCheckInOutAdvance.getCheckInOutStatusByAssetIds(
+                assets.stream().map(Assets::getId).collect(Collectors.toList())
+        );
+        Query checkInOutQuery = new Query(
+                Criteria.where("assetId").in(assets.stream().map(Assets::getId).collect(Collectors.toList())));
+        List<AssetCheckInOut> assetCheckInOutDataList = mongoTemplate.find(checkInOutQuery, AssetCheckInOut.class);
+
+        List<String> assetIds = assets.stream().map(Assets::getId).collect(Collectors.toList());
+        Map<String, List<AssetExtraFields>> customFieldsMap = fetchAllCustomFields(assetIds);
+
+        List<AssetWithCustomFieldsDTO> assetDTOs = assets.stream()
+                .map(asset -> convertToDTO(asset, null, customFieldsMap))
+                .toList();
+
+        return assetDTOs.stream()
+                .map(asset -> {
+                    Optional<CheckInOutStatus> statusOpt = listOfCheckInOutStatus.stream()
+                            .filter(status -> status.getAssetId().equals(asset.getId()))
+                            .findFirst();
+                    Optional<AssetCheckInOut> assetCheckInOutOptional = assetCheckInOutDataList.stream()
+                            .filter(status -> status.getAssetId().equals(asset.getId()))
+                            .findFirst();
+                    assetCheckInOutOptional.ifPresentOrElse(
+                            asset::setAssetCheckInOut,
+                            () -> asset.setAssetCheckInOut(null));
+                    statusOpt.ifPresentOrElse(
+                            status -> asset.setCheckedInOutStatus(status.getStatus()),
+                            () -> asset.setCheckedInOutStatus("Checked In")
+                    );
+                    return asset;
+                })
+                .toList();
+    }
+
+    private PaginatedAssetResponseDTO emptyPaginatedResponse(AssetAdvancedFilterDTO filter) {
+        return new PaginatedAssetResponseDTO(
+                new ArrayList<>(),
+                0,
+                0,
+                filter.getPageNumber(),
+                filter.getPageSize(),
+                false,
+                false
+        );
     }
 
     @Override
@@ -206,52 +256,66 @@ public class AssetRepositoryCustomAdvancedImpl implements AssetRepositoryCustomA
     }
 
     private Query buildQuery(AssetAdvancedFilterDTO filter) {
+        return buildQuery(filter, false);
+    }
+
+    private Query buildQuery(AssetAdvancedFilterDTO filter, boolean ignoreTextFieldFilters) {
         List<Criteria> criteriaList = new ArrayList<>();
 
         // Always filter by companyId
         criteriaList.add(Criteria.where("companyId").is(filter.getCompanyId()));
 
-        // Add optional predefined field filters
-        if (filter.getAssetId() != null && !filter.getAssetId().isEmpty()) {
-            try {
-                criteriaList.add(Criteria.where("assetId").is(Integer.parseInt(filter.getAssetId())));
-            } catch (NumberFormatException e) {
-                log.warn("Invalid assetId: {}", filter.getAssetId());
+        if (ignoreTextFieldFilters) {
+            if (filter.getLocation() != null && !filter.getLocation().isEmpty()) {
+                criteriaList.add(Criteria.where("location").is(filter.getLocation()));
             }
-        }
+            if (filter.getStatus() != null && !filter.getStatus().isEmpty()) {
+                criteriaList.add(Criteria.where("status")
+                        .regex(".*" + escapeRegex(filter.getStatus()) + ".*", "i"));
+            }
+        } else {
+            // Add optional predefined field filters
+            if (filter.getAssetId() != null && !filter.getAssetId().isEmpty()) {
+                try {
+                    criteriaList.add(Criteria.where("assetId").is(Integer.parseInt(filter.getAssetId())));
+                } catch (NumberFormatException e) {
+                    log.warn("Invalid assetId: {}", filter.getAssetId());
+                }
+            }
 
-        if (filter.getName() != null && !filter.getName().isEmpty()) {
-            criteriaList.add(Criteria.where("name")
-                    .regex(".*" + escapeRegex(filter.getName()) + ".*", "i"));
-        }
+            if (filter.getName() != null && !filter.getName().isEmpty()) {
+                criteriaList.add(Criteria.where("name")
+                        .regex(".*" + escapeRegex(filter.getName()) + ".*", "i"));
+            }
 
-        if (filter.getCustomer() != null && !filter.getCustomer().isEmpty()) {
-            criteriaList.add(Criteria.where("customer")
-                    .regex(".*" + escapeRegex(filter.getCustomer()) + ".*", "i"));
-        }
+            if (filter.getCustomer() != null && !filter.getCustomer().isEmpty()) {
+                criteriaList.add(Criteria.where("customer")
+                        .regex(".*" + escapeRegex(filter.getCustomer()) + ".*", "i"));
+            }
 
-        if (filter.getSerialNumber() != null && !filter.getSerialNumber().isEmpty()) {
-            criteriaList.add(Criteria.where("serialNumber")
-                    .regex(".*" + escapeRegex(filter.getSerialNumber()) + ".*", "i"));
-        }
+            if (filter.getSerialNumber() != null && !filter.getSerialNumber().isEmpty()) {
+                criteriaList.add(Criteria.where("serialNumber")
+                        .regex(".*" + escapeRegex(filter.getSerialNumber()) + ".*", "i"));
+            }
 
-        if (filter.getCategory() != null && !filter.getCategory().isEmpty()) {
-            criteriaList.add(Criteria.where("category")
-                    .regex(".*" + escapeRegex(filter.getCategory()) + ".*", "i"));
-        }
+            if (filter.getCategory() != null && !filter.getCategory().isEmpty()) {
+                criteriaList.add(Criteria.where("category")
+                        .regex(".*" + escapeRegex(filter.getCategory()) + ".*", "i"));
+            }
 
-        if (filter.getLocation() != null && !filter.getLocation().isEmpty()) {
-            criteriaList.add(Criteria.where("location").is(filter.getLocation()));
-        }
+            if (filter.getLocation() != null && !filter.getLocation().isEmpty()) {
+                criteriaList.add(Criteria.where("location").is(filter.getLocation()));
+            }
 
-        if (filter.getStatus() != null && !filter.getStatus().isEmpty()) {
-            criteriaList.add(Criteria.where("status")
-                    .regex(".*" + escapeRegex(filter.getStatus()) + ".*", "i"));
-        }
+            if (filter.getStatus() != null && !filter.getStatus().isEmpty()) {
+                criteriaList.add(Criteria.where("status")
+                        .regex(".*" + escapeRegex(filter.getStatus()) + ".*", "i"));
+            }
 
-        if (filter.getEmail() != null && !filter.getEmail().isEmpty()) {
-            criteriaList.add(Criteria.where("email")
-                    .regex(".*" + escapeRegex(filter.getEmail()) + ".*", "i"));
+            if (filter.getEmail() != null && !filter.getEmail().isEmpty()) {
+                criteriaList.add(Criteria.where("email")
+                        .regex(".*" + escapeRegex(filter.getEmail()) + ".*", "i"));
+            }
         }
 
         Query query = new Query();
@@ -371,6 +435,14 @@ public class AssetRepositoryCustomAdvancedImpl implements AssetRepositoryCustomA
 
                 String key = entry.getKey();
                 String value = entry.getValue();
+
+                if (AdvanceFilterUtils.isCustomFieldSearchKey(key)) {
+                    continue;
+                }
+
+                if (AdvanceFilterUtils.isCustomFieldCheckInOutKey(key)) {
+                    continue;
+                }
 
                 // Treat null / empty / only spaces as no filter
                 if (value != null && !value.trim().isEmpty()) {

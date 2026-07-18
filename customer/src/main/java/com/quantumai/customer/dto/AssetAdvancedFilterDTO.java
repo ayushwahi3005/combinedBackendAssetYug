@@ -3,6 +3,7 @@ package com.quantumai.customer.dto;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import java.util.Map;
 
 @Data
@@ -22,6 +23,12 @@ public class AssetAdvancedFilterDTO {
     private Integer pageSize = 10;
     private String sortField;
     private String sortDirection = "DESC";
+  /** Global search applied after other filters (matches standard and custom field values). */
+    @JsonAlias({"searchData", "searchTerm"})
+    private String search;
+  /** Filter by check-in/out status: "Checked In" or "Checked Out". */
+    @JsonAlias({"checkInOutStatus", "checkedInOutStatus"})
+    private String checkedInOut;
     private Map<String, String> customFields;
 
     public String getEffectiveSortField() {
@@ -29,7 +36,11 @@ public class AssetAdvancedFilterDTO {
     }
 
     public boolean hasCustomFieldFilters() {
-        return customFields != null && !customFields.isEmpty();
+        if (customFields == null || customFields.isEmpty()) {
+            return false;
+        }
+        return customFields.entrySet().stream()
+            .anyMatch(entry -> entry.getValue() != null && !entry.getValue().trim().isEmpty());
     }
 }
 

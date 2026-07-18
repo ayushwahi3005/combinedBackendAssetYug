@@ -107,11 +107,17 @@ public class UserServiceImpl implements UserService {
             // Send the verification email
             sendSimpleMessage(email, subject, message);
             log.info("Firebase verification email sent successfully to: {}", email);
-            
-        } catch (Exception e) {
-            log.error("Failed to send Firebase verification email to {}: {}", email, e.getMessage(), e);
-            throw new TheMailException("Failed to send verification email. Please try again later.", (MailException) e);
-        }
+
+        } catch (FirebaseAuthException e) {
+            log.error("Failed to generate verification link", e);
+            throw new RuntimeException("Failed to generate verification link", e);
+
+        } catch (MailException e) {
+            log.error("Failed to send email", e);
+            throw new TheMailException(
+                    "Failed to send verification email.",
+                    e
+            );}
     }
     
     @Override

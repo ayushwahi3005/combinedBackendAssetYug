@@ -18,6 +18,8 @@ public interface CompanyCustomerService {
 
   public List<CompanyCustomerDTO> getAllCustomer(Long companyId);
 
+  public List<CompanyCustomerDTO> getActiveAllCustomer(Long companyId);
+
   public void updateCustomer(CompanyCustomerDTO companyCustomerDTO) throws EmailAlreadyExistsException;
 
   public void deleteCustomer(String id);

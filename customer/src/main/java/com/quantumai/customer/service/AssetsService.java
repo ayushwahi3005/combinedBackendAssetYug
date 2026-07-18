@@ -128,6 +128,8 @@ public interface AssetsService {
 
   public List<AssetCategoryInspection> getAllAssetInspectionByCategory(Long companyId,String category);
 
+  public List<AssetCategoryInspection> getAllActiveAssetInspectionByCategory(Long companyId,String category);
+
   public List<AssetCategoryInspection> getAllAssetInspection(Long companyId);
 
   public void addAssetInspectionInstance(

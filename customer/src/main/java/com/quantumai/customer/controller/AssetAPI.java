@@ -18,6 +18,7 @@ import com.quantumai.customer.entity.enums.ImportHistoryRecordType;
 import com.quantumai.customer.exception.*;
 import com.quantumai.customer.repository.*;
 import com.quantumai.customer.service.*;
+import com.quantumai.customer.util.AdvanceFilterUtils;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import java.io.*;
@@ -82,6 +83,7 @@ public class AssetAPI {
   @Autowired private AssetQRRepository qrRepository;
   @Autowired private AuditService auditService;
   @Autowired private AssetCategoryInspectionInstanceRepository assetCategoryInspectionInstanceRepository;;
+  @Autowired private AssetFileRepository assetFileRepository;
 
   private final ModelMapper modelMapper = new ModelMapper();
 
@@ -308,29 +310,37 @@ public class AssetAPI {
 
   @Operation(summary = "Get All Asset Inspection By Category", description = "Endpoint to get all asset inspection by category")
   @GetMapping(value = "/getAllAssetInspectionByCategory/{companyId}")
-  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'inspections')")
   public List<AssetCategoryInspection> getAllAssetInspectionByCategory(
           @PathVariable Long companyId, @RequestParam String category) throws Exception {
     return assetsService.getAllAssetInspectionByCategory(companyId, category);
   }
 
+  @Operation(summary = "Get All Active Asset Inspection By Category", description = "Endpoint to get all asset inspection by category")
+  @GetMapping(value = "/getAllActiveAssetInspectionByCategory/{companyId}")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'inspections')")
+  public List<AssetCategoryInspection> getAllActiveAssetInspectionByCategory(
+          @PathVariable Long companyId, @RequestParam String category) throws Exception {
+    return assetsService.getAllActiveAssetInspectionByCategory(companyId, category);
+  }
+
   @Operation(summary = "Get All Asset Inspection", description = "Endpoint to get all asset inspection")
   @GetMapping(value = "/getAllAssetInspection/{companyId}")
-  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'inspections')")
   public List<AssetCategoryInspection> getAllAssetInspection(@PathVariable Long companyId) throws Exception {
     return assetsService.getAllAssetInspection(companyId);
   }
 
   @Operation(summary = "Get All Asset Inspection Instance", description = "Endpoint to get all asset inspection instance")
   @GetMapping(value = "/getAllAssetInspectionInstance/{companyId}")
-  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'inspections')")
   public List<AssetCategoryInspectionInstance> getAllAssetInspectionInstance(@PathVariable Long companyId) {
     return assetsService.getAllAssetCategoryInspectionValues(companyId);
   }
 
   @Operation(summary = "Get All Asset Inspection Instance Paginated", description = "Endpoint to get all asset inspection instance paginated")
   @GetMapping(value = "/getAllAssetInspectionInstance/{companyId}/{pageNumber}/{pageSize}")
-  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'inspections')")
   public PaginatedResultDTO<AssetCategoryInspectionInstance> getAllAssetInspectionInstancePaginated(
           @PathVariable Long companyId,
           @PathVariable Integer pageNumber,
@@ -342,14 +352,14 @@ public class AssetAPI {
 
   @Operation(summary = "Get All Asset Inspection Instance By Asset Id", description = "Endpoint to get all asset inspection instance by asset id")
   @GetMapping(value = "/getAllAssetInspectionInstanceByAssetId/{assetId}")
-  @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
+  @PreAuthorize("@appSecurity.canViewAny(authentication, 'inspections')")
   public List<AssetCategoryInspectionInstance> getAllAssetInspectionInstanceByAssetId(@PathVariable String assetId) {
     return assetsService.getAllAssetCategoryInspectionInstanceByAsset(assetId);
   }
 
   @Operation(summary = "Get All Asset Inspection Instance By Asset Id Paginated", description = "Endpoint to get all asset inspection instance by asset id paginated")
   @GetMapping(value = "/getAllAssetInspectionInstanceByAssetId/{assetId}/{pageNumber}/{pageSize}")
-  @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
+  @PreAuthorize("@appSecurity.canViewAny(authentication, 'inspections')")
   public PaginatedResultDTO<AssetCategoryInspectionInstance> getAllAssetInspectionInstanceByAssetIdPaginated(
           @PathVariable String assetId,
           @PathVariable Integer pageNumber,
@@ -384,7 +394,7 @@ public class AssetAPI {
 
   @Operation(summary = "Get Asset Inspection", description = "Endpoint to get asset inspection")
   @GetMapping(value = "/getAssetInspection/{id}")
-  @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
+  @PreAuthorize("@appSecurity.canViewAny(authentication, 'inspections')")
   public AssetCategoryInspection getAssetInspection(@PathVariable String id) throws Exception {
     return assetsService.getAssetInspection(id);
   }
@@ -417,12 +427,18 @@ public class AssetAPI {
   @Operation(summary = "Get Assets With Advanced Filter", description = "Endpoint to get assets with advanced filter")
   @PostMapping("/advancedFilter/optimized")
   @PreAuthorize("@appSecurity.canView(authentication, #filter.companyId, 'assets')")
-  public PaginatedAssetResponseDTO getAssetsWithAdvancedFilter(@RequestBody AssetAdvancedFilterDTO filter)
+  public PaginatedAssetResponseDTO getAssetsWithAdvancedFilter(
+          @RequestBody AssetAdvancedFilterDTO filter,
+          @RequestParam(name = "search", required = false) String searchParam)
           throws NoSubscriptionError {
     log.info("Optimized advanced filter - CompanyId: {}", filter.getCompanyId());
     if (filter.getPageNumber() == null) filter.setPageNumber(0);
     if (filter.getPageSize() == null) filter.setPageSize(10);
     if (filter.getSortDirection() == null || filter.getSortDirection().isEmpty()) filter.setSortDirection("DESC");
+    AdvanceFilterUtils.normalizeAssetAdvancedFilter(filter, searchParam);
+    if (!AdvanceFilterUtils.normalizeSearch(filter.getSearch()).isEmpty()) {
+      filter.setPageNumber(0);
+    }
     return assetsService.getAssetsWithAdvancedFilter(filter);
   }
 
@@ -477,16 +493,32 @@ public class AssetAPI {
   public ResponseEntity<AssetUniqueFieldConfigurationDTO> addUniqueFieldConfig(@RequestBody AssetUniqueFieldConfigurationDTO assetUniqueFieldConfigurationDTO) throws Exception {
 
     log.info("Adding/Updating Unique Field Configuration: {}", assetUniqueFieldConfigurationDTO);
-    AssetUniqueFieldConfiguration beforeState = null;
-    if(assetUniqueFieldConfigurationDTO.getId() != null) {
-      beforeState = assetUniqueFieldConfigurationRepository.findById(assetUniqueFieldConfigurationDTO.getId()).orElse(null);
-    }
+    AssetUniqueFieldConfiguration beforeState = assetUniqueFieldConfigurationRepository
+            .findByCompanyIdAndFieldName(
+                    assetUniqueFieldConfigurationDTO.getCompanyId(),
+                    assetUniqueFieldConfigurationDTO.getFieldName())
+            .orElse(null);
 
     AssetUniqueFieldConfigurationDTO result = assetsService.saveUniqueFieldConfiguration(assetUniqueFieldConfigurationDTO);
-    if (beforeState != null) {
-      auditService.logUpdateWithComparison(AuditModule.ASSET_CUSTOM_FIELD, assetUniqueFieldConfigurationDTO.getId(), assetUniqueFieldConfigurationDTO.getFieldName(), assetUniqueFieldConfigurationDTO.getCompanyId(), beforeState, result);
-    } else {
-      auditService.logCreate(AuditModule.ASSET_CUSTOM_FIELD, assetUniqueFieldConfigurationDTO.getId(), assetUniqueFieldConfigurationDTO.getFieldName(), assetUniqueFieldConfigurationDTO.getCompanyId(), Map.of("unique", "true"));
+
+    AssetUniqueFieldConfiguration afterState = assetUniqueFieldConfigurationRepository
+            .findByCompanyIdAndFieldName(
+                    assetUniqueFieldConfigurationDTO.getCompanyId(),
+                    assetUniqueFieldConfigurationDTO.getFieldName())
+            .orElse(null);
+
+    if (beforeState != null && afterState != null) {
+      Map<String, Object> changes = AuditChangeCalculator.computeUniqueFieldChanges(beforeState, afterState);
+      if (!changes.isEmpty()) {
+        auditService.logUpdate(AuditModule.ASSET_CUSTOM_FIELD, afterState.getId(), afterState.getFieldName(),
+                afterState.getCompanyId(), changes);
+      }
+    } else if (afterState != null) {
+      auditService.logCreate(AuditModule.ASSET_CUSTOM_FIELD, afterState.getId(), afterState.getFieldName(),
+              afterState.getCompanyId(),
+              Map.of("fieldName", afterState.getFieldName(),
+                      "isUnique", String.valueOf(afterState.getIsUnique()),
+                      "type", afterState.getType() != null ? afterState.getType() : ""));
     }
     return ResponseEntity.ok(result);
   }
@@ -520,9 +552,7 @@ public class AssetAPI {
     List<String> mandatoryColumnList =
             assetMandatoryList.stream().map(ele -> ele.getName().toLowerCase()).toList();
 
-//    log.info("📌 Columns for companyId {}: {}", companyId, columnMappings.toString());
     Map<String, String> columnMap = parseColumnMappings(columnMappings);
-//    log.info("📋 Column Mappings Parsed: {}", columnMap);
 
     long totalCount = countFileRows(file);
     if (totalCount > 1001) throw new ImportFileRowException("Import File cannot import more than 1000 rows");
@@ -537,16 +567,6 @@ public class AssetAPI {
     importHistoryDTO.setDate(LocalDateTime.now());
     importHistoryDTO.setComplete(0L);
     importHistoryDTO = customerService.addImportHistory(importHistoryDTO);
-
-
-//    try {
-//      Thread.sleep(50000);
-//    } catch (InterruptedException e) {
-//      throw new RuntimeException(e);
-//    }
-
-
-
 
     try (CSVReader csvReader = new CSVReader(new InputStreamReader(file.getInputStream()))) {
       String[] headers = csvReader.readNext();
@@ -563,14 +583,13 @@ public class AssetAPI {
 
       long currCount = 0;
 
-
       String[] row;
       while ((row = csvReader.readNext()) != null) {
         if (isEmptyRow(row)) continue;
 
         AssetsDTO assetsDTO = new AssetsDTO();
         assetsDTO.setCompanyId(companyId);
-        int errorFlag =0;
+        int errorFlag = 0;
         StringBuilder errorDesc = new StringBuilder();
         Map<Integer, Boolean> errorCellMap = new HashMap<>();
 
@@ -584,14 +603,13 @@ public class AssetAPI {
           switch (columnMap.get(field).toLowerCase()) {
             case "name":
               log.info("NAME FIELD VALUE: '{}'", row[j]);
-              if(row[j].trim().isEmpty()){
-
-                  errorDesc.append("Name is Mandatory");
-                  errorFlag = 1;
-                  errorCellMap.put(j, true);
-
-              } else{
-              assetsDTO.setName(row[j]);}
+              if (row[j].trim().isEmpty()) {
+                errorDesc.append("Name is Mandatory");
+                errorFlag = 1;
+                errorCellMap.put(j, true);
+              } else {
+                assetsDTO.setName(row[j]);
+              }
               break;
             case "serialnumber":
               if (mandatoryColumnList.contains("serialnumber") && row[j].trim().isEmpty()) {
@@ -607,7 +625,7 @@ public class AssetAPI {
                 errorCellMap.put(j, true);
                 break;
               }
-              final String categoryValue = row[j].trim();  // ✅ effectively final, safe for lambda
+              final String categoryValue = row[j].trim();
               if (!categoryValue.isBlank()) {
                 List<AssetCategory> match = assetCategoryRepository.findByCompanyId(companyId)
                         .stream().filter(x -> x.getName().equalsIgnoreCase(categoryValue))
@@ -616,8 +634,7 @@ public class AssetAPI {
                   errorDesc.append("CATEGORY");
                   errorFlag = 1;
                   errorCellMap.put(j, true);
-                }
-                else assetsDTO.setCategory(match.get(0).getName());
+                } else assetsDTO.setCategory(match.get(0).getName());
               }
               break;
             case "customer":
@@ -647,110 +664,121 @@ public class AssetAPI {
                 errorCellMap.put(j, true);
                 break;
               }
-              else if(row[j].trim().isEmpty()) { break; }
+              else if (row[j].trim().isEmpty()) { break; }
               String loc = row[j].trim();
-              List<Location> locs = locationList.stream()
-                      .filter(l -> l.getName().equalsIgnoreCase(loc)).toList();
-              if (!locs.isEmpty()) { assetsDTO.setLocation("location:" + locs.get(0).getId()); break; }
-              List<Bin> bins = binList.stream()
-                      .filter(b -> b.getBinNumber().equalsIgnoreCase(loc)).toList();
-              if (!bins.isEmpty()) { assetsDTO.setLocation("bin:" + bins.get(0).getId()); break; }
-              errorDesc.append("LOCATION");
-              errorFlag = 1;
-              errorCellMap.put(j, true);
+              if(!loc.isEmpty()){
+                String code= loc.substring(0, Math.min(loc.length(), 3)).toLowerCase();
+                Long id=loc.length() > 3 ? Long.parseLong(loc.substring(3)) : null;
+                if(code.equals("bin")){
+                  List<Bin> bins = binList.stream()
+                          .filter(b -> b.getBinId().equals(id)).toList();
+                  if (!bins.isEmpty()) { assetsDTO.setLocation("bin:" + bins.get(0).getId()); break; }
+                  errorDesc.append("LOCATION");
+                  errorFlag = 1;
+                  errorCellMap.put(j, true);
+                }
+                else{
+                  List<Location> locs = locationList.stream()
+                          .filter(l -> l.getLocationId().equals(id)).toList();
+                  if (!locs.isEmpty()) { assetsDTO.setLocation("location:" + locs.get(0).getId()); break; }
+                  errorDesc.append("LOCATION");
+                  errorFlag = 1;
+                  errorCellMap.put(j, true);
+                }
+
+
+
+              }
+
               break;
             case "status":
               switch (row[j].toLowerCase()) {
                 case "active": assetsDTO.setStatus("active"); break label;
                 case "inactive": assetsDTO.setStatus("inactive"); break label;
                 case "outofservice": assetsDTO.setStatus("outofservice"); break label;
-                default:  assetsDTO.setStatus("active"); break label;
+                default: assetsDTO.setStatus("active"); break label;
               }
           }
         }
-        log.info("Error Flag : {}",errorFlag);
-        log.info("Asset DTO : {}",assetsDTO.toString());
+
+        log.info("Error Flag : {}", errorFlag);
+        log.info("Asset DTO : {}", assetsDTO.toString());
+
         if (errorFlag == 1) {
           Row errorRow = errorSheet.createRow(excelIndex++);
           for (int k = 0; k < row.length; k++) {
             Cell cell = errorRow.createCell(k);
             cell.setCellValue(row[k]);
           }
-
-          // Apply red background to error cells
           for (Map.Entry<Integer, Boolean> entry : errorCellMap.entrySet()) {
             if (entry.getValue()) {
               Cell errorCell = errorRow.getCell(entry.getKey());
               if (errorCell != null) errorCell.setCellStyle(errorCellStyle);
             }
           }
-
-          // Create error description cell with red background
           Cell errorDescriptionCell = errorRow.createCell(row.length);
           errorDescriptionCell.setCellValue(errorDesc.toString());
           errorDescriptionCell.setCellStyle(errorCellStyle);
         } else {
           log.info("Attempting to save asset: {}", assetsDTO.toString());
 
-          // ✅ STEP 1: Collect all extra field values and validate format/mandatory (don't stop on first error)
+          // ✅ STEP 1: Collect all extra field values and validate format/mandatory
+          // FIX: use a per-field "fieldValid" flag so an earlier bad column no longer
+          // suppresses every extra field that comes after it in the row.
           List<AssetExtraFieldName> extraFieldNames = extraFieldNameRepository.findByCompanyId(companyId);
-          Map<String, String> extraFieldValues = new HashMap<>();
+          Map<String, String> extraFieldValues = new HashMap<>();        // key: lowercase name -> value
+          Map<String, String> extraFieldDisplayNames = new HashMap<>();  // key: lowercase name -> original-cased name
           List<String> formatErrorMessages = new ArrayList<>();
 
-          // Process extra fields from CSV to collect values and validate format
           for (int j = 0; j < row.length; j++) {
             String field = headerMap.get(j);
             String value = row[j] != null ? row[j].trim() : "";
 
             if (columnMap.get(field) == null) continue;
 
-            // Check if this column maps to an extra field
             for (AssetExtraFieldName extraFieldName : extraFieldNames) {
               if (columnMap.get(field).equalsIgnoreCase(extraFieldName.getName())) {
                 String formattedValue = value;
+                boolean fieldValid = true;
 
-                // ✅ Check mandatory extra fields
-                if (mandatoryColumnList.contains(extraFieldName.getName().toLowerCase())) {
-                  if (value.trim().isEmpty()) {
-                    formatErrorMessages.add(extraFieldName.getName().toUpperCase() + " is MANDATORY");
+                // Mandatory check
+                if (mandatoryColumnList.contains(extraFieldName.getName().toLowerCase())
+                        && value.trim().isEmpty()) {
+                  formatErrorMessages.add(extraFieldName.getName().toUpperCase() + " is MANDATORY");
+                  errorCellMap.put(j, true);
+                  errorFlag = 1;
+                  fieldValid = false;
+                }
+                // Number format check
+                else if ("number".equals(extraFieldName.getType()) && !value.trim().isEmpty()) {
+                  try {
+                    int val = Integer.parseInt(value);
+                    formattedValue = Integer.toString(val);
+                  } catch (NumberFormatException e) {
+                    formatErrorMessages.add(extraFieldName.getName().toUpperCase() + " - Invalid number format");
                     errorCellMap.put(j, true);
                     errorFlag = 1;
-                    break;
+                    fieldValid = false;
+                  }
+                }
+                // Date format check
+                else if ("date".equals(extraFieldName.getType()) && !value.trim().isEmpty()) {
+                  try {
+                    DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+                    LocalDate date = LocalDate.parse(value, inputFormatter);
+                    DateTimeFormatter outputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+                    formattedValue = date.format(outputFormatter);
+                  } catch (Exception e) {
+                    formatErrorMessages.add(extraFieldName.getName().toUpperCase() + " - Invalid date format (use dd-MM-yyyy)");
+                    errorCellMap.put(j, true);
+                    errorFlag = 1;
+                    fieldValid = false;
                   }
                 }
 
-                // ✅ Validate format based on type (don't break, collect all errors)
-                if ("number".equals(extraFieldName.getType())) {
-                  if (!value.trim().isEmpty()) {
-                    try {
-                      int val = Integer.parseInt(value);
-                      formattedValue = Integer.toString(val);
-                    } catch (NumberFormatException e) {
-                      formatErrorMessages.add(extraFieldName.getName().toUpperCase() + " - Invalid number format");
-                      errorCellMap.put(j, true);
-                      errorFlag = 1;
-                      break;
-                    }
-                  }
-                } else if ("date".equals(extraFieldName.getType())) {
-                  if (!value.trim().isEmpty()) {
-                    try {
-                      DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
-                      LocalDate date = LocalDate.parse(value, inputFormatter);
-                      DateTimeFormatter outputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-                      formattedValue = date.format(outputFormatter);
-                    } catch (Exception e) {
-                      formatErrorMessages.add(extraFieldName.getName().toUpperCase() + " - Invalid date format (use dd-MM-yyyy)");
-                      errorCellMap.put(j, true);
-                      errorFlag = 1;
-                      break;
-                    }
-                  }
-                }
-
-                // Only add to map if format validation passed for this field
-                if (errorFlag == 0) {
+                if (fieldValid) {
                   extraFieldValues.put(extraFieldName.getName().toLowerCase(), formattedValue);
+                  extraFieldDisplayNames.put(extraFieldName.getName().toLowerCase(), extraFieldName.getName());
                 }
                 break;
               }
@@ -759,23 +787,19 @@ public class AssetAPI {
 
           // ✅ STEP 2: Validate unique fields (even if there are format errors, so we can highlight all problems)
           if (!validateAllUniqueFieldsForImport(assetsDTO, extraFieldValues, companyId, errorDesc,
-                                                errorCellMap, headerMap, columnMap)) {
+                  errorCellMap, headerMap, columnMap)) {
             errorFlag = 1;
             log.warn("Unique field validation failed: {}", errorDesc.toString());
           }
 
-          // ✅ Combine all error messages
-          if (errorFlag == 1) {
-            if (!formatErrorMessages.isEmpty()) {
-              for (int i = 0; i < formatErrorMessages.size(); i++) {
-                if (i == 0 && errorDesc.length() == 0) {
-                  errorDesc.append("ERROR: ").append(formatErrorMessages.get(i));
-                } else {
-                  if (errorDesc.length() > 0) {
-                    errorDesc.append(" | ");
-                  }
-                  errorDesc.append(formatErrorMessages.get(i));
-                }
+          // ✅ Combine all format error messages
+          if (errorFlag == 1 && !formatErrorMessages.isEmpty()) {
+            for (int i = 0; i < formatErrorMessages.size(); i++) {
+              if (i == 0 && errorDesc.length() == 0) {
+                errorDesc.append("ERROR: ").append(formatErrorMessages.get(i));
+              } else {
+                if (errorDesc.length() > 0) errorDesc.append(" | ");
+                errorDesc.append(formatErrorMessages.get(i));
               }
             }
           }
@@ -784,24 +808,28 @@ public class AssetAPI {
           if (errorFlag == 0) {
             AssetsDTO savedAssetDTO = assetsService.addAssets(assetsDTO);
 
-            // Save extra fields
             for (Map.Entry<String, String> entry : extraFieldValues.entrySet()) {
-              AssetExtraFields extraFields = new AssetExtraFields();
+              String lowerKey = entry.getKey();
+              String originalName = extraFieldDisplayNames.getOrDefault(lowerKey, entry.getKey());
+
+              Optional<AssetExtraFields> existingExtra =
+                      extraFieldsRepository.findByNameAndAssetId(originalName, savedAssetDTO.getId());
+              AssetExtraFields extraFields = existingExtra.orElse(new AssetExtraFields());
+
               extraFields.setAssetId(savedAssetDTO.getId());
-              extraFields.setName(entry.getKey());
+              extraFields.setName(originalName);
               extraFields.setValue(entry.getValue());
               extraFields.setCompanyId(companyId);
 
-              // Find type from extraFieldNames
               for (AssetExtraFieldName extraFieldName : extraFieldNames) {
-                if (extraFieldName.getName().equalsIgnoreCase(entry.getKey())) {
+                if (extraFieldName.getName().equalsIgnoreCase(originalName)) {
                   extraFields.setType(extraFieldName.getType());
                   break;
                 }
               }
 
               extraFieldsRepository.save(extraFields);
-              log.info("Extra field saved: {} = {}", entry.getKey(), entry.getValue());
+              log.info("Extra field saved: {} = {}", originalName, entry.getValue());
             }
           }
 
@@ -811,16 +839,12 @@ public class AssetAPI {
               Cell cell = errorRow.createCell(col);
               cell.setCellValue(row[col]);
             }
-
-            // Apply red background to error cells
             for (Map.Entry<Integer, Boolean> entry : errorCellMap.entrySet()) {
               if (entry.getValue()) {
                 Cell errorCell = errorRow.getCell(entry.getKey());
                 if (errorCell != null) errorCell.setCellStyle(errorCellStyle);
               }
             }
-
-            // Create error description cell with red background
             Cell errorDescriptionCell = errorRow.createCell(row.length);
             errorDescriptionCell.setCellValue(errorDesc.toString());
             errorDescriptionCell.setCellStyle(errorCellStyle);
@@ -843,10 +867,10 @@ public class AssetAPI {
       importHistoryDTO.setMessage(e.getMessage());
       log.error("Import failed", e);
     } catch (Exception e) {
-        throw new RuntimeException(e);
+      throw new RuntimeException(e);
     }
 
-      customerService.addImportHistory(importHistoryDTO);
+    customerService.addImportHistory(importHistoryDTO);
     sendImportNotification(companyId, file.getOriginalFilename());
     log.info("Import completed for companyId: {}", companyId);
   }
@@ -1172,7 +1196,15 @@ public class AssetAPI {
       return new ResponseEntity<>(r, HttpStatus.NOT_FOUND);
     }
     try {
-      assetsService.addAssetFile(file, assetId, username);
+      AssetFile savedFile = assetsService.addAssetFile(file, assetId, username);
+      Assets asset = assetsRepository.findById(assetId).orElseThrow();
+      auditService.log(AuditModule.ASSET, AuditAction.CREATE,
+              String.valueOf(asset.getAssetId()), asset.getName(), asset.getCompanyId(),
+              "Uploaded file: " + file.getOriginalFilename(),
+              Map.of("fileName", file.getOriginalFilename(),
+                      "fileId", savedFile.getId(),
+                      "uploadedBy", username,
+                      "action", "file_upload"));
       ResponseMessageDTO r = new ResponseMessageDTO();
       r.setResponseMessage("Uploaded successfully: " + file.getOriginalFilename());
       return new ResponseEntity<>(r, HttpStatus.OK);
@@ -1187,12 +1219,26 @@ public class AssetAPI {
   @PostMapping("/mandatoryFields")
   @PreAuthorize("@appSecurity.canEdit(authentication, #mandatoryFields.companyId, 'assets')")
   public void mandatoryFields(@RequestBody AssetMandatoryFields mandatoryFields) throws NoSubscriptionError {
-    AssetMandatoryFields beforeState = assetMandatoryFieldsRepository.findById(mandatoryFields.getId()).orElse(null);
+    AssetMandatoryFields beforeState = assetMandatoryFieldsRepository
+            .findByNameAndCompanyId(mandatoryFields.getName(), mandatoryFields.getCompanyId())
+            .orElse(null);
+
     assetsService.updateMandatoryFields(mandatoryFields);
+
+    AssetMandatoryFields afterState = assetMandatoryFieldsRepository
+            .findByNameAndCompanyId(mandatoryFields.getName(), mandatoryFields.getCompanyId())
+            .orElse(mandatoryFields);
+
     if (beforeState != null) {
-      auditService.logUpdateWithComparison(AuditModule.ASSET_CUSTOM_FIELD, mandatoryFields.getId(), mandatoryFields.getName(), mandatoryFields.getCompanyId(), beforeState, mandatoryFields);
+      Map<String, Object> changes = AuditChangeCalculator.computeMandatoryShowChanges(beforeState, afterState, "mandatory");
+      if (!changes.isEmpty()) {
+        auditService.logUpdate(AuditModule.ASSET_CUSTOM_FIELD, afterState.getId(), afterState.getName(),
+                afterState.getCompanyId(), changes);
+      }
     } else {
-      auditService.logCreate(AuditModule.ASSET_CUSTOM_FIELD, mandatoryFields.getId(), mandatoryFields.getName(), mandatoryFields.getCompanyId(), Map.of("mandatory", "true"));
+      auditService.logCreate(AuditModule.ASSET_CUSTOM_FIELD, afterState.getId(), afterState.getName(),
+              afterState.getCompanyId(),
+              Map.of("name", afterState.getName(), "mandatory", String.valueOf(afterState.isMandatory())));
     }
   }
 
@@ -1200,12 +1246,27 @@ public class AssetAPI {
   @PostMapping("/showFields")
   @PreAuthorize("@appSecurity.canEdit(authentication, #showFields.companyId, 'assets')")
   public void showFields(@RequestBody AssetShowFields showFields) throws NoSubscriptionError {
-    AssetShowFields beforeState = assetShowFieldsRepository.findById(showFields.getId()).orElse(null);
+    log.info("Show Fields Request: {}", showFields.toString());
+    AssetShowFields beforeState = assetShowFieldsRepository
+            .findByNameAndCompanyId(showFields.getName(), showFields.getCompanyId())
+            .orElse(null);
+
     assetsService.updateShowFields(showFields);
+
+    AssetShowFields afterState = assetShowFieldsRepository
+            .findByNameAndCompanyId(showFields.getName(), showFields.getCompanyId())
+            .orElse(showFields);
+
     if (beforeState != null) {
-      auditService.logUpdateWithComparison(AuditModule.ASSET_CUSTOM_FIELD, showFields.getId(), showFields.getName(), showFields.getCompanyId(), beforeState, showFields);
+      Map<String, Object> changes = AuditChangeCalculator.computeMandatoryShowChanges(beforeState, afterState, "show");
+      if (!changes.isEmpty()) {
+        auditService.logUpdate(AuditModule.ASSET_CUSTOM_FIELD, afterState.getId(), afterState.getName(),
+                afterState.getCompanyId(), changes);
+      }
     } else {
-      auditService.logCreate(AuditModule.ASSET_CUSTOM_FIELD, showFields.getId(), showFields.getName(), showFields.getCompanyId(), Map.of("show", "true"));
+      auditService.logCreate(AuditModule.ASSET_CUSTOM_FIELD, afterState.getId(), afterState.getName(),
+              afterState.getCompanyId(),
+              Map.of("name", afterState.getName(), "show", String.valueOf(afterState.isShow())));
     }
   }
 
@@ -1238,13 +1299,18 @@ public class AssetAPI {
   @PreAuthorize("@appSecurity.canCreate(authentication, #categoryDTO.companyId, 'assets')")
   public void addCategory(@RequestBody CategoryDTO categoryDTO) throws Exception {
     assetsService.addCategory(categoryDTO);
-    auditService.logCreate(AuditModule.ASSET_CATEGORY, null, categoryDTO.getName(),
-            categoryDTO.getCompanyId(), Map.of("name", String.valueOf(categoryDTO.getName())));
+    assetCategoryRepository.findByNameAndCompanyId(categoryDTO.getName(), categoryDTO.getCompanyId())
+            .ifPresent(cat -> auditService.logCreate(AuditModule.ASSET_CATEGORY,
+                    String.valueOf(cat.getAssetCategoryId()), cat.getName(),
+                    cat.getCompanyId(),
+                    Map.of("categoryId", String.valueOf(cat.getAssetCategoryId()),
+                            "name", cat.getName(),
+                            "status", cat.getStatus() != null ? cat.getStatus() : "")));
   }
 
   @Operation(summary = "Add Asset Inspection", description = "Endpoint to add asset inspection")
   @PostMapping(value = "/addAssetInspection")
-  @PreAuthorize("@appSecurity.canCreate(authentication, #assetCategoryInspection.companyId, 'assets')")
+  @PreAuthorize("@appSecurity.canCreate(authentication, #assetCategoryInspection.companyId, 'inspections')")
   public void addAssetInspection(@RequestBody AssetCategoryInspection assetCategoryInspection) throws NoSubscriptionError {
     assetsService.addAssetInspection(assetCategoryInspection);
     // Service mutates the object: assetCategoryInspectionId is set after save
@@ -1257,16 +1323,16 @@ public class AssetAPI {
 
   @Operation(summary = "Add Asset Inspection Instance", description = "Endpoint to add asset inspection instance")
   @PostMapping(value = "/addAssetInspectionInstance")
-  @PreAuthorize("@appSecurity.canCreateAny(authentication, 'assets')")
+  @PreAuthorize("@appSecurity.canCreateAny(authentication, 'inspections')")
   public void addAssetInspectionInstance(@RequestBody AssetCategoryInspectionInstance assetCategoryInspection) {
     assetsService.addAssetInspectionInstance(assetCategoryInspection);
-    // Service mutates the object: assetCategoryInspectionInstanceId is set after save
+    String businessAssetId = resolveBusinessAssetId(assetCategoryInspection.getAssetId());
     auditService.logCreate(AuditModule.ASSET_INSPECTION_INSTANCE,
             String.valueOf(assetCategoryInspection.getAssetCategoryInspectionInstanceId()),
             assetCategoryInspection.getAssetCategoryInspectionName(),
             assetCategoryInspection.getCompanyId(),
             Map.of("instanceId", String.valueOf(assetCategoryInspection.getAssetCategoryInspectionInstanceId()),
-                    "assetId", String.valueOf(assetCategoryInspection.getAssetId()),
+                    "assetId", businessAssetId,
                     "inspectionName", String.valueOf(assetCategoryInspection.getAssetCategoryInspectionName()),
                     "status", String.valueOf(assetCategoryInspection.getStatus()),
                     "dueDate", String.valueOf(assetCategoryInspection.getInspectionDueDate())));
@@ -1276,26 +1342,32 @@ public class AssetAPI {
 
   @Operation(summary = "Update Asset Inspection Instance", description = "Endpoint to update asset inspection instance")
   @PutMapping(value = "/addAssetInspectionInstance")
-  @PreAuthorize("@appSecurity.canEdit(authentication, #assetCategoryInspection.companyId, 'assets')")
+  @PreAuthorize("@appSecurity.canEdit(authentication, #assetCategoryInspection.companyId, 'inspections')")
   public void updateAssetInspectionInstance(@RequestBody AssetCategoryInspectionInstance assetCategoryInspection) throws NoSubscriptionError {
     // Fetch current state before update
     AssetCategoryInspectionInstance beforeState = assetCategoryInspectionInstanceRepository
             .findById(assetCategoryInspection.getId()).orElse(null);
     
     assetsService.updateAssetInspectionInstance(assetCategoryInspection);
+
+    AssetCategoryInspectionInstance afterState = assetCategoryInspectionInstanceRepository
+            .findById(assetCategoryInspection.getId()).orElse(assetCategoryInspection);
     
     if (beforeState != null) {
-      // Log with detailed field comparison
-      auditService.logUpdateWithComparison(AuditModule.ASSET_INSPECTION_INSTANCE,
-              String.valueOf(assetCategoryInspection.getAssetCategoryInspectionInstanceId()),
-              assetCategoryInspection.getAssetCategoryInspectionName(),
-              assetCategoryInspection.getCompanyId(), beforeState, assetCategoryInspection);
+      Map<String, Object> changes = AuditChangeCalculator.computeChanges(beforeState, afterState);
+      changes.put("assetId", Map.of(
+              "old", resolveBusinessAssetId(beforeState.getAssetId()),
+              "new", resolveBusinessAssetId(afterState.getAssetId())));
+      auditService.logUpdate(AuditModule.ASSET_INSPECTION_INSTANCE,
+              String.valueOf(afterState.getAssetCategoryInspectionInstanceId()),
+              afterState.getAssetCategoryInspectionName(),
+              afterState.getCompanyId(), changes);
     }
   }
 
   @Operation(summary = "Update Asset Inspection", description = "Endpoint to update asset inspection")
   @PutMapping(value = "/updateAssetInspection")
-  @PreAuthorize("@appSecurity.canCreate(authentication, #assetCategoryInspection.companyId, 'assets')")
+  @PreAuthorize("@appSecurity.canEdit(authentication, #assetCategoryInspection.companyId, 'inspections')")
   public void updateAssetInspection(@RequestBody AssetCategoryInspection assetCategoryInspection) throws NoSubscriptionError {
     // Fetch current state before update
     AssetCategoryInspection beforeState = assetCategoryInspectionRepository
@@ -1323,11 +1395,11 @@ public class AssetAPI {
     assetsService.updateCategory(categoryDTO);
     
     if (beforeStateOpt.isPresent()) {
-      // Fetch updated state for comparison
       AssetCategory afterState = assetCategoryRepository.findById(categoryDTO.getId()).orElse(null);
       if (afterState != null) {
         auditService.logUpdateWithComparison(AuditModule.ASSET_CATEGORY,
-                categoryDTO.getId(), categoryDTO.getName(), categoryDTO.getCompanyId(),
+                String.valueOf(afterState.getAssetCategoryId()), afterState.getName(),
+                afterState.getCompanyId(),
                 beforeStateOpt.get(), afterState);
       }
     }
@@ -1400,6 +1472,16 @@ public class AssetAPI {
   @DeleteMapping("deleteFile/{id}")
   @PreAuthorize("@appSecurity.canDeleteAny(authentication, 'assets')")
   public void deleteFile(@PathVariable String id) throws NoSubscriptionError {
+    assetFileRepository.findById(id).ifPresent(file -> {
+      Assets asset = assetsRepository.findById(file.getAssetId()).orElse(null);
+      String entityId = asset != null ? String.valueOf(asset.getAssetId()) : file.getAssetId();
+      String entityName = asset != null ? asset.getName() : file.getFileName();
+      Long companyId = asset != null ? asset.getCompanyId() : file.getCompanyId();
+      auditService.logDelete(AuditModule.ASSET, entityId, entityName, companyId,
+              Map.of("fileName", file.getFileName(),
+                      "fileId", file.getId(),
+                      "action", "file_delete"));
+    });
     assetsService.deleteFile(id);
   }
 
@@ -1418,7 +1500,7 @@ public class AssetAPI {
 
   @Operation(summary = "Delete Asset Inspection", description = "Endpoint to delete asset inspection")
   @DeleteMapping(value = "/deleteAssetInspection/{id}")
-  @PreAuthorize("@appSecurity.canDeleteAny(authentication, 'assets')")
+  @PreAuthorize("@appSecurity.canDeleteAny(authentication, 'inspections')")
   public void deleteAssetInspection(@PathVariable String id) throws NoSubscriptionError {
     assetCategoryInspectionRepository.findById(id).ifPresent(insp ->
             auditService.logDelete(AuditModule.ASSET_INSPECTION,
@@ -1507,7 +1589,7 @@ public class AssetAPI {
     CellStyle textStyle = workbook.createCellStyle();
     textStyle.setDataFormat(workbook.createDataFormat().getFormat("@"));
 
-    for (String h : new String[]{"ID","Serial Number","Customer","Category","Location","Status","Checked In/Out","Last Handled By","Last Known Location"})
+    for (String h : new String[]{"ID","Asset Name","Serial Number","Customer","Category","Location","Status","Checked In/Out","Last Handled By","Last Known Location"})
       header.createCell(col++).setCellValue(h);
     for (AssetExtraFieldName ef : extraFieldNames) header.createCell(col++).setCellValue(ef.getName());
 
@@ -1516,6 +1598,7 @@ public class AssetAPI {
       Row row = sheet.createRow(rowIdx++);
       int c = 0;
       Cell idCell = row.createCell(c++); idCell.setCellValue(String.valueOf(asset.getAssetId())); idCell.setCellStyle(textStyle);
+      Cell nameCell = row.createCell(c++); nameCell.setCellValue(asset.getName() != null ? asset.getName() : ""); nameCell.setCellStyle(textStyle);
       Cell snCell = row.createCell(c++); snCell.setCellValue(asset.getSerialNumber()); snCell.setCellStyle(textStyle);
       row.createCell(c++).setCellValue(asset.getCustomer());
       row.createCell(c++).setCellValue(asset.getCategory());
@@ -1741,88 +1824,93 @@ public class AssetAPI {
                                                    Long companyId, StringBuilder errorDesc,
                                                    Map<Integer, Boolean> errorCellMap, Map<Integer, String> headerMap,
                                                    Map<String, String> columnMap) {
+    List<AssetUniqueFieldConfiguration> uniqueConfigs;
     try {
-      List<AssetUniqueFieldConfiguration> uniqueConfigs = assetUniqueFieldConfigurationRepository.findByCompanyIdAndIsUniqueTrue(companyId);
-
-      if (uniqueConfigs == null || uniqueConfigs.isEmpty()) {
-        log.debug("No unique field configurations found for company: {}", companyId);
-        return true;
-      }
-
-      boolean hasViolations = false;
-      List<String> violationMessages = new ArrayList<>();
-
-      // ✅ Check ALL fields and collect all violations
-      for (AssetUniqueFieldConfiguration config : uniqueConfigs) {
-        String fieldName = config.getFieldName();
-        String fieldType = config.getType();
-        String fieldValue = null;
-        int cellIndex = -1;
-
-        // Get field value from standard fields or extra fields
-        if ("STANDARD".equalsIgnoreCase(fieldType)) {
-          switch (fieldName.toLowerCase()) {
-            case "name":
-              fieldValue = assetsDTO.getName();
-              break;
-            case "serialnumber":
-              fieldValue = assetsDTO.getSerialNumber();
-              break;
-            case "customer":
-              fieldValue = assetsDTO.getCustomer();
-              break;
-            case "category":
-              fieldValue = assetsDTO.getCategory();
-              break;
-            case "location":
-              fieldValue = assetsDTO.getLocation();
-              break;
-          }
-        } else if ("EXTRA".equalsIgnoreCase(fieldType)) {
-          fieldValue = extraFieldValues.get(fieldName.toLowerCase());
-        }
-
-        // Find cell index for highlighting error
-        for (Map.Entry<Integer, String> entry : headerMap.entrySet()) {
-          String header = entry.getValue();
-          if (columnMap.get(header) != null && columnMap.get(header).equalsIgnoreCase(fieldName)) {
-            cellIndex = entry.getKey();
-            break;
-          }
-        }
-
-        // Validate uniqueness
-        if (fieldValue != null && !fieldValue.trim().isEmpty()) {
-          boolean isValid = isUniqueFieldValid(companyId, fieldName, fieldValue, fieldType);
-          if (!isValid) {
-            hasViolations = true;
-            String violation = fieldName.toUpperCase() + " (value: '" + fieldValue + "' already exists)";
-            violationMessages.add(violation);
-
-            // ✅ Highlight ALL problematic cells
-            if (cellIndex >= 0) {
-              errorCellMap.put(cellIndex, true);
-            }
-
-            log.warn("Unique field validation failed for {}: {}", fieldName, fieldValue);
-          }
-        }
-      }
-
-      // ✅ Build comprehensive error message with all violations
-      if (hasViolations) {
-        errorDesc.append("DUPLICATE VALUES FOUND: ");
-        for (int i = 0; i < violationMessages.size(); i++) {
-          errorDesc.append(violationMessages.get(i));
-          if (i < violationMessages.size() - 1) {
-            errorDesc.append(" | ");
-          }
-        }
-        return false;
-      }
-
+      uniqueConfigs = assetUniqueFieldConfigurationRepository.findByCompanyIdAndIsUniqueTrue(companyId);
     } catch (Exception e) {
-      log.error("Error validating unique fields during import: {}", e.getMessage(), e);
+      // FIX: don't fail every row just because config lookup itself broke.
+      log.error("Error loading unique field configuration for company {}: {}", companyId, e.getMessage(), e);
+      return true; // fail-open on config load failure
+    }
+
+    if (uniqueConfigs == null || uniqueConfigs.isEmpty()) {
+      log.debug("No unique field configurations found for company: {}", companyId);
+      return true;
+    }
+
+    boolean hasViolations = false;
+    List<String> violationMessages = new ArrayList<>();
+
+    for (AssetUniqueFieldConfiguration config : uniqueConfigs) {
+      String fieldName = config.getFieldName();
+      String fieldType = config.getType();
+      String fieldValue = null;
+      int cellIndex = -1;
+
+      if ("STANDARD".equalsIgnoreCase(fieldType)) {
+        switch (fieldName.toLowerCase()) {
+          case "name":
+            fieldValue = assetsDTO.getName();
+            break;
+          case "serialnumber":
+            fieldValue = assetsDTO.getSerialNumber();
+            break;
+          case "customer":
+            fieldValue = assetsDTO.getCustomer();
+            break;
+          case "category":
+            fieldValue = assetsDTO.getCategory();
+            break;
+          case "location":
+            // FIX: assetsDTO.getLocation() holds "location:<id>" / "bin:<id>",
+            // not the raw CSV text — comparing that against stored unique
+            // values would basically always report a false violation.
+            fieldValue = null;
+            break;
+        }
+      } else if ("EXTRA".equalsIgnoreCase(fieldType)) {
+        fieldValue = extraFieldValues.get(fieldName.toLowerCase());
+      }
+
+      for (Map.Entry<Integer, String> entry : headerMap.entrySet()) {
+        String header = entry.getValue();
+        if (columnMap.get(header) != null && columnMap.get(header).equalsIgnoreCase(fieldName)) {
+          cellIndex = entry.getKey();
+          break;
+        }
+      }
+
+      if (fieldValue != null && !fieldValue.trim().isEmpty()) {
+        boolean isValid;
+        try {
+          isValid = isUniqueFieldValid(companyId, fieldName, fieldValue, fieldType);
+        } catch (Exception e) {
+          // FIX: don't silently kill the row with a blank error reason —
+          // surface the failure into errorDesc and highlight the cell if known.
+          log.error("Error checking uniqueness for field {} (value '{}'): {}",
+                  fieldName, fieldValue, e.getMessage(), e);
+          hasViolations = true;
+          violationMessages.add(fieldName.toUpperCase() + " - could not verify uniqueness (" + e.getMessage() + ")");
+          if (cellIndex >= 0) errorCellMap.put(cellIndex, true);
+          continue;
+        }
+
+        if (!isValid) {
+          hasViolations = true;
+          violationMessages.add(fieldName.toUpperCase() + " (value: '" + fieldValue + "' already exists)");
+          if (cellIndex >= 0) errorCellMap.put(cellIndex, true);
+          log.warn("Unique field validation failed for {}: {}", fieldName, fieldValue);
+        }
+      }
+    }
+
+    if (hasViolations) {
+      if (errorDesc.length() > 0) errorDesc.append(" | ");
+      errorDesc.append("DUPLICATE VALUES FOUND: ");
+      for (int i = 0; i < violationMessages.size(); i++) {
+        errorDesc.append(violationMessages.get(i));
+        if (i < violationMessages.size() - 1) errorDesc.append(" | ");
+      }
       return false;
     }
 
@@ -1948,6 +2036,15 @@ public class AssetAPI {
               String.valueOf(asset.getAssetId()), asset.getName(),
               asset.getCompanyId(), fieldChange);
     });
+  }
+
+  private String resolveBusinessAssetId(String mongoAssetId) {
+    if (mongoAssetId == null || mongoAssetId.isBlank()) {
+      return mongoAssetId;
+    }
+    return assetsRepository.findById(mongoAssetId)
+            .map(asset -> String.valueOf(asset.getAssetId()))
+            .orElse(mongoAssetId);
   }
 }
 

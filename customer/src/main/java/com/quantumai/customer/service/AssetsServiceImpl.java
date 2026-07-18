@@ -13,6 +13,7 @@ import com.quantumai.customer.exception.AssetUniqueFieldViolationException;
 import com.quantumai.customer.exception.CategoryException;
 import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
 import com.quantumai.customer.repository.*;
+import com.quantumai.customer.util.AdvanceFilterUtils;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -557,6 +558,7 @@ public class AssetsServiceImpl implements AssetsService {
       log.info(extraFieldNameOptional.get().getName()+" "+extraFieldNameOptional.get().getCompanyId());
       Optional<AssetShowFields> assetShowFieldsOptional=assetShowFieldsRepository.findByNameAndCompanyId(extraFieldNameOptional.get().getName(),
               extraFieldNameOptional.get().getCompanyId());
+      log.info("AssetShowFields Optional: "+assetShowFieldsOptional.isPresent());
       if(assetShowFieldsOptional.isPresent()){
           AssetShowFields showFields=assetShowFieldsOptional.get();
           long count=assetRepositoryCustom.countActiveAssetsWithExtraField(extraFieldNameOptional.get().getName(),extraFieldNameOptional.get().getCompanyId());
@@ -1260,6 +1262,7 @@ public class AssetsServiceImpl implements AssetsService {
     if (filter instanceof Map) {
       // Cast the filter to a Map
       Map<?, ?> filterMap = (Map<?, ?>) filter;
+      String effectiveSearch = AdvanceFilterUtils.resolveSearchTerm(searchData, filterMap);
 
       // Get all keys
       Set<?> keys = filterMap.keySet();
@@ -1297,7 +1300,7 @@ public class AssetsServiceImpl implements AssetsService {
                           String myValue = map.get(key);
                           String expectedValue = value.toString();
                           String keyString = key.toString();
-                          if (!keyString.equals("companyId")
+                          if (!AdvanceFilterUtils.isFilterMetadataKey(keyString)
                           && !keyString.equals("location")
                               && myValue != null
                               && value != null
@@ -1403,18 +1406,11 @@ public class AssetsServiceImpl implements AssetsService {
       }
 
       System.out.println("TOTAL__LENGTH___" + filteredAssetsWithAllFields.size());
-      String mySearchData;
-      if (searchData.equals("null")) {
-        mySearchData = "";
-      } else {
-        mySearchData = searchData;
-      }
-      System.out.println("==========/////////////////////////================>"+filteredAssetsWithAllFields);
-      if (mySearchData != null && mySearchData != "") {
-        System.out.println("---------->" + mySearchData);
+      log.info("Effective search term: {}", effectiveSearch);
+      if (!effectiveSearch.isEmpty()) {
         filteredAssetsWithAllFields =
             filteredAssetsWithAllFields.stream()
-                .filter((data) -> data.toLowerCase().contains(mySearchData.toLowerCase()))
+                .filter(data -> AdvanceFilterUtils.matchesSearch(data, effectiveSearch))
                 .collect(Collectors.toList());
       }
 //        ObjectMapper objectMapperNew = new ObjectMapper();
@@ -1717,7 +1713,47 @@ public class AssetsServiceImpl implements AssetsService {
           .collect(Collectors.toList());
   }
 
-    @Override
+  @Override
+  public List<AssetCategoryInspection> getAllActiveAssetInspectionByCategory(Long companyId, String category)  {
+    System.out.println("===================>>>" + category);
+    if (category.trim().isEmpty()) {
+      return new ArrayList<>();
+    }
+
+    return assetCategoryInspectionRepository.findByCompanyId(companyId)
+            .stream()
+            .filter(data -> {
+
+              if (data.getStatus() == null || !data.getStatus().equals(StatusEnum.active)) {
+                return false;
+              }
+
+              // Include inspections having no category
+              if (data.getCategoryName() == null|| data.getCategoryName().isEmpty()|| data.getCategoryName().toString().trim().isEmpty()) {
+                return true;
+              }
+
+              return data.getCategoryName().stream()
+                      .anyMatch(categoryObj -> {
+                        try {
+                          if (categoryObj instanceof Map) {
+                            Map<?, ?> categoryMap = (Map<?, ?>) categoryObj;
+                            Object categoryNameValue = categoryMap.get("categoryName");
+                            return categoryNameValue != null &&
+                                    categoryNameValue.toString().equalsIgnoreCase(category);
+                          }
+
+                          return categoryObj != null &&
+                                  categoryObj.toString().equalsIgnoreCase(category);
+                        } catch (Exception e) {
+                          return false;
+                        }
+                      });
+            })
+            .collect(Collectors.toList());
+  }
+
+  @Override
     public List<AssetCategoryInspection> getAllAssetInspection(Long companyId) {
         return assetCategoryInspectionRepository.findByCompanyId(companyId);
     }
@@ -1725,8 +1761,14 @@ public class AssetsServiceImpl implements AssetsService {
     @Override
   public void addAssetInspectionInstance(
       AssetCategoryInspectionInstance assetCategoryInspectionInstance) {
-      if(assetCategoryInspectionInstance.getId()==null||assetCategoryInspectionInstance.getId().isEmpty()) {
+      LocalDateTime now = LocalDateTime.now();
+      boolean isNew = assetCategoryInspectionInstance.getId() == null
+              || assetCategoryInspectionInstance.getId().isEmpty();
+
+      if (isNew) {
         log.info("New AssetCategoryInspectionInstance : {}",assetCategoryInspectionInstance.toString());
+        assetCategoryInspectionInstance.setCreatedAt(now);
+        assetCategoryInspectionInstance.setUpdatedAt(now);
         inspectionInstanceIdGeneratorRepository.findByCompanyId(assetCategoryInspectionInstance.getCompanyId()).ifPresentOrElse((data) -> {
           Long seqId = data.getSeq();
           assetCategoryInspectionInstance.setAssetCategoryInspectionInstanceId(seqId);
@@ -1745,7 +1787,10 @@ public class AssetsServiceImpl implements AssetsService {
         log.info("Update AssetCategoryInspectionInstance : {}",assetCategoryInspectionInstance.toString());
         assetCategoryInspectionInstanceRepository.findById(assetCategoryInspectionInstance.getId()).ifPresent((data)->{
           assetCategoryInspectionInstance.setAssetCategoryInspectionInstanceId(data.getAssetCategoryInspectionInstanceId());
+          assetCategoryInspectionInstance.setCreatedAt(
+                  data.getCreatedAt() != null ? data.getCreatedAt() : now);
         });
+        assetCategoryInspectionInstance.setUpdatedAt(now);
       }
 
     assetCategoryInspectionInstanceRepository.save(assetCategoryInspectionInstance);
@@ -1753,10 +1798,12 @@ public class AssetsServiceImpl implements AssetsService {
 
   @Override
   public void updateAssetInspectionInstance(AssetCategoryInspectionInstance assetCategoryInspection) {
+    LocalDateTime now = LocalDateTime.now();
     assetCategoryInspectionInstanceRepository.findById(assetCategoryInspection.getId()).ifPresent((data)->{
       assetCategoryInspection.setAssetCategoryInspectionInstanceId(data.getAssetCategoryInspectionInstanceId());
+      assetCategoryInspection.setCreatedAt(data.getCreatedAt() != null ? data.getCreatedAt() : now);
     });
-
+    assetCategoryInspection.setUpdatedAt(now);
       assetCategoryInspectionInstanceRepository.save(assetCategoryInspection);
   }
 
@@ -1860,7 +1907,7 @@ public class AssetsServiceImpl implements AssetsService {
         totalCheckedIn++;
       }
     }
-
+    log.info("Total Checked In: {}, Total Checked Out: {}", totalCheckedIn, totalCheckedOut);
     int totalRecords = assetCheckInOutDataList.size();
     int startIndex = (int) (pageNumber * pageSize);
     int endIndex = (int) Math.min(startIndex + pageSize, totalRecords);
@@ -2105,12 +2152,21 @@ public class AssetsServiceImpl implements AssetsService {
                 filter.getPageNumber(), filter.getPageSize(), filter.getCompanyId());
 
         try {
-            // Delegate to custom repository for optimized MongoDB aggregation
+            String searchTerm = AdvanceFilterUtils.normalizeSearch(filter.getSearch());
+            if (!searchTerm.isEmpty()) {
+                filter.setSearch(searchTerm);
+                List<AssetWithCustomFieldsDTO> allFiltered = assetsRepository.findAllWithAdvancedFilter(filter);
+                enrichLocationNames(allFiltered);
+                List<AssetWithCustomFieldsDTO> searched = allFiltered.stream()
+                        .filter(asset -> AdvanceFilterUtils.matchesAssetSearch(asset, searchTerm))
+                        .collect(Collectors.toList());
+                PaginatedAssetResponseDTO response = paginateAssetResults(searched, filter);
+                log.info("Search '{}' matched {} of {} filtered assets", searchTerm, response.getTotalElements(), allFiltered.size());
+                return response;
+            }
+
             PaginatedAssetResponseDTO response = assetsRepository.getAssetsWithAdvancedFilter(filter);
-
-            // Enrich location information if needed
             enrichLocationNames(response.getAssets());
-
             log.info("Successfully fetched {} assets", response.getAssets().size());
             return response;
 
@@ -2126,6 +2182,38 @@ public class AssetsServiceImpl implements AssetsService {
                     false
             );
         }
+    }
+
+    private PaginatedAssetResponseDTO paginateAssetResults(
+            List<AssetWithCustomFieldsDTO> assets, AssetAdvancedFilterDTO filter) {
+        int pageNumber = filter.getPageNumber() != null ? filter.getPageNumber() : 0;
+        int pageSize = filter.getPageSize() != null ? filter.getPageSize() : 10;
+        long totalCount = assets.size();
+        int totalPages = pageSize > 0 ? (int) Math.ceil((double) totalCount / pageSize) : 0;
+        int start = pageNumber * pageSize;
+
+        if (start >= assets.size()) {
+            return new PaginatedAssetResponseDTO(
+                    new ArrayList<>(),
+                    totalCount,
+                    totalPages,
+                    pageNumber,
+                    pageSize,
+                    false,
+                    pageNumber > 0
+            );
+        }
+
+        int end = Math.min(start + pageSize, assets.size());
+        return new PaginatedAssetResponseDTO(
+                new ArrayList<>(assets.subList(start, end)),
+                totalCount,
+                totalPages,
+                pageNumber,
+                pageSize,
+                pageNumber < totalPages - 1,
+                pageNumber > 0
+        );
     }
 
     /**
@@ -2277,11 +2365,20 @@ public class AssetsServiceImpl implements AssetsService {
     try {
       log.info("Saving unique field configuration for company: {} field: {}", configDTO.getCompanyId(), configDTO.getFieldName());
 
-      AssetUniqueFieldConfiguration config = modelMapper.map(configDTO, AssetUniqueFieldConfiguration.class);
-      config.setCreatedAt(LocalDateTime.now().toString());
-      config.setUpdatedAt(LocalDateTime.now().toString());
+      Optional<AssetUniqueFieldConfiguration> existingOpt =
+              assetUniqueFieldConfigurationRepository.findByCompanyIdAndFieldName(
+                      configDTO.getCompanyId(), configDTO.getFieldName());
 
-      deleteUniqueFieldConfigurationByCompanyAndField(configDTO.getCompanyId(), configDTO.getFieldName());
+      AssetUniqueFieldConfiguration config = modelMapper.map(configDTO, AssetUniqueFieldConfiguration.class);
+      String now = LocalDateTime.now().toString();
+      if (existingOpt.isPresent()) {
+        AssetUniqueFieldConfiguration existing = existingOpt.get();
+        config.setId(existing.getId());
+        config.setCreatedAt(existing.getCreatedAt());
+      } else {
+        config.setCreatedAt(now);
+      }
+      config.setUpdatedAt(now);
 
       AssetUniqueFieldConfiguration savedConfig = assetUniqueFieldConfigurationRepository.save(config);
       log.info("Unique field configuration saved successfully with ID: {}", savedConfig.getId());

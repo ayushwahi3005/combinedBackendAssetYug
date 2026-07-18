@@ -186,6 +186,12 @@ public class CustomerAPI {
   public ResponseEntity<CompanyInformation> addCompanyInformation(
           @RequestBody CompanyInformation companyInformation) throws Exception {
     customerService.addCompanyInformation(companyInformation);
+    if (companyInformation.getId() != null) {
+      auditService.logCreate(AuditModule.COMPANY, String.valueOf(companyInformation.getId()),
+              companyInformation.getCompanyName(), companyInformation.getId(),
+              Map.of("companyName", companyInformation.getCompanyName() != null
+                      ? companyInformation.getCompanyName() : ""));
+    }
     return ResponseEntity.ok(companyInformation);
   }
 
@@ -195,7 +201,17 @@ public class CustomerAPI {
   public ResponseEntity<CompanyInformation> updateCompanyInformation(
           @RequestBody CompanyInformation companyInformation) throws Exception {
     log.info("Updating company information: {}", companyInformation);
+    CompanyInformation beforeState = null;
+    if (companyInformation.getId() != null) {
+      beforeState = customerService.getcompanyInformation(companyInformation.getId());
+    }
     customerService.addCompanyInformation(companyInformation);
+    CompanyInformation afterState = customerService.getcompanyInformation(companyInformation.getId());
+    if (beforeState != null && afterState != null) {
+      auditService.logUpdateWithComparison(AuditModule.COMPANY,
+              String.valueOf(afterState.getId()), afterState.getCompanyName(),
+              afterState.getId(), beforeState, afterState);
+    }
     return ResponseEntity.ok(companyInformation);
   }
 

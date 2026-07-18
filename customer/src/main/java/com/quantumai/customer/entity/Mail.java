@@ -1,5 +1,8 @@
 package com.quantumai.customer.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.quantumai.customer.dto.CustomRoleDTO;
 import java.util.Collection;
 import lombok.Data;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -8,6 +11,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 @Data
 @Document
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Mail implements UserDetails {
 
   private String firstName;
@@ -16,7 +20,9 @@ public class Mail implements UserDetails {
   private String message;
   private String email;
   private String from;
-  private String role;
+
+  @JsonDeserialize(using = MailRoleDeserializer.class)
+  private CustomRoleDTO role;
 
   @Override
   public Collection<? extends GrantedAuthority> getAuthorities() {

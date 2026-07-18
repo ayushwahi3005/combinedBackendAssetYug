@@ -16,6 +16,7 @@ import com.quantumai.customer.exception.EmailAlreadyExistsException;
 import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
 import com.quantumai.customer.exception.ExtraFieldDeletionException;
 import com.quantumai.customer.repository.*;
+import com.quantumai.customer.util.AdvanceFilterUtils;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -169,6 +170,23 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
               companyCustomerDTO.getCompanyCustomerId();
               companyCustomerDTOList.add(companyCustomerDTO);
             });
+    return companyCustomerDTOList;
+  }
+
+  @Override
+  public List<CompanyCustomerDTO> getActiveAllCustomer(Long companyId) {
+    List<CompanyCustomer> companyCustomerList = companyCustomerRepository.findByCompanyId(companyId);
+//    System.out.println(
+//        "-----------------------my list---------------->" + companyCustomerList.size());
+    List<CompanyCustomerDTO> companyCustomerDTOList = new ArrayList<>();
+    companyCustomerList.stream().filter((data)->data.getStatus().equalsIgnoreCase("active"))
+            .forEach(
+                    (x) -> {
+                      CompanyCustomerDTO companyCustomerDTO = modelMapper.map(x, CompanyCustomerDTO.class);
+                      System.out.println(companyCustomerDTO.getCompanyCustomerId());
+                      companyCustomerDTO.getCompanyCustomerId();
+                      companyCustomerDTOList.add(companyCustomerDTO);
+                    });
     return companyCustomerDTOList;
   }
 
@@ -836,6 +854,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
     if (filter instanceof Map) {
       // Cast the filter to a Map
       Map<?, ?> filterMap = (Map<?, ?>) filter;
+      String effectiveSearch = AdvanceFilterUtils.resolveSearchTerm(searchData, filterMap);
 
       // Get all keys
       Set<?> keys = filterMap.keySet();
@@ -873,7 +892,9 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
                       String myValue = map.get(key);
                       String expectedValue = value.toString();
                       String keyString = key.toString();
-                      if (!keyString.equals("companyId") && value != null && !value.toString().isEmpty()) {
+                      if (!AdvanceFilterUtils.isFilterMetadataKey(keyString)
+                          && value != null
+                          && !value.toString().isEmpty()) {
                         myValue = myValue != null ? myValue.toLowerCase() : "";
                         expectedValue = expectedValue.toLowerCase();
                         
@@ -943,10 +964,9 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
       // System.out.println("total3->"+filteredAssetsWithAllFields.size()+"
       // "+searchData.length()+" "+searchData.charAt(1));
 
-      if (!searchData.isEmpty() && searchData != "") {
-        System.out.println("---------->" + searchData);
+      if (!effectiveSearch.isEmpty()) {
         filteredAssetsWithAllFields = filteredAssetsWithAllFields.stream()
-            .filter((data) -> data.toLowerCase().contains(searchData.toLowerCase()))
+            .filter(data -> AdvanceFilterUtils.matchesSearch(data, effectiveSearch))
             .collect(Collectors.toList());
       }
       System.out.println("total4->" + filteredAssetsWithAllFields.size());
