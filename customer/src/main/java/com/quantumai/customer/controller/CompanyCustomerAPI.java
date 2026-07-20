@@ -1196,55 +1196,42 @@ public class CompanyCustomerAPI {
                   extraFieldsDTO.setCompanyId(companyId);
                   log.info("Mandatory Fields "+mandatoryFieldsMap.toString());
                   log.info("Mandatory Fields Map Check for {} : {}", companyCustomerExtraFieldName.getName(), mandatoryFieldsMap.containsKey(companyCustomerExtraFieldName.getName().toLowerCase()));
-                  if(mandatoryFieldsMap.containsKey(companyCustomerExtraFieldName.getName().toLowerCase())){
-                    if(value.trim().isEmpty()){
-                      errorDesc.append("ERROR WITH ").append(companyCustomerExtraFieldName.getName().toUpperCase()).append(" MANDATORY WHILE ADDING IN CUSTOMER");
-                      errorFlag = 1;
+                  if(mandatoryFieldsMap.containsKey(companyCustomerExtraFieldName.getName().toLowerCase())
+                      && CustomerImportUtils.isBlank(value)){
+                    errorDesc.append("ERROR WITH ").append(companyCustomerExtraFieldName.getName().toUpperCase()).append(" MANDATORY WHILE ADDING IN CUSTOMER");
+                    errorFlag = 1;
+                    break;
+                  }
+                  if (companyCustomerExtraFieldName.getType().equals("number")) {
+                    if (CustomerImportUtils.isBlank(value)) {
                       break;
                     }
+                    try {
+                      int val = Integer.parseInt(value.trim());
+                      extraFieldsDTO.setValue(Integer.toString(val));
+                    } catch (Exception e) {
+                      errorFlag = 1;
+                      if (!errorDesc.isEmpty()) {
+                        errorDesc.append(", ");
+                      }
+                      errorDesc.append("ERROR WHILE ADDING IN ").append(companyCustomerExtraFieldName.getName().toUpperCase());
+                    }
                   }
-                  else{
-                    if (companyCustomerExtraFieldName.getType().equals("number")) {
-                      if (CustomerImportUtils.isBlank(value)) {
-                        if (!mandatoryFieldsMap.containsKey(companyCustomerExtraFieldName.getName().toLowerCase())) {
-                          break;
-                        }
-                        errorDesc.append("ERROR WITH ").append(companyCustomerExtraFieldName.getName().toUpperCase()).append(" MANDATORY WHILE ADDING IN CUSTOMER");
-                        errorFlag = 1;
-                        break;
-                      }
-                      try {
-                        int val = Integer.parseInt(value.trim());
-                        extraFieldsDTO.setValue(Integer.toString(val));
-                      } catch (Exception e) {
-                        errorFlag = 1;
-                        if (!errorDesc.isEmpty()) {
-                          errorDesc.append(", ");
-                        }
-                        errorDesc.append("ERROR WHILE ADDING IN ").append(companyCustomerExtraFieldName.getName().toUpperCase());
-                      }
+                  else if (companyCustomerExtraFieldName.getType().equals("date")) {
+                    if (CustomerImportUtils.isBlank(value)) {
+                      break;
                     }
-                    else if (companyCustomerExtraFieldName.getType().equals("date")) {
-                      if (CustomerImportUtils.isBlank(value)) {
-                        if (!mandatoryFieldsMap.containsKey(companyCustomerExtraFieldName.getName().toLowerCase())) {
-                          break;
-                        }
-                        errorDesc.append("ERROR WITH ").append(companyCustomerExtraFieldName.getName().toUpperCase()).append(" MANDATORY WHILE ADDING IN CUSTOMER");
-                        errorFlag = 1;
-                        break;
+                    try {
+                      extraFieldsDTO.setValue(CustomerImportUtils.parseImportDate(value));
+                    } catch (Exception e) {
+                      errorFlag = 1;
+                      if (!errorDesc.isEmpty()) {
+                        errorDesc.append(", ");
                       }
-                      try {
-                        extraFieldsDTO.setValue(CustomerImportUtils.parseImportDate(value));
-                      } catch (Exception e) {
-                        errorFlag = 1;
-                        if (!errorDesc.isEmpty()) {
-                          errorDesc.append(", ");
-                        }
-                        errorDesc.append("ERROR WHILE ADDING IN ").append(companyCustomerExtraFieldName.getName().toUpperCase());
-                      }
-                    } else {
-                      extraFieldsDTO.setValue(value);
+                      errorDesc.append("ERROR WHILE ADDING IN ").append(companyCustomerExtraFieldName.getName().toUpperCase());
                     }
+                  } else {
+                    extraFieldsDTO.setValue(value);
                   }
 
                   if (errorFlag == 0) {
