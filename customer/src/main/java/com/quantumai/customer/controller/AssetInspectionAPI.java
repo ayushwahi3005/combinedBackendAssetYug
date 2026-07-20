@@ -113,7 +113,7 @@ public class AssetInspectionAPI {
         public ResponseEntity<byte[]> inspectionDetailedExport(
                 @PathVariable Long companyId,
                 @PathVariable String assetId) throws Exception {
-                return ResponseEntity.ok(assetInspectionService.exportInspectionExcel(companyId, assetId));
+                return ResponseEntity.ok(assetInspectionService.exportInspectionDetailedExcel(companyId, assetId));
         }
 
 

@@ -297,7 +297,7 @@ public class UserServiceImpl implements UserService {
         Long userId=existingUser.getUserId();
         log.info("Existing user details {},New Details {}",existingUser.toString(),usersDTO.toString());
         // If this is a password update (activating the account)
-        if ((( usersDTO.getStatus().equals(StatusEnum.inActive)))||(existingUser.getStatus() .equals( StatusEnum.inActive) && usersDTO.getStatus().equals(StatusEnum.active)&& userActivationService.canActivateNewUser(existingUser.getCompanyId()))) {
+        if ((( usersDTO.getStatus().equals(UserStatusEnum.inActive)))||(existingUser.getStatus() .equals( UserStatusEnum.inActive) && usersDTO.getStatus().equals(UserStatusEnum.active)&& userActivationService.canActivateNewUser(existingUser.getCompanyId()))) {
             // Encode the new password
 //            usersDTO.setPassword(passwordEncoder.encode(usersDTO.getPassword()));
             // Set status to active when password is set

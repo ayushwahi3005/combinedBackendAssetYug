@@ -14,6 +14,7 @@ import com.quantumai.customer.exception.CategoryException;
 import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
 import com.quantumai.customer.repository.*;
 import com.quantumai.customer.util.AdvanceFilterUtils;
+import com.quantumai.customer.util.LocationHierarchyUtil;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -92,6 +93,8 @@ public class AssetsServiceImpl implements AssetsService {
   private AssetRepositoryCustom assetRepositoryCustom;
 
   @Autowired InspectionInstanceIdGeneratorRepository inspectionInstanceIdGeneratorRepository;
+
+  @Autowired private LocationHierarchyUtil locationHierarchyUtil;
 
   @Autowired
   private  InspectionTemplateIdGeneratorRepository inspectionTemplateIdGeneratorRepository;
@@ -299,61 +302,21 @@ public class AssetsServiceImpl implements AssetsService {
     if (asset.getLocation()!=null&&asset.getLocation().startsWith("bin")) {
       Optional<Bin> binOptional = binRepository.findById(asset.getLocation().substring(4));
       binOptional.ifPresent(bin -> {
-        // ✅ Get full hierarchy for bin: Location Hierarchy -> Bin
-        if (bin.getLocationId() != null) {
-          String hierarchyPath = buildLocationHierarchyPath(bin.getLocationId());
-          String fullPath = hierarchyPath + " -> " + bin.getBinNumber();
-          assetDTO.setLocation(fullPath);
-          assetDTO.setLocationName(fullPath);
-          log.info("Bin found with full hierarchy path: {}", fullPath);
-        } else {
-          assetDTO.setLocation(bin.getBinNumber());
-        }
+        String fullPath = locationHierarchyUtil.resolveAssetLocationName(asset);
+        assetDTO.setLocation(fullPath);
+        assetDTO.setLocationName(fullPath);
+        log.info("Bin found with full hierarchy path: {}", fullPath);
       });
 
     } else if (asset.getLocation()!=null&&asset.getLocation().startsWith("location")) {
-      Optional<Location> locationOptional =
-              locationRepository.findById(asset.getLocation().substring(9));
-      locationOptional.ifPresent(loc -> {
-        // ✅ Get full hierarchy for location: Parent -> Parent -> Current
-        String hierarchyPath = buildLocationHierarchyPath(loc);
-        assetDTO.setLocation(hierarchyPath);
-        assetDTO.setLocationName(hierarchyPath);
-        log.info("Location found with full hierarchy path: {}", hierarchyPath);
-      });
+      String hierarchyPath = locationHierarchyUtil.resolveAssetLocationName(asset);
+      assetDTO.setLocation(hierarchyPath);
+      assetDTO.setLocationName(hierarchyPath);
+      log.info("Location found with full hierarchy path: {}", hierarchyPath);
     }
 
     return assetDTO;
 
-  }
-
-  /**
-   * ✅ Build the full hierarchical path for a location
-   * Example: "Building A -> Floor 2 -> Conference Room"
-   * Recursively gets parent locations and builds the complete path
-   */
-  private String buildLocationHierarchyPath(Location location) {
-    if (location == null) {
-      return "";
-    }
-
-    // ✅ If location has no parent, return just its name
-    if (location.getParentLocation() == null || location.getParentLocation().isEmpty()) {
-      return location.getName();
-    }
-
-    // ✅ Recursively build hierarchy by getting parent location
-    Optional<Location> parentLocationOptional = locationRepository.findById(location.getParentLocation());
-
-    if (parentLocationOptional.isPresent()) {
-      Location parentLocation = parentLocationOptional.get();
-      // ✅ Build: ParentHierarchy -> CurrentLocation
-      String parentPath = buildLocationHierarchyPath(parentLocation);
-      return parentPath + " -> " + location.getName();
-    } else {
-      // ✅ If parent not found, just return current location name
-      return location.getName();
-    }
   }
 
   private static final Object idGeneratorLock = new Object();
@@ -1473,9 +1436,9 @@ public class AssetsServiceImpl implements AssetsService {
                   checkInOutRepository.findByAssetId(data.getId());
               if (assetCheckInOutDTO.isPresent()
                   && assetCheckInOutDTO.get().getStatus().equals("Checked Out")) {
-                checkIn.getAndSet(checkIn.get() + 1);
-              } else {
                 checkOut.getAndSet(checkOut.get() + 1);
+              } else {
+                checkIn.getAndSet(checkIn.get() + 1);
               }
               //			assetCheckInOutDTOmyList.forEach((checkList)->{
               //

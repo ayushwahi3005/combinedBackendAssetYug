@@ -9,6 +9,7 @@ import com.quantumai.customer.entity.Assets;
 import com.quantumai.customer.entity.CompanyCustomer;
 import com.quantumai.customer.entity.enums.InspectionInstanceStatus;
 import com.quantumai.customer.repository.AssetCategoryInspectionInstanceRepositoryCustom;
+import com.quantumai.customer.util.LocationHierarchyUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
@@ -31,6 +32,9 @@ public class AssetCategoryInspectionInstanceRepositoryImpl implements AssetCateg
 
     @Autowired
     private MongoTemplate mongoTemplate;
+
+    @Autowired
+    private LocationHierarchyUtil locationHierarchyUtil;
 
     @Override
     public InspectionStatusCountDTO getStatusCountByCompanyId(Long companyId) {
@@ -349,7 +353,7 @@ public class AssetCategoryInspectionInstanceRepositoryImpl implements AssetCateg
             if (asset != null) {
                 detail.setAssetName(asset.getName());
                 detail.setAssetCategory(asset.getCategory());
-                detail.setAssetLocation(asset.getLocation());
+                detail.setAssetLocation(locationHierarchyUtil.resolveAssetLocationName(asset));
                 detail.setSerialNumber(asset.getSerialNumber());
                 detail.setAssetBusinessId(asset.getAssetId());
                 detail.setCustomerId(asset.getCustomerId());

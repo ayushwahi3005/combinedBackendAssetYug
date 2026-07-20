@@ -20,4 +20,7 @@ public class ImportHistory {
   private String message;
   private String executedBy;
   private Long companyId;
+  private Boolean hasErrorReport;
+  private String errorReportFileName;
+  private byte[] errorReportFile;
 }

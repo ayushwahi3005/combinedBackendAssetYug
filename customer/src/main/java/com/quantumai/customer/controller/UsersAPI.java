@@ -23,6 +23,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+
+import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -42,6 +44,7 @@ import org.springframework.web.client.RestTemplate;
         },
         allowedHeaders = {"device-id", "Content-Type", "Authorization"}
 )
+@Slf4j
 @Tag(name = "Users", description = "Users Management API")
 public class UsersAPI {
   private RestTemplate restTemplate = new RestTemplate();
@@ -122,6 +125,7 @@ public class UsersAPI {
   @PostMapping("/send/{companyId}")
   public void sendEmail(@PathVariable Long companyId, @RequestBody Mail mail)
           throws NoSubscriptionError, UserAccessException {
+    log.info("Mail Details: {}", mail.toString());
     checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     Optional<Subscription> subscriptionOptional =
         subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE);
@@ -287,6 +291,8 @@ public class UsersAPI {
         throw new NoSubscriptionError("No Active Subscription");
       }
     }
+    log.info("Updating user status for userId: {}, email: {}, new status: {}",
+            usersDTO.getUserId(), usersDTO.getEmail(), usersDTO.getStatus());
     userService.updateUserStatus(usersDTO);
     
     // Fetch updated state for audit comparison

@@ -17,6 +17,7 @@ import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
 import com.quantumai.customer.exception.ExtraFieldDeletionException;
 import com.quantumai.customer.repository.*;
 import com.quantumai.customer.util.AdvanceFilterUtils;
+import com.quantumai.customer.util.PhoneUtils;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -133,6 +134,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
     }
 
     companyCustomer.setUpdatedAt(LocalDateTime.now().toString());
+    normalizeCustomerPhone(companyCustomer);
 
       if(companyCustomer.getEmail()!=null&&!companyCustomer.getEmail().trim().isEmpty()&&companyCustomerRepository.findByEmailAndCompanyId(companyCustomer.getEmail(),companyCustomer.getCompanyId()).isPresent()){
         throw new EmailAlreadyExistsException("User With Email Already Present");
@@ -204,6 +206,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
 
     // Always update timestamp
     companyCustomer.setUpdatedAt(LocalDateTime.now().toString());
+    normalizeCustomerPhone(companyCustomer);
     if(companyCustomer.getEmail()!=null&&!companyCustomer.getEmail().isEmpty()){
     Optional<CompanyCustomer> customer=companyCustomerRepository.findByEmailAndCompanyId(companyCustomer.getEmail(),companyCustomer.getCompanyId());
         if(customer.isPresent()&&!customer.get().getId().equals(companyCustomer.getId())){
@@ -1110,7 +1113,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
     com.quantumai.customer.dto.CompanyCustomerTemplateFieldsDTO dto = new com.quantumai.customer.dto.CompanyCustomerTemplateFieldsDTO();
     // Removed 'Apartment' from standard fields
     List<String> standard = Arrays.asList(
-        "Name","Email","Phone","Address","City","State","Country","ZipCode","Category","Status"
+        "Name","Email","Phone","Address","City","State","Country","Zip Code","Category","Status"
     );
     dto.setStandardFields(standard);
     List<CompanyCustomerExtraFieldName> extraFieldNames = extraFieldNameRepository.findByCompanyId(companyId);
@@ -1373,4 +1376,10 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
 //        companyCustomerCategoryRepository.countByCompanyIdAndcompanyCustomerCategoryId(companyId,id);
 //        return 0;
 //    }
+
+  private void normalizeCustomerPhone(CompanyCustomer companyCustomer) {
+    if (companyCustomer.getPhone() != null && !companyCustomer.getPhone().trim().isEmpty()) {
+      companyCustomer.setPhone(PhoneUtils.normalizeForStorage(companyCustomer.getPhone()));
+    }
+  }
  }

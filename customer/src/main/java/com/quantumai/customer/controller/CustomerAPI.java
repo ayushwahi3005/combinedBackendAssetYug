@@ -13,6 +13,7 @@ import com.quantumai.customer.entity.enums.AuditAction;
 import com.quantumai.customer.entity.enums.AuditModule;
 import com.quantumai.customer.exception.*;
 import com.quantumai.customer.repository.CustomerRepository;
+import com.quantumai.customer.repository.ImportHistoryRepository;
 import com.quantumai.customer.repository.BinRepository;
 import com.quantumai.customer.repository.CustomRoleRepository;
 import com.quantumai.customer.repository.LocationRepository;
@@ -27,6 +28,8 @@ import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -51,6 +54,7 @@ public class CustomerAPI {
   @Autowired private CustomRoleRepository customRoleRepository;
   @Autowired private LocationRepository locationRepository;
   @Autowired private BinRepository binRepository;
+  @Autowired private ImportHistoryRepository importHistoryRepository;
 
   // ─── Public endpoints (no auth needed) ───────────────────────────────────
   // These are called before login so cannot require authentication
@@ -474,6 +478,27 @@ public class CustomerAPI {
 
   public void updateImportHistory(@RequestBody ImportHistory importHistory) {
     customerService.updateImportHistory(importHistory);
+  }
+
+  @Operation(summary = "Download Import Error Report", description = "Download failed import rows with error messages")
+  @GetMapping("/downloadImportErrorReport/{companyId}/{importHistoryId}")
+  @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'imports')")
+  public ResponseEntity<byte[]> downloadImportErrorReport(
+          @PathVariable Long companyId,
+          @PathVariable String importHistoryId) {
+    return importHistoryRepository.findById(importHistoryId)
+            .filter(history -> companyId.equals(history.getCompanyId()))
+            .filter(history -> history.getErrorReportFile() != null && history.getErrorReportFile().length > 0)
+            .map(history -> {
+              String fileName = history.getErrorReportFileName() != null
+                      ? history.getErrorReportFileName()
+                      : "ImportErrors.xlsx";
+              return ResponseEntity.ok()
+                      .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                      .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                      .body(history.getErrorReportFile());
+            })
+            .orElse(ResponseEntity.notFound().build());
   }
 
   // ─── Card & Stripe ────────────────────────────────────────────────────────
