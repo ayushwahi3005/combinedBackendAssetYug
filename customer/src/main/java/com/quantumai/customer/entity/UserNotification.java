@@ -15,7 +15,6 @@ import java.time.LocalDateTime;
 @Data
 @Document
 @NoArgsConstructor
-@AllArgsConstructor
 public class UserNotification {
 
     @Id
@@ -29,5 +28,19 @@ public class UserNotification {
 
     @DBRef
     private Notification notification;
+    private String createdBy;
+    private String lastUpdatedBy;
 
+    public UserNotification(String id, String userId, String notificationId, Long companyId,
+                            boolean isRead, LocalDateTime readAt, LocalDateTime deliveredAt,
+                            Notification notification) {
+        this.id = id;
+        this.userId = userId;
+        this.notificationId = notificationId;
+        this.companyId = companyId;
+        this.isRead = isRead;
+        this.readAt = readAt;
+        this.deliveredAt = deliveredAt;
+        this.notification = notification;
+    }
 }

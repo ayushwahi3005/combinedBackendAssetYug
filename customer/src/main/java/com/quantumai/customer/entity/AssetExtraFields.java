@@ -13,4 +13,7 @@ public class AssetExtraFields {
   private String assetId;
   private String type;
   private Long companyId;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

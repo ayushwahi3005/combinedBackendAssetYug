@@ -212,8 +212,8 @@ public class AssetInspectionServiceImpl implements AssetInspectionService {
                 .filter(i -> i.getStatus() == InspectionInstanceStatus.COMPLETED)
                 .count();
 
-        System.out.println("Total instances: " + instances.size());
-        System.out.println("Completed instances: " + completedCount);
+//        System.out.println("Total instances: " + instances.size());
+//        System.out.println("Completed instances: " + completedCount);
 
         List<InspectionCompletedCountPerDayDTO> result =
                 inspectionsPerDay.entrySet()

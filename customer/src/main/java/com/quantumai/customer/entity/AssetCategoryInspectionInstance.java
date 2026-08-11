@@ -30,4 +30,6 @@ public class AssetCategoryInspectionInstance {
   private List<InspectionTemplateResult> inspectionTemplates;
 
   private List<SelectedItem> selectedItemList;
+
+  private String lastUpdatedBy;
 }

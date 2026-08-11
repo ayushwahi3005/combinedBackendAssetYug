@@ -108,8 +108,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
       } else {
-        System.out.println("Customer HIT ====>");
-        log.info("User Email: {}", userEmail);
+//        System.out.println("Customer HIT ====>");
+//        log.info("User Email: {}", userEmail);
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
           String deviceId = request.getHeader("device-id");
           String mobileId = request.getHeader("mobile-id");
@@ -156,11 +156,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 //            deviceMismatch,
 //            mobileMismatch,
 //            sessionExpiredDevice);
-          //      if ((deviceMismatch && mobileMismatch) || sessionExpired) {
-          //        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-          //        response.getWriter().write("Token is invalid for the current device.");
-          //        return;
-          //      }
+
+//          log.info(
+//                  "DeviceId: {} currentDeviceId: {} currentMobileId: {}",
+//                  deviceId,
+//                  currentDeviceId,
+//                  currentMobileId);
+
           if ((deviceId != null && !Objects.equals(currentDeviceId, deviceId))
                   || (sessionExpiredDevice)) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);

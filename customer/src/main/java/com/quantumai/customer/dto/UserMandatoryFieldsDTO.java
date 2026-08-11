@@ -8,4 +8,7 @@ public class UserMandatoryFieldsDTO {
   private String email;
   private String type;
   private Long companyId;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

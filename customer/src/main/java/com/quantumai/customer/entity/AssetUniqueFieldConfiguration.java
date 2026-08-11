@@ -21,4 +21,7 @@ public class AssetUniqueFieldConfiguration {
   private String type; // STANDARD or EXTRA
   private String createdAt;
   private String updatedAt;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

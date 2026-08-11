@@ -14,4 +14,7 @@ public class ActiveSessionMobile {
   private String mobileId;
   private String userAgent;
   private LocalDateTime lastActivityTime;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

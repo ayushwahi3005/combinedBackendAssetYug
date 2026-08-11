@@ -9,4 +9,7 @@ public class CategoryDTO {
   private String name;
   private String status;
   private Long companyId;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

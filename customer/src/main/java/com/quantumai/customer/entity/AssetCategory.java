@@ -13,4 +13,7 @@ public class AssetCategory {
   private String name;
   private String status;
   private Long companyId;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

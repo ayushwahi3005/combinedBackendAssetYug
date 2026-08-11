@@ -15,6 +15,8 @@ public interface CompanyCustomerCategoryRepository
 
   public Optional<CompanyCustomerCategory> findByNameAndCompanyId(String name,Long companyId);
 
+  public Optional<CompanyCustomerCategory> findByNameIgnoreCaseAndCompanyId(String name,Long companyId);
+
   public void deleteByCompanyId(Long companyId);
 
 }

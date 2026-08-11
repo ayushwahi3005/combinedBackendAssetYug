@@ -22,4 +22,7 @@ public class CustomRoleDTO {
   private CustomRoleType inventory;
   private CustomRoleType inspections;
   private Long companyId;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

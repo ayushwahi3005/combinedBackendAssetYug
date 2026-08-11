@@ -11,4 +11,7 @@ public class CompanyCustomerFileDTO {
   private String fileName;
   private byte[] file;
   private LocalDateTime uploadDateTime;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

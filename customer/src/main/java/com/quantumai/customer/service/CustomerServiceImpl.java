@@ -176,7 +176,7 @@ public class CustomerServiceImpl implements CustomerService {
     if (isBlacklisted) {
       baseResponseDTO.setMessage("Account created. You have previously used a free trial. Please subscribe to a plan to use the application.");
     } else {
-      baseResponseDTO.setMessage("User Successfully Created with 7-day free trial");
+      baseResponseDTO.setMessage("User Successfully Created with 3-day free trial");
     }
 
     // Admin admin = new Admin();
@@ -375,15 +375,20 @@ public class CustomerServiceImpl implements CustomerService {
 
   @Override
   public AuthenticationResponseDTO getLoginToken(String email, String password, String deviceId)
-      throws WrongCredentialException, UserNotFound {
+      throws WrongCredentialException, UserNotFound,UserInActiveException {
     // TODO Auto-generated method stub
     Optional<Customer> customer = customerRepository.findByEmail(email);
-    System.out.println("////" + customer);
+    Optional<Users> optionalUsers=usersRepository.findByEmail(email);
+//    System.out.println("////" + customer);
     //    log.info("Pswd {} {}",passwordEncoder.encode(password),customer.get().getPassword()
     //    );
     if (customer.isEmpty()) {
       throw new UserNotFound("User Not Associated to any company");
-    } else if (passwordEncoder.matches(password, customer.get().getPassword())) {
+    }
+    else if(optionalUsers.isPresent()&&optionalUsers.get().getStatus()==UserStatusEnum.inActive){
+      throw new UserInActiveException("User is inactive");
+    }
+   else if (passwordEncoder.matches(password, customer.get().getPassword())) {
 
       var jwtToken = jwtService.generateToken(customer.get(), deviceId);
       userService.updateLastLogin(customer.get().getEmail(),customer.get().getCompanyId());
@@ -954,6 +959,21 @@ public class CustomerServiceImpl implements CustomerService {
   @Override
   public void deleteCardDetails(String id) {
     customerStripeDetailsRepository.deleteById(id);
+  }
+
+  @Override
+  public void cancelImportHistory(Long companyId, String importHistoryId) throws Exception {
+    Optional<ImportHistory> optionalImportHistory =
+        importHistoryRepository.findById(importHistoryId);
+    if (optionalImportHistory.isEmpty()) {
+      throw new Exception("Import History Not Found");
+    }
+    ImportHistory importHistory = optionalImportHistory.get();
+    if (!importHistory.getCompanyId().equals(companyId)) {
+      throw new Exception("Import History Not Found for this company");
+    }
+    importHistory.setStatus("Cancelled");
+    importHistoryRepository.save(importHistory);
   }
 
   @Override

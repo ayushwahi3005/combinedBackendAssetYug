@@ -20,4 +20,7 @@ public class SubscriptionDTO {
   private String stripeSubscriptionId;
   private String stripeCustomerId;
   private String subscriptionName;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

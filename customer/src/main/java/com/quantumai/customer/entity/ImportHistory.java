@@ -23,4 +23,7 @@ public class ImportHistory {
   private Boolean hasErrorReport;
   private String errorReportFileName;
   private byte[] errorReportFile;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

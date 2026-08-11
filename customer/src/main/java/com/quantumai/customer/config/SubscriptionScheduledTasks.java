@@ -91,7 +91,7 @@ public class SubscriptionScheduledTasks {
                 "The trial period for your account has ended. Please note that we will retain your data for the next "
                         + purgeExpiryDays + " days. During this time, you may choose to upgrade your plan to continue accessing your data and services without interruption.\n"
                         + "\n"
-                        + "If no action is taken within one week, the data associated with your trial account may be permanently deleted.\n"
+                        + "If no action is taken within 3 days, the data associated with your trial account may be permanently deleted.\n"
                         + "\n"
                         + "If you have any questions or need assistance, feel free to reach out.",
                 user.getFirstName()));

@@ -34,7 +34,7 @@ public class TrialService {
      * If the email is blacklisted (previously had a trial and account was deleted),
      * no trial is granted — user must subscribe to a plan.
      */
-    int trial_period=7;
+    int trial_period=3;
     public void initializeTrial(String customerEmail, Long companyId) {
         // Check if user previously had a trial and was blacklisted
         if (blacklistedEmailRepository.existsByEmail(customerEmail)) {
@@ -167,7 +167,7 @@ public class TrialService {
         // Send expiration notification
         Notification notification = new Notification();
         notification.setTitle("Free Trial Expired");
-        notification.setMessage("Your 7-day free trial has expired. Please upgrade to a paid plan to continue using our services.");
+        notification.setMessage(String.format("Your %d-day free trial has expired. Please upgrade to a paid plan to continue using our services.", trial_period));
         notification.setAlertType("TRIAL_EXPIRED");
         notification.setCreatedAt(LocalDateTime.now());
         

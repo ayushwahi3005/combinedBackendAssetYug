@@ -13,6 +13,8 @@ public interface AssetCategoryRepository extends MongoRepository<AssetCategory, 
 
   public Optional<AssetCategory> findByNameAndCompanyId(String name,Long companyId);
 
+  public Optional<AssetCategory> findByNameIgnoreCaseAndCompanyId(String name,Long companyId);
+
   public List<AssetCategory> findByCompanyIdAndStatus(Long companyId, String status);
 
   public void deleteByCompanyId(Long companyId);

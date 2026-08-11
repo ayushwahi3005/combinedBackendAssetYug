@@ -14,4 +14,7 @@ public class CustomerDTO {
   private String password;
   private Long companyId;
   private String role;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

@@ -54,7 +54,7 @@ public class JwtAdminAuthenticationFilter extends OncePerRequestFilter {
       res.setStatus(HttpServletResponse.SC_OK);
     } else {
       final String authHeader = request.getHeader("Authorization");
-      System.out.println("------------------------>" + authHeader);
+//      System.out.println("------------------------>" + authHeader);
       final String jwt;
       final String userEmail;
       if (authHeader == null || !authHeader.startsWith("Bearer ")) {

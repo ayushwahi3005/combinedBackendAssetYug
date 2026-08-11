@@ -29,7 +29,7 @@ public interface CustomerService {
       AuthenticationRequestDTO authenticationRequestDTO, String deviceId) throws Exception;
 
   public AuthenticationResponseDTO getLoginToken(String email, String password, String deviceId)
-      throws WrongCredentialException, UserNotFound;
+      throws WrongCredentialException, UserNotFound,UserInActiveException;
 
   public void addCompanyInformation(CompanyInformation companyInformation) throws Exception;
 
@@ -88,6 +88,8 @@ public interface CustomerService {
   public CustomerStripeDetails getCardDetails(Long companyId);
 
   public void deleteCardDetails(String id);
+
+  public void cancelImportHistory(Long companyId, String importHistoryId) throws Exception;
 
   Page<ImportHistoryDTO> getImportHistoryListWithDateFilter(Long companyId, int pageNumber, int pageSize, String startDate, String endDate);
 }

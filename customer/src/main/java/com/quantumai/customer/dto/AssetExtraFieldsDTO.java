@@ -13,4 +13,7 @@ public class AssetExtraFieldsDTO {
   private String value;
   private String assetId;
   private String type;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

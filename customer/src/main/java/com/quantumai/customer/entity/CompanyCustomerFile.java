@@ -17,4 +17,7 @@ public class CompanyCustomerFile {
   private byte[] file;
   private LocalDateTime uploadDateTime;
     private Long companyId;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

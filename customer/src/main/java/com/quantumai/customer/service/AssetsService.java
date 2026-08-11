@@ -54,6 +54,8 @@ public interface AssetsService {
 
   public List<AssetFileDTO> getAssetFile(String assetId);
 
+  PaginatedResultDTO<AssetFileDTO> getAssetFilePaginated(String assetId, int pageNumber, int pageSize);
+
   public AssetFileDTO downloadFile(String id);
 
   public void deleteFile(String id);

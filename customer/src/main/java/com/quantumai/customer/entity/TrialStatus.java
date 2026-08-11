@@ -30,4 +30,7 @@ public class TrialStatus {
     public void updateTimestamp() {
         this.updatedAt = LocalDateTime.now();
     }
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

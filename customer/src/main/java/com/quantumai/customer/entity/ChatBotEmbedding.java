@@ -39,4 +39,7 @@ public class ChatBotEmbedding {
 
     /** The embedding vector from OpenAI */
     private List<Double> embedding;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

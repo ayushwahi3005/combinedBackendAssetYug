@@ -23,4 +23,6 @@ public class Users {
   private String password;
   private UserStatusEnum status;
   @DBRef private CustomRole role;
+  private String createdBy;
+  private String lastUpdatedBy;
 }

@@ -48,19 +48,43 @@ public final class CustomerImportUtils {
   }
 
   public static String normalizeZipValue(String rawZip) {
+    if (isBlank(rawZip)) {
+      return rawZip;
+    }
+    String zipValue = rawZip.trim();
     try {
-      if (rawZip.contains("E") || rawZip.contains("e")) {
-        java.math.BigDecimal bd = new java.math.BigDecimal(rawZip);
-        String zipValue = bd.toPlainString();
-        if (zipValue.contains(".")) {
-          zipValue = zipValue.replaceAll("\\.0+$", "");
-        }
-        return zipValue;
+      if (zipValue.contains("E") || zipValue.contains("e")) {
+        java.math.BigDecimal bd = new java.math.BigDecimal(zipValue);
+        zipValue = bd.toPlainString();
       }
     } catch (NumberFormatException ignored) {
       // keep raw value
     }
-    return rawZip;
+    if (zipValue.matches("\\d+\\.0+")) {
+      zipValue = zipValue.replaceAll("\\.0+$", "");
+    }
+    return zipValue;
+  }
+
+  public static String normalizeCountryName(String country) {
+    if (isBlank(country)) {
+      return country;
+    }
+    String trimmed = country.trim();
+    if (trimmed.equalsIgnoreCase("United States")
+            || trimmed.equalsIgnoreCase("USA")
+            || trimmed.equalsIgnoreCase("US")) {
+      return "United States of America";
+    }
+    return trimmed;
+  }
+
+  public static boolean isValidCountry(String country, java.util.Collection<String> countryList) {
+    if (isBlank(country)) {
+      return false;
+    }
+    String normalized = normalizeCountryName(country);
+    return countryList.stream().anyMatch(valid -> valid.equalsIgnoreCase(normalized));
   }
 
   public static String parseOptionalNumber(String value, boolean mandatory) {
@@ -102,5 +126,12 @@ public final class CustomerImportUtils {
   public static boolean isNameMapped(java.util.Collection<String> mappedValues) {
     return mappedValues.stream()
         .anyMatch(value -> "name".equals(normalizeMappedField(value)));
+  }
+
+  public static void appendImportError(StringBuilder errorDesc, String message) {
+    if (errorDesc.length() > 0) {
+      errorDesc.append(", ");
+    }
+    errorDesc.append(message);
   }
 }

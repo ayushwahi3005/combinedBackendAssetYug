@@ -14,4 +14,7 @@ public class ActiveSession {
   private String deviceId;
   private String userAgent;
   private LocalDateTime lastActivityTime;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

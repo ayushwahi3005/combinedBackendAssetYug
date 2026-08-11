@@ -11,4 +11,7 @@ public class AssetCheckInOutDTO {
   private String status;
   private List<AssetCheckInOutDetailsDTO> detailsList;
   private Long companyId;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

@@ -18,4 +18,7 @@ public class AssetFile {
   private byte[] file;
   private Long companyId;
   private String uploadedBy;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

@@ -21,4 +21,7 @@ public class AssetsDTO {
   private Long companyId;
   private String updatedAt;
   private Map<String, String> extraFields; // For custom field validation
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

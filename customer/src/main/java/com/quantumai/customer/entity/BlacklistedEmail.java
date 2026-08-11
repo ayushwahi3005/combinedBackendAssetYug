@@ -36,4 +36,7 @@ public class BlacklistedEmail {
         this.deletedAt = LocalDateTime.now();
         this.createdAt = LocalDateTime.now();
     }
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

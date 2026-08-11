@@ -116,11 +116,11 @@ public class SubscriptionServiceImpl implements SubscriptionService {
             (subs) -> {
               // LocalDate planRenewDate = subs.getSubscriptionDate();
               LocalDate planExpiredDate = subs.getExpiryDate();
-              System.out.println(
-                  "Expired-->" + planExpiredDate);
+//              System.out.println(
+//                  "Expired-->" + planExpiredDate);
               if (LocalDate.now().isAfter(planExpiredDate)
                   || LocalDateTime.now().equals(planExpiredDate)) {
-                System.out.println("Yesss");
+//                System.out.println("Yesss");
                 subs.setStatus(SubscriptionEnum.EXPIRED);
                 subscriptionRepository.save(subs);
               }

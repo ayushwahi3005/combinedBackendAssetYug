@@ -12,4 +12,7 @@ public class AccountLockInfo {
   private String customerEmail;
   private Boolean lockedStatus;
   private Integer incorrectAttemptCount;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

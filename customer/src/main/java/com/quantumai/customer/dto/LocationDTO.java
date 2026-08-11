@@ -17,4 +17,7 @@ public class LocationDTO {
   private String state;
   private String status;
   private String zipCode;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

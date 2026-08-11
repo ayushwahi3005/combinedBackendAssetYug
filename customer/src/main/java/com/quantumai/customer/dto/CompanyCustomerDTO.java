@@ -20,4 +20,7 @@ public class CompanyCustomerDTO {
   private String country;
   private String zipCode;
   private String updatedAt;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

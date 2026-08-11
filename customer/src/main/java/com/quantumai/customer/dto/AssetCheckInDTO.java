@@ -19,4 +19,7 @@ public class AssetCheckInDTO {
   private String ipAddress;
   private String userLocation;
   private Long companyId;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

@@ -33,4 +33,7 @@ public class CustomerSubscribed {
   public void setLastDate(LocalDate lastDate) {
     this.lastDate = lastDate;
   }
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

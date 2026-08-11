@@ -21,4 +21,6 @@ public class Assets {
   private String image;
   private Long companyId;
   private String updatedAt;
+  private String createdBy;
+  private String lastUpdatedBy;
 }

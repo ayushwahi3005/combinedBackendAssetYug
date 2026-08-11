@@ -66,4 +66,7 @@ public class Mail implements UserDetails {
     // TODO Auto-generated method stub
     return false;
   }
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

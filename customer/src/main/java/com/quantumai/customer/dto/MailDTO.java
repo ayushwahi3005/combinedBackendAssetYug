@@ -11,4 +11,7 @@ public class MailDTO {
   private String message;
   private String email;
   private String role;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

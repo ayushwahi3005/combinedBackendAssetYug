@@ -11,6 +11,7 @@ import com.quantumai.customer.entity.enums.AuditAction;
 import com.quantumai.customer.entity.enums.AuditModule;
 import com.quantumai.customer.exception.*;
 import com.quantumai.customer.service.AuditService;
+import com.quantumai.customer.repository.CompanyInformationRepository;
 import com.quantumai.customer.repository.CustomRoleRepository;
 import com.quantumai.customer.repository.CustomerRepository;
 import com.quantumai.customer.repository.SubscriptionRepository;
@@ -63,6 +64,8 @@ public class UsersAPI {
 
   @Autowired private UsersRepository usersRepository;
   @Autowired private CustomerRepository customerRepository;
+
+  @Autowired private CompanyInformationRepository companyInformationRepository;
 
   @Autowired private CustomRoleRepository customRoleRepository;
 
@@ -137,12 +140,12 @@ public class UsersAPI {
     System.out.print(
         "---------------------///////--------------------////-----------------"
             + response.getToken());
-    //    String emailId = "http://localhost:4200/invitation/";
-    String emailId = "http://assetyugg.com.s3-website-us-east-1.amazonaws.com/invitation/";
-    userService.sendSimpleMessage(
-        mail.getEmail(),
-        "Invitation mail: ",
-        mail.getMessage() + emailId + companyId + "/" + response.getToken());
+    String emailId = "http://assetyuggg.com.s3-website.us-east-2.amazonaws.com/invitation/";
+    String invitationLink = emailId + companyId + "/" + response.getToken();
+    String organizationName = companyInformationRepository.findById(companyId)
+        .map(CompanyInformation::getCompanyName)
+        .orElse("your organization");
+    userService.sendInvitationEmail(mail, invitationLink, organizationName);
   }
 
   //	@GetMapping(value="/getCustomer/{companyId}")
@@ -199,6 +202,13 @@ public class UsersAPI {
     return ResponseEntity.ok(userList);
   }
 
+  @Operation(summary = "Get All Active Users", description = "Endpoint to get all active users")
+  @GetMapping(value = "/getActiveUsers/{companyId}")
+  public ResponseEntity<List<UsersDTO>> getActiveUsers(@PathVariable Long companyId) {
+    List<UsersDTO> userList = userService.getAllActiveUsers(companyId);
+    return ResponseEntity.ok(userList);
+  }
+
   @Operation(summary = "Get Users", description = "Endpoint to get users")
   @GetMapping(value = "/invite/getUser/{companyId}/{details}")
   public ResponseEntity<UsersDTO> getUsers(
@@ -220,7 +230,7 @@ public class UsersAPI {
   @PostMapping(value = "/resend-email-firebase-verification/{companyId}/{email}")
   public ResponseEntity<Map<String, String>> resendFirebaseVerificationEmail(
       @PathVariable Long companyId,
-      @PathVariable String email) throws UserException, TheMailException, FirebaseAuthException, UserEmailAlreadyVerifiedException, UserAccessException {
+      @PathVariable String email) throws UserException, TheMailException, FirebaseAuthException, UserEmailAlreadyVerifiedException, UserAccessException, TooManyAttemptException {
     checkUserDetailsPermissionFromSpringContext(CustomRoleType.create);
     userService.resendFirebaseVerificationEmail(email, companyId);
     

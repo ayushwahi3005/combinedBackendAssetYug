@@ -12,4 +12,7 @@ public class UserExtraFieldsDTO {
   private String userId;
   private String type;
   private Long companyId;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

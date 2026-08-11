@@ -61,4 +61,7 @@ public class Admin implements UserDetails {
     // TODO Auto-generated method stub
     return true;
   }
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

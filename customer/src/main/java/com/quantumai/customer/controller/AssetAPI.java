@@ -162,6 +162,18 @@ public class AssetAPI {
     return assetsService.getAssetFile(assetId);
   }
 
+  @Operation(summary = "Get Asset File Paginated", description = "Endpoint to get asset files with pagination")
+  @GetMapping("/getFile/{assetId}/{pageNumber}/{pageSize}")
+  @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
+  public PaginatedResultDTO<AssetFileDTO> getAssetFilePaginated(
+          @PathVariable String assetId,
+          @PathVariable Integer pageNumber,
+          @PathVariable Integer pageSize) {
+    if (pageNumber == null) pageNumber = 0;
+    if (pageSize == null) pageSize = 10;
+    return assetsService.getAssetFilePaginated(assetId, pageNumber, pageSize);
+  }
+
   @Operation(summary = "Download File", description = "Endpoint to download file")
   @GetMapping("/getFile/download/{id}")
   @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
@@ -309,7 +321,7 @@ public class AssetAPI {
   }
 
   @Operation(summary = "Get All Asset Inspection By Category", description = "Endpoint to get all asset inspection by category")
-  @GetMapping(value = "/getAllAssetInspectionByCategory/{companyId}")
+  @GetMapping(value = "/getAllAssetInspectionadvanceFilterByCategory/{companyId}")
   @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'inspections')")
   public List<AssetCategoryInspection> getAllAssetInspectionByCategory(
           @PathVariable Long companyId, @RequestParam String category) throws Exception {
@@ -596,7 +608,6 @@ public class AssetAPI {
         for (int j = 0; j < row.length; j++) {
           String field = headerMap.get(j);
           log.info("Column Mapping for field '{}': '{}'", field, columnMap.get(field));
-          if (errorFlag == 1) break;
           if (columnMap.get(field) == null) continue;
 
           label:
@@ -604,23 +615,23 @@ public class AssetAPI {
             case "name":
               log.info("NAME FIELD VALUE: '{}'", row[j]);
               if (row[j].trim().isEmpty()) {
-                errorDesc.append("Name is Mandatory");
+                appendAssetImportError(errorDesc, "ERROR WITH NO NAME WHILE ADDING IN ASSET");
                 errorFlag = 1;
                 errorCellMap.put(j, true);
               } else {
                 assetsDTO.setName(row[j]);
               }
               break;
-            case "serialnumber":
+            case "serial number":
               if (mandatoryColumnList.contains("serialnumber") && row[j].trim().isEmpty()) {
-                errorDesc.append("Serial Number is Mandatory");
+                appendAssetImportError(errorDesc, "ERROR WITH SERIAL NUMBER MANDATORY WHILE ADDING IN ASSET");
                 errorFlag = 1;
                 errorCellMap.put(j, true);
               } else { assetsDTO.setSerialNumber(row[j]); }
               break;
             case "category":
               if (mandatoryColumnList.contains("category") && row[j].trim().isEmpty()) {
-                errorDesc.append("Category is Mandatory");
+                appendAssetImportError(errorDesc, "ERROR WITH CATEGORY MANDATORY WHILE ADDING IN ASSET");
                 errorFlag = 1;
                 errorCellMap.put(j, true);
                 break;
@@ -631,7 +642,7 @@ public class AssetAPI {
                         .stream().filter(x -> x.getName().equalsIgnoreCase(categoryValue))
                         .toList();
                 if (match.isEmpty()) {
-                  errorDesc.append("CATEGORY");
+                  appendAssetImportError(errorDesc, "ERROR WHILE ADDING IN CATEGORY");
                   errorFlag = 1;
                   errorCellMap.put(j, true);
                 } else assetsDTO.setCategory(match.get(0).getName());
@@ -639,7 +650,7 @@ public class AssetAPI {
               break;
             case "customer":
               if (mandatoryColumnList.contains("customer") && row[j].trim().isEmpty()) {
-                errorDesc.append("Customer is Mandatory");
+                appendAssetImportError(errorDesc, "ERROR WITH CUSTOMER MANDATORY WHILE ADDING IN ASSET");
                 errorFlag = 1;
                 errorCellMap.put(j, true);
                 break;
@@ -648,7 +659,7 @@ public class AssetAPI {
               if (!customerName.isBlank()) {
                 CompanyCustomerDTO customerDTO = companyCustomerAPI.getCompanyCustomerByLocalId(customerName, companyId);
                 if (customerDTO == null) {
-                  errorDesc.append("CUSTOMER NOT FOUND");
+                  appendAssetImportError(errorDesc, "ERROR WHILE ADDING IN CUSTOMER");
                   errorFlag = 1;
                   errorCellMap.put(j, true);
                 } else {
@@ -659,7 +670,7 @@ public class AssetAPI {
               break;
             case "location":
               if (mandatoryColumnList.contains("location") && row[j].trim().isEmpty()) {
-                errorDesc.append("Location is Mandatory");
+                appendAssetImportError(errorDesc, "ERROR WITH LOCATION MANDATORY WHILE ADDING IN ASSET");
                 errorFlag = 1;
                 errorCellMap.put(j, true);
                 break;
@@ -668,20 +679,33 @@ public class AssetAPI {
               String loc = row[j].trim();
               if(!loc.isEmpty()){
                 String code= loc.substring(0, Math.min(loc.length(), 3)).toLowerCase();
-                Long id=loc.length() > 3 ? Long.parseLong(loc.substring(3)) : null;
+                Long id;
+                try{
+                id=loc.length() > 3 ? Long.parseLong(loc.substring(3)) : null;
+                }
+                catch (NumberFormatException e){
+                  appendAssetImportError(errorDesc, "ERROR WHILE ADDING IN LOCATION");
+                  errorFlag = 1;
+                  errorCellMap.put(j, true);
+                  break;
+                }
                 if(code.equals("bin")){
                   List<Bin> bins = binList.stream()
                           .filter(b -> b.getBinId().equals(id)).toList();
                   if (!bins.isEmpty()) { assetsDTO.setLocation("bin:" + bins.get(0).getId()); break; }
-                  errorDesc.append("LOCATION");
+                  appendAssetImportError(errorDesc, "ERROR WHILE ADDING IN LOCATION");
                   errorFlag = 1;
                   errorCellMap.put(j, true);
                 }
-                else{
+                else if(code.equals("loc")){
                   List<Location> locs = locationList.stream()
                           .filter(l -> l.getLocationId().equals(id)).toList();
                   if (!locs.isEmpty()) { assetsDTO.setLocation("location:" + locs.get(0).getId()); break; }
-                  errorDesc.append("LOCATION");
+                  appendAssetImportError(errorDesc, "ERROR WHILE ADDING IN LOCATION");
+                  errorFlag = 1;
+                  errorCellMap.put(j, true);
+                }else{
+                  appendAssetImportError(errorDesc, "ERROR WHILE ADDING IN LOCATION");
                   errorFlag = 1;
                   errorCellMap.put(j, true);
                 }
@@ -704,7 +728,108 @@ public class AssetAPI {
         log.info("Error Flag : {}", errorFlag);
         log.info("Asset DTO : {}", assetsDTO.toString());
 
-        if (errorFlag == 1) {
+        List<AssetExtraFieldName> extraFieldNames = extraFieldNameRepository.findByCompanyId(companyId);
+        Map<String, String> extraFieldValues = new HashMap<>();
+        Map<String, String> extraFieldDisplayNames = new HashMap<>();
+        List<String> formatErrorMessages = new ArrayList<>();
+
+        for (int j = 0; j < row.length; j++) {
+          String field = headerMap.get(j);
+          String value = row[j] != null ? row[j].trim() : "";
+
+          if (columnMap.get(field) == null) continue;
+
+          for (AssetExtraFieldName extraFieldName : extraFieldNames) {
+            if (columnMap.get(field).equalsIgnoreCase(extraFieldName.getName())) {
+              String formattedValue = value;
+              boolean fieldValid = true;
+
+              if (mandatoryColumnList.contains(extraFieldName.getName().toLowerCase())
+                      && value.trim().isEmpty()) {
+                formatErrorMessages.add("ERROR WITH " + extraFieldName.getName().toUpperCase()
+                        + " MANDATORY WHILE ADDING IN ASSET");
+                errorCellMap.put(j, true);
+                errorFlag = 1;
+                fieldValid = false;
+              }
+              else if ("number".equals(extraFieldName.getType()) && !value.trim().isEmpty()) {
+                try {
+                  int val = Integer.parseInt(value);
+                  formattedValue = Integer.toString(val);
+                } catch (NumberFormatException e) {
+                  formatErrorMessages.add("ERROR WHILE ADDING IN "
+                          + extraFieldName.getName().toUpperCase());
+                  errorCellMap.put(j, true);
+                  errorFlag = 1;
+                  fieldValid = false;
+                }
+              }
+              else if ("date".equals(extraFieldName.getType()) && !value.trim().isEmpty()) {
+                try {
+                  DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+                  LocalDate date = LocalDate.parse(value, inputFormatter);
+                  DateTimeFormatter outputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+                  formattedValue = date.format(outputFormatter);
+                } catch (Exception e) {
+                  formatErrorMessages.add("ERROR WHILE ADDING IN "
+                          + extraFieldName.getName().toUpperCase());
+                  errorCellMap.put(j, true);
+                  errorFlag = 1;
+                  fieldValid = false;
+                }
+              }
+
+              if (fieldValid) {
+                extraFieldValues.put(extraFieldName.getName().toLowerCase(), formattedValue);
+                extraFieldDisplayNames.put(extraFieldName.getName().toLowerCase(), extraFieldName.getName());
+              }
+              break;
+            }
+          }
+        }
+
+        if (!validateAllUniqueFieldsForImport(assetsDTO, extraFieldValues, companyId, errorDesc,
+                errorCellMap, headerMap, columnMap)) {
+          errorFlag = 1;
+          log.warn("Unique field validation failed: {}", errorDesc.toString());
+        }
+
+        if (!formatErrorMessages.isEmpty()) {
+          for (String formatErrorMessage : formatErrorMessages) {
+            appendAssetImportError(errorDesc, formatErrorMessage);
+          }
+        }
+
+        if (errorFlag == 0) {
+          log.info("Attempting to save asset: {}", assetsDTO.toString());
+          AssetsDTO savedAssetDTO = assetsService.addAssets(assetsDTO);
+
+          for (Map.Entry<String, String> entry : extraFieldValues.entrySet()) {
+            String lowerKey = entry.getKey();
+            String originalName = extraFieldDisplayNames.getOrDefault(lowerKey, entry.getKey());
+
+            Optional<AssetExtraFields> existingExtra =
+                    extraFieldsRepository.findByNameAndAssetId(originalName, savedAssetDTO.getId());
+            AssetExtraFields extraFields = existingExtra.orElse(new AssetExtraFields());
+
+            extraFields.setAssetId(savedAssetDTO.getId());
+            extraFields.setName(originalName);
+            extraFields.setValue(entry.getValue());
+            extraFields.setCompanyId(companyId);
+
+            for (AssetExtraFieldName extraFieldName : extraFieldNames) {
+              if (extraFieldName.getName().equalsIgnoreCase(originalName)) {
+                extraFields.setType(extraFieldName.getType());
+                break;
+              }
+            }
+
+            extraFieldsRepository.save(extraFields);
+            log.info("Extra field saved: {} = {}", originalName, entry.getValue());
+          }
+        }
+
+        if (errorFlag != 0) {
           Row errorRow = errorSheet.createRow(excelIndex++);
           for (int k = 0; k < row.length; k++) {
             Cell cell = errorRow.createCell(k);
@@ -719,137 +844,7 @@ public class AssetAPI {
           Cell errorDescriptionCell = errorRow.createCell(row.length);
           errorDescriptionCell.setCellValue(errorDesc.toString());
           errorDescriptionCell.setCellStyle(errorCellStyle);
-        } else {
-          log.info("Attempting to save asset: {}", assetsDTO.toString());
-
-          // ✅ STEP 1: Collect all extra field values and validate format/mandatory
-          // FIX: use a per-field "fieldValid" flag so an earlier bad column no longer
-          // suppresses every extra field that comes after it in the row.
-          List<AssetExtraFieldName> extraFieldNames = extraFieldNameRepository.findByCompanyId(companyId);
-          Map<String, String> extraFieldValues = new HashMap<>();        // key: lowercase name -> value
-          Map<String, String> extraFieldDisplayNames = new HashMap<>();  // key: lowercase name -> original-cased name
-          List<String> formatErrorMessages = new ArrayList<>();
-
-          for (int j = 0; j < row.length; j++) {
-            String field = headerMap.get(j);
-            String value = row[j] != null ? row[j].trim() : "";
-
-            if (columnMap.get(field) == null) continue;
-
-            for (AssetExtraFieldName extraFieldName : extraFieldNames) {
-              if (columnMap.get(field).equalsIgnoreCase(extraFieldName.getName())) {
-                String formattedValue = value;
-                boolean fieldValid = true;
-
-                // Mandatory check
-                if (mandatoryColumnList.contains(extraFieldName.getName().toLowerCase())
-                        && value.trim().isEmpty()) {
-                  formatErrorMessages.add(extraFieldName.getName().toUpperCase() + " is MANDATORY");
-                  errorCellMap.put(j, true);
-                  errorFlag = 1;
-                  fieldValid = false;
-                }
-                // Number format check
-                else if ("number".equals(extraFieldName.getType()) && !value.trim().isEmpty()) {
-                  try {
-                    int val = Integer.parseInt(value);
-                    formattedValue = Integer.toString(val);
-                  } catch (NumberFormatException e) {
-                    formatErrorMessages.add(extraFieldName.getName().toUpperCase() + " - Invalid number format");
-                    errorCellMap.put(j, true);
-                    errorFlag = 1;
-                    fieldValid = false;
-                  }
-                }
-                // Date format check
-                else if ("date".equals(extraFieldName.getType()) && !value.trim().isEmpty()) {
-                  try {
-                    DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
-                    LocalDate date = LocalDate.parse(value, inputFormatter);
-                    DateTimeFormatter outputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-                    formattedValue = date.format(outputFormatter);
-                  } catch (Exception e) {
-                    formatErrorMessages.add(extraFieldName.getName().toUpperCase() + " - Invalid date format (use dd-MM-yyyy)");
-                    errorCellMap.put(j, true);
-                    errorFlag = 1;
-                    fieldValid = false;
-                  }
-                }
-
-                if (fieldValid) {
-                  extraFieldValues.put(extraFieldName.getName().toLowerCase(), formattedValue);
-                  extraFieldDisplayNames.put(extraFieldName.getName().toLowerCase(), extraFieldName.getName());
-                }
-                break;
-              }
-            }
-          }
-
-          // ✅ STEP 2: Validate unique fields (even if there are format errors, so we can highlight all problems)
-          if (!validateAllUniqueFieldsForImport(assetsDTO, extraFieldValues, companyId, errorDesc,
-                  errorCellMap, headerMap, columnMap)) {
-            errorFlag = 1;
-            log.warn("Unique field validation failed: {}", errorDesc.toString());
-          }
-
-          // ✅ Combine all format error messages
-          if (errorFlag == 1 && !formatErrorMessages.isEmpty()) {
-            for (int i = 0; i < formatErrorMessages.size(); i++) {
-              if (i == 0 && errorDesc.length() == 0) {
-                errorDesc.append("ERROR: ").append(formatErrorMessages.get(i));
-              } else {
-                if (errorDesc.length() > 0) errorDesc.append(" | ");
-                errorDesc.append(formatErrorMessages.get(i));
-              }
-            }
-          }
-
-          // ✅ STEP 3: Save asset and extra fields ONLY if all validations pass
-          if (errorFlag == 0) {
-            AssetsDTO savedAssetDTO = assetsService.addAssets(assetsDTO);
-
-            for (Map.Entry<String, String> entry : extraFieldValues.entrySet()) {
-              String lowerKey = entry.getKey();
-              String originalName = extraFieldDisplayNames.getOrDefault(lowerKey, entry.getKey());
-
-              Optional<AssetExtraFields> existingExtra =
-                      extraFieldsRepository.findByNameAndAssetId(originalName, savedAssetDTO.getId());
-              AssetExtraFields extraFields = existingExtra.orElse(new AssetExtraFields());
-
-              extraFields.setAssetId(savedAssetDTO.getId());
-              extraFields.setName(originalName);
-              extraFields.setValue(entry.getValue());
-              extraFields.setCompanyId(companyId);
-
-              for (AssetExtraFieldName extraFieldName : extraFieldNames) {
-                if (extraFieldName.getName().equalsIgnoreCase(originalName)) {
-                  extraFields.setType(extraFieldName.getType());
-                  break;
-                }
-              }
-
-              extraFieldsRepository.save(extraFields);
-              log.info("Extra field saved: {} = {}", originalName, entry.getValue());
-            }
-          }
-
-          if (errorFlag != 0) {
-            Row errorRow = errorSheet.createRow(excelIndex++);
-            for (int col = 0; col < row.length; col++) {
-              Cell cell = errorRow.createCell(col);
-              cell.setCellValue(row[col]);
-            }
-            for (Map.Entry<Integer, Boolean> entry : errorCellMap.entrySet()) {
-              if (entry.getValue()) {
-                Cell errorCell = errorRow.getCell(entry.getKey());
-                if (errorCell != null) errorCell.setCellStyle(errorCellStyle);
-              }
-            }
-            Cell errorDescriptionCell = errorRow.createCell(row.length);
-            errorDescriptionCell.setCellValue(errorDesc.toString());
-            errorDescriptionCell.setCellStyle(errorCellStyle);
-            log.warn("📋 Extra field error recorded at row {}: {}", excelIndex - 1, errorDesc.toString());
-          }
+          log.warn("Import error recorded at row {}: {}", excelIndex - 1, errorDesc.toString());
         }
 
         currCount++;
@@ -858,9 +853,18 @@ public class AssetAPI {
         importHistoryDTO = customerService.addImportHistory(importHistoryDTO);
       }
 
+      if (excelIndex > 1) {
+        importHistoryDTO.setHasErrorReport(true);
+        importHistoryDTO.setErrorReportFileName("AssetImportErrors.xlsx");
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+          workbook.write(baos);
+          importHistoryDTO.setErrorReportFile(baos.toByteArray());
+        }
+      }
+
       sendImportEmail(email, workbook, excelIndex > 1, "Asset Import Results - AssetYug");
       importHistoryDTO.setStatus("Completed");
-      importHistoryDTO.setMessage(excelIndex > 1 ? "Sent import result via email" : "Import was Successfully Done");
+      importHistoryDTO.setMessage(excelIndex > 1 ? "We have sent import result via email" : "Import was Successfully Done");
 
     } catch (IOException | CsvValidationException e) {
       importHistoryDTO.setStatus("Failed");
@@ -886,10 +890,9 @@ public class AssetAPI {
           throws CsvValidationException, JsonParseException, IOException,
           MessagingException, ImportFileRowException, NoSubscriptionError, ImportInProgressException {
 
-
     boolean isInProgress = importHistoryRepository
-            .findTopByCompanyIdAndStatusAndRecordTypeOrderByDateDesc(companyId, "In-Progress", ImportHistoryRecordType.ADDASSET)
-            .map(h -> h.getDate().isAfter(LocalDateTime.now().minusMinutes(30))) // stale-lock guard
+            .findTopByCompanyIdAndStatusAndRecordTypeOrderByDateDesc(companyId, "In-Progress", ImportHistoryRecordType.UPDATEASSET)
+            .map(h -> h.getDate().isAfter(LocalDateTime.now().minusMinutes(30)))
             .orElse(false);
 
     if (isInProgress) {
@@ -898,7 +901,17 @@ public class AssetAPI {
       );
     }
 
+    List<Location> locationList = locationRepository.findByCompanyId(companyId);
+    List<Bin> binList = binRepository.findByCompanyId(companyId);
+    List<AssetMandatoryFields> assetMandatoryList =
+            assetMandatoryFieldsRepository.findByCompanyIdAndMandatory(companyId, true);
+    List<String> mandatoryColumnList =
+            assetMandatoryList.stream().map(ele -> ele.getName().toLowerCase()).toList();
 
+    Map<String, String> columnMap = parseColumnMappings(columnMappings);
+
+    long totalCount = countFileRows(file);
+    if (totalCount > 1001) throw new ImportFileRowException("Import File cannot import more than 1000 rows");
 
     ImportHistory importHistoryDTO = new ImportHistory();
     importHistoryDTO.setFileName(file.getOriginalFilename());
@@ -910,212 +923,313 @@ public class AssetAPI {
     importHistoryDTO.setDate(LocalDateTime.now());
     importHistoryDTO.setComplete(0L);
     importHistoryDTO = customerService.addImportHistory(importHistoryDTO);
-    List<Location> locationList = locationRepository.findByCompanyId(companyId);
-    List<Bin> binList = binRepository.findByCompanyId(companyId);
-    Map<String, String> columnMap = parseColumnMappings(columnMappings);
 
-    long totalCount = countFileRows(file);
-    if (totalCount > 1001) throw new ImportFileRowException("Import File cannot import more than 1000 rows");
-
-
-
-    long currCount = 0;
     try (CSVReader csvReader = new CSVReader(new InputStreamReader(file.getInputStream()))) {
       String[] headers = csvReader.readNext();
       Map<Integer, String> headerMap = buildHeaderMap(headers);
 
       Workbook workbook = new XSSFWorkbook();
-      Sheet errorSheet = workbook.createSheet("Error Report");
-      int errorRowIndex = 0;
-      if (headers != null) {
-        Row errorHeaderRow = errorSheet.createRow(errorRowIndex++);
-        for (int i = 0; i < headers.length; i++) errorHeaderRow.createCell(i).setCellValue(headers[i]);
-        errorHeaderRow.createCell(headers.length).setCellValue("Error");
-      }
+      Sheet errorSheet = workbook.createSheet("Errors");
+      CellStyle errorCellStyle = createErrorCellStyle(workbook);
+      int excelIndex = 0;
 
+      Row headerRow = errorSheet.createRow(excelIndex++);
+      for (int i = 0; i < headers.length; i++) headerRow.createCell(i).setCellValue(headers[i]);
+      headerRow.createCell(headers.length).setCellValue("Error");
+
+      long currCount = 0;
       String[] row;
       while ((row = csvReader.readNext()) != null) {
         if (isEmptyRow(row)) continue;
 
         int errorFlag = 0;
         StringBuilder errorDesc = new StringBuilder();
-        Assets assets = new Assets();
+        Map<Integer, Boolean> errorCellMap = new HashMap<>();
+        AssetsDTO assetsDTO = null;
+        String excludeAssetId = null;
 
-        // Find asset by assetId
+        int assetIdCellIndex = -1;
         String assetIdValue = null;
         for (int j = 0; j < row.length; j++) {
           String field = headerMap.get(j);
-          if ("assetid".equalsIgnoreCase(columnMap.get(field))) {
-            assetIdValue = row[j].trim();
+          if (columnMap.get(field) != null && "assetid".equalsIgnoreCase(columnMap.get(field))) {
+            assetIdCellIndex = j;
+            assetIdValue = row[j] != null ? row[j].trim() : "";
             break;
           }
         }
 
-        if (assetIdValue != null) {
-          Optional<Assets> myAssets = assetsRepository.findByAssetIdAndCompanyId(
-                  Integer.parseInt(assetIdValue), companyId);
-          if (myAssets.isEmpty()) {
-            errorFlag = 1;
-            errorDesc.append("ASSETID NOT FOUND");
-          } else {
-            assets = myAssets.get();
-          }
-        } else {
+        if (assetIdValue == null || assetIdValue.isEmpty()) {
+          appendAssetImportError(errorDesc, "ERROR WITH NO ASSET ID WHILE UPDATING IN ASSET");
           errorFlag = 1;
-          errorDesc.append("ASSETID COLUMN MISSING OR EMPTY");
+          if (assetIdCellIndex >= 0) errorCellMap.put(assetIdCellIndex, true);
+        } else {
+          try {
+            Optional<Assets> myAssets = assetsRepository.findByAssetIdAndCompanyId(
+                    Integer.parseInt(assetIdValue), companyId);
+            if (myAssets.isEmpty()) {
+              appendAssetImportError(errorDesc, "ERROR ASSET ID NOT FOUND WHILE UPDATING IN ASSET");
+              errorFlag = 1;
+              if (assetIdCellIndex >= 0) errorCellMap.put(assetIdCellIndex, true);
+            } else {
+              assetsDTO = modelMapper.map(myAssets.get(), AssetsDTO.class);
+              excludeAssetId = assetsDTO.getId();
+            }
+          } catch (NumberFormatException e) {
+            appendAssetImportError(errorDesc, "ERROR WITH INVALID ASSET ID WHILE UPDATING IN ASSET");
+            errorFlag = 1;
+            if (assetIdCellIndex >= 0) errorCellMap.put(assetIdCellIndex, true);
+          }
         }
 
-        // Process remaining fields
-        for (int j = 0; j < row.length && errorFlag == 0; j++) {
+        if (assetsDTO == null) {
+          assetsDTO = new AssetsDTO();
+          assetsDTO.setCompanyId(companyId);
+        }
+
+        for (int j = 0; j < row.length; j++) {
           String field = headerMap.get(j);
           if (columnMap.get(field) == null) continue;
 
-          switch (columnMap.get(field).toLowerCase()) {
+          String mappedField = columnMap.get(field).toLowerCase();
+          if ("assetid".equals(mappedField)) continue;
+
+          label:
+          switch (mappedField) {
             case "name":
-              String nameValue = row[j] != null ? row[j].trim() : "";
-              if (nameValue.isEmpty()) {
-                errorDesc.append("Name is mandatory and cannot be empty");
+              if (row[j].trim().isEmpty()) {
+                appendAssetImportError(errorDesc, "ERROR WITH NO NAME WHILE UPDATING IN ASSET");
                 errorFlag = 1;
+                errorCellMap.put(j, true);
               } else {
-                assets.setName(nameValue);
+                assetsDTO.setName(row[j]);
               }
               break;
+            case "serial number":
             case "serialnumber":
-              assets.setSerialNumber(row[j]);
+              if (mandatoryColumnList.contains("serialnumber") && row[j].trim().isEmpty()) {
+                appendAssetImportError(errorDesc, "ERROR WITH SERIAL NUMBER MANDATORY WHILE UPDATING IN ASSET");
+                errorFlag = 1;
+                errorCellMap.put(j, true);
+              } else {
+                assetsDTO.setSerialNumber(row[j]);
+              }
               break;
             case "category":
-              final String categoryValue = row[j].trim();
-              List<AssetCategory> cats = assetCategoryRepository.findByCompanyId(companyId)
-                      .stream().filter(x -> x.getName().equalsIgnoreCase(categoryValue)).toList();
-              if (cats.isEmpty()) {
-                errorDesc.append("ERROR IN CATEGORY");
+              if (mandatoryColumnList.contains("category") && row[j].trim().isEmpty()) {
+                appendAssetImportError(errorDesc, "ERROR WITH CATEGORY MANDATORY WHILE UPDATING IN ASSET");
                 errorFlag = 1;
-              } else {
-                assets.setCategory(cats.get(0).getName());
+                errorCellMap.put(j, true);
+                break;
+              }
+              final String categoryValue = row[j].trim();
+              if (!categoryValue.isBlank()) {
+                List<AssetCategory> match = assetCategoryRepository.findByCompanyId(companyId)
+                        .stream().filter(x -> x.getName().equalsIgnoreCase(categoryValue))
+                        .toList();
+                if (match.isEmpty()) {
+                  appendAssetImportError(errorDesc, "ERROR WHILE UPDATING IN CATEGORY");
+                  errorFlag = 1;
+                  errorCellMap.put(j, true);
+                } else {
+                  assetsDTO.setCategory(match.get(0).getName());
+                }
+              }
+              break;
+            case "customer":
+              if (mandatoryColumnList.contains("customer") && row[j].trim().isEmpty()) {
+                appendAssetImportError(errorDesc, "ERROR WITH CUSTOMER MANDATORY WHILE UPDATING IN ASSET");
+                errorFlag = 1;
+                errorCellMap.put(j, true);
+                break;
+              }
+              String customerName = row[j].trim();
+              if (!customerName.isBlank()) {
+                CompanyCustomerDTO customerDTO = companyCustomerAPI.getCompanyCustomerByLocalId(customerName, companyId);
+                if (customerDTO == null) {
+                  appendAssetImportError(errorDesc, "ERROR WHILE UPDATING IN CUSTOMER");
+                  errorFlag = 1;
+                  errorCellMap.put(j, true);
+                } else {
+                  assetsDTO.setCustomerId(customerDTO.getId());
+                  assetsDTO.setCustomer(customerDTO.getName());
+                }
               }
               break;
             case "location":
-
-             if(row[j].trim().isEmpty()) { break; }
+              if (mandatoryColumnList.contains("location") && row[j].trim().isEmpty()) {
+                appendAssetImportError(errorDesc, "ERROR WITH LOCATION MANDATORY WHILE UPDATING IN ASSET");
+                errorFlag = 1;
+                errorCellMap.put(j, true);
+                break;
+              } else if (row[j].trim().isEmpty()) {
+                break;
+              }
               String loc = row[j].trim();
-              List<Location> locs = locationList.stream()
-                      .filter(l -> l.getName().equalsIgnoreCase(loc)).toList();
-              if (!locs.isEmpty()) { assets.setLocation("location:" + locs.get(0).getId()); break; }
-              List<Bin> bins = binList.stream()
-                      .filter(b -> b.getBinNumber().equalsIgnoreCase(loc)).toList();
-              if (!bins.isEmpty()) { assets.setLocation("bin:" + bins.get(0).getId()); break; }
-              errorDesc.append("LOCATION"); errorFlag = 1;
+              if (!loc.isEmpty()) {
+                String code = loc.substring(0, Math.min(loc.length(), 3)).toLowerCase();
+                Long id;
+                try {
+                  id = loc.length() > 3 ? Long.parseLong(loc.substring(3)) : null;
+                } catch (NumberFormatException e) {
+                  appendAssetImportError(errorDesc, "ERROR WHILE UPDATING IN LOCATION");
+                  errorFlag = 1;
+                  errorCellMap.put(j, true);
+                  break;
+                }
+                if (code.equals("bin")) {
+                  List<Bin> bins = binList.stream()
+                          .filter(b -> b.getBinId().equals(id)).toList();
+                  if (!bins.isEmpty()) {
+                    assetsDTO.setLocation("bin:" + bins.get(0).getId());
+                    break;
+                  }
+                  appendAssetImportError(errorDesc, "ERROR WHILE UPDATING IN LOCATION");
+                  errorFlag = 1;
+                  errorCellMap.put(j, true);
+                } else if (code.equals("loc")) {
+                  List<Location> locs = locationList.stream()
+                          .filter(l -> l.getLocationId().equals(id)).toList();
+                  if (!locs.isEmpty()) {
+                    assetsDTO.setLocation("location:" + locs.get(0).getId());
+                    break;
+                  }
+                  appendAssetImportError(errorDesc, "ERROR WHILE UPDATING IN LOCATION");
+                  errorFlag = 1;
+                  errorCellMap.put(j, true);
+                } else {
+                  appendAssetImportError(errorDesc, "ERROR WHILE UPDATING IN LOCATION");
+                  errorFlag = 1;
+                  errorCellMap.put(j, true);
+                }
+              }
               break;
             case "status":
               switch (row[j].toLowerCase()) {
-                case "active":
-                  assets.setStatus("active");
-                  break;
-                case "inactive":
-                  assets.setStatus("inactive");
-                  break;
-                case "outofservice":
-                  assets.setStatus("outofservice");
-                  break;
-                default:
-                  assets.setStatus("active");
+                case "active": assetsDTO.setStatus("active"); break label;
+                case "inactive": assetsDTO.setStatus("inactive"); break label;
+                case "outofservice": assetsDTO.setStatus("outofservice"); break label;
+                default: assetsDTO.setStatus("active"); break label;
               }
-              break;
           }
         }
 
-        if (errorFlag == 0) {
-          AssetsDTO updatedAsset = assetsService.addAssets(modelMapper.map(assets, AssetsDTO.class));
+        List<AssetExtraFieldName> extraFieldNames = extraFieldNameRepository.findByCompanyId(companyId);
+        Map<String, String> extraFieldValues = new HashMap<>();
+        Map<String, String> extraFieldDisplayNames = new HashMap<>();
+        List<String> formatErrorMessages = new ArrayList<>();
 
-          // Handle extra fields for update
-          List<AssetExtraFieldName> extraFieldNames = extraFieldNameRepository.findByCompanyId(companyId);
-          List<AssetMandatoryFields> mandatoryFieldsList =
-              assetMandatoryFieldsRepository.findByCompanyIdAndMandatory(companyId, true);
-          Map<String, Boolean> mandatoryExtraFieldsMap = new HashMap<>();
-          for (AssetMandatoryFields mf : mandatoryFieldsList) {
-            mandatoryExtraFieldsMap.put(mf.getName().toLowerCase(), true);
-          }
+        for (int j = 0; j < row.length; j++) {
+          String field = headerMap.get(j);
+          String value = row[j] != null ? row[j].trim() : "";
 
-          // Process extra fields from CSV
-          for (int j = 0; j < row.length; j++) {
-            String field = headerMap.get(j);
-            String value = row[j] != null ? row[j].trim() : "";
+          if (columnMap.get(field) == null) continue;
 
-            if (columnMap.get(field) == null) continue;
+          for (AssetExtraFieldName extraFieldName : extraFieldNames) {
+            if (columnMap.get(field).equalsIgnoreCase(extraFieldName.getName())) {
+              String formattedValue = value;
+              boolean fieldValid = true;
 
-            // Check if this column maps to an extra field
-            for (AssetExtraFieldName extraFieldName : extraFieldNames) {
-              if (columnMap.get(field).equalsIgnoreCase(extraFieldName.getName())) {
-                // Find or create extra field
-                Optional<AssetExtraFields> existingExtra =
-                    extraFieldsRepository.findByNameAndAssetId(
-                        extraFieldName.getName(), updatedAsset.getId());
-
-                AssetExtraFields extraFields = existingExtra.orElse(new AssetExtraFields());
-                extraFields.setAssetId(updatedAsset.getId());
-                extraFields.setName(extraFieldName.getName());
-                extraFields.setType(extraFieldName.getType());
-
-                // Check mandatory constraint
-                if (mandatoryExtraFieldsMap.getOrDefault(extraFieldName.getName().toLowerCase(), false)) {
-                  if (value.isEmpty()) {
-                    errorDesc.append("ERROR WITH ").append(extraFieldName.getName().toUpperCase())
-                            .append(" MANDATORY WHILE UPDATING ASSET");
-                    errorFlag = 1;
-                    break;
-                  }
+              if (mandatoryColumnList.contains(extraFieldName.getName().toLowerCase())
+                      && value.trim().isEmpty()) {
+                formatErrorMessages.add("ERROR WITH " + extraFieldName.getName().toUpperCase()
+                        + " MANDATORY WHILE UPDATING IN ASSET");
+                errorCellMap.put(j, true);
+                errorFlag = 1;
+                fieldValid = false;
+              } else if ("number".equals(extraFieldName.getType()) && !value.trim().isEmpty()) {
+                try {
+                  int val = Integer.parseInt(value);
+                  formattedValue = Integer.toString(val);
+                } catch (NumberFormatException e) {
+                  formatErrorMessages.add("ERROR WHILE UPDATING IN "
+                          + extraFieldName.getName().toUpperCase());
+                  errorCellMap.put(j, true);
+                  errorFlag = 1;
+                  fieldValid = false;
                 }
-
-                if (errorFlag == 0) {
-                  // Validate and format based on type
-                  String formattedValue = value;
-                  if ("number".equals(extraFieldName.getType())) {
-                    if(value.trim().isEmpty()){
-                      extraFields.setValue("");
-                      continue;
-                    }
-                    try {
-                      int val = Integer.parseInt(value);
-                      formattedValue = Integer.toString(val);
-                    } catch (NumberFormatException e) {
-                      errorDesc.append("ERROR WHILE UPDATING IN ").append(extraFieldName.getName().toUpperCase())
-                              .append(" - Invalid number format");
-                      errorFlag = 1;
-                      break;
-                    }
-                  } else if ("date".equals(extraFieldName.getType())) {
-                    if(value.trim().isEmpty()){
-                      extraFields.setValue("");
-                      continue;
-                    }
-                    try {
-                      DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
-                      LocalDate date = LocalDate.parse(value, inputFormatter);
-                      DateTimeFormatter outputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-                      formattedValue = date.format(outputFormatter);
-                    } catch (Exception e) {
-                      errorDesc.append("ERROR WHILE UPDATING IN ").append(extraFieldName.getName().toUpperCase())
-                              .append(" - Invalid date format (use dd-MM-yyyy)");
-                      errorFlag = 1;
-                      break;
-                    }
-                  }
-
-                  extraFields.setValue(formattedValue);
-                  extraFields.setCompanyId(companyId);
-                  extraFieldsRepository.save(extraFields);
+              } else if ("date".equals(extraFieldName.getType()) && !value.trim().isEmpty()) {
+                try {
+                  DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+                  LocalDate date = LocalDate.parse(value, inputFormatter);
+                  DateTimeFormatter outputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+                  formattedValue = date.format(outputFormatter);
+                } catch (Exception e) {
+                  formatErrorMessages.add("ERROR WHILE UPDATING IN "
+                          + extraFieldName.getName().toUpperCase());
+                  errorCellMap.put(j, true);
+                  errorFlag = 1;
+                  fieldValid = false;
                 }
-                break;
               }
+
+              if (fieldValid) {
+                extraFieldValues.put(extraFieldName.getName().toLowerCase(), formattedValue);
+                extraFieldDisplayNames.put(extraFieldName.getName().toLowerCase(), extraFieldName.getName());
+              }
+              break;
             }
           }
         }
 
+        if (excludeAssetId != null
+                && !validateAllUniqueFieldsForImport(assetsDTO, extraFieldValues, companyId, errorDesc,
+                errorCellMap, headerMap, columnMap, excludeAssetId, "UPDATING")) {
+          errorFlag = 1;
+          log.warn("Unique field validation failed during update: {}", errorDesc.toString());
+        }
+
+        if (!formatErrorMessages.isEmpty()) {
+          for (String formatErrorMessage : formatErrorMessages) {
+            appendAssetImportError(errorDesc, formatErrorMessage);
+          }
+        }
+
+        if (errorFlag == 0 && excludeAssetId != null) {
+          log.info("Attempting to update asset: {}", assetsDTO.toString());
+          AssetsDTO updatedAssetDTO = assetsService.addAssets(assetsDTO);
+
+          for (Map.Entry<String, String> entry : extraFieldValues.entrySet()) {
+            String lowerKey = entry.getKey();
+            String originalName = extraFieldDisplayNames.getOrDefault(lowerKey, entry.getKey());
+
+            Optional<AssetExtraFields> existingExtra =
+                    extraFieldsRepository.findByNameAndAssetId(originalName, updatedAssetDTO.getId());
+            AssetExtraFields extraFields = existingExtra.orElse(new AssetExtraFields());
+
+            extraFields.setAssetId(updatedAssetDTO.getId());
+            extraFields.setName(originalName);
+            extraFields.setValue(entry.getValue());
+            extraFields.setCompanyId(companyId);
+
+            for (AssetExtraFieldName extraFieldName : extraFieldNames) {
+              if (extraFieldName.getName().equalsIgnoreCase(originalName)) {
+                extraFields.setType(extraFieldName.getType());
+                break;
+              }
+            }
+
+            extraFieldsRepository.save(extraFields);
+            log.info("Extra field updated: {} = {}", originalName, entry.getValue());
+          }
+        }
+
         if (errorFlag != 0) {
-          Row errorRow = errorSheet.createRow(errorRowIndex++);
-          for (int col = 0; col < row.length; col++) errorRow.createCell(col).setCellValue(row[col]);
-          errorRow.createCell(row.length).setCellValue(errorDesc.toString());
-          log.warn("📋 Update error recorded at row {}: {}", errorRowIndex - 1, errorDesc.toString());
+          Row errorRow = errorSheet.createRow(excelIndex++);
+          for (int k = 0; k < row.length; k++) {
+            Cell cell = errorRow.createCell(k);
+            cell.setCellValue(row[k]);
+          }
+          for (Map.Entry<Integer, Boolean> entry : errorCellMap.entrySet()) {
+            if (entry.getValue()) {
+              Cell errorCell = errorRow.getCell(entry.getKey());
+              if (errorCell != null) errorCell.setCellStyle(errorCellStyle);
+            }
+          }
+          Cell errorDescriptionCell = errorRow.createCell(row.length);
+          errorDescriptionCell.setCellValue(errorDesc.toString());
+          errorDescriptionCell.setCellStyle(errorCellStyle);
+          log.warn("Update import error recorded at row {}: {}", excelIndex - 1, errorDesc.toString());
         }
 
         currCount++;
@@ -1124,18 +1238,29 @@ public class AssetAPI {
         importHistoryDTO = customerService.addImportHistory(importHistoryDTO);
       }
 
-      sendImportEmail(email, workbook, errorSheet.getLastRowNum() > 0, "Asset Update Results - AssetYug");
-      importHistoryDTO.setStatus("Completed");
+      if (excelIndex > 1) {
+        importHistoryDTO.setHasErrorReport(true);
+        importHistoryDTO.setErrorReportFileName("AssetUpdateImportErrors.xlsx");
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+          workbook.write(baos);
+          importHistoryDTO.setErrorReportFile(baos.toByteArray());
+        }
+      }
 
-    } catch (IOException e) {
+      sendImportEmail(email, workbook, excelIndex > 1, "Asset Update Results - AssetYug");
+      importHistoryDTO.setStatus("Completed");
+      importHistoryDTO.setMessage(excelIndex > 1 ? "We have sent import result via email" : "Import was Successfully Done");
+
+    } catch (IOException | CsvValidationException e) {
       importHistoryDTO.setStatus("Failed");
       importHistoryDTO.setMessage(e.getMessage());
       log.error("Update import failed", e);
     } catch (Exception e) {
-        throw new RuntimeException(e);
+      throw new RuntimeException(e);
     }
 
-      customerService.addImportHistory(importHistoryDTO);
+    customerService.addImportHistory(importHistoryDTO);
+    sendImportNotification(companyId, file.getOriginalFilename());
     log.info("Update import completed for companyId: {}", companyId);
   }
 
@@ -1762,6 +1887,11 @@ public class AssetAPI {
    * Checks both standard fields and extra fields
    */
   private boolean isUniqueFieldValid(Long companyId, String fieldName, String fieldValue, String fieldType) {
+    return isUniqueFieldValid(companyId, fieldName, fieldValue, fieldType, null);
+  }
+
+  private boolean isUniqueFieldValid(Long companyId, String fieldName, String fieldValue, String fieldType,
+                                     String excludeAssetId) {
     if (fieldValue == null || fieldValue.trim().isEmpty()) {
       return true; // Empty values are allowed
     }
@@ -1794,6 +1924,11 @@ public class AssetAPI {
         }
 
         List<Assets> existingAssets = mongoTemplate.find(query, Assets.class);
+        if (excludeAssetId != null) {
+          existingAssets = existingAssets.stream()
+                  .filter(a -> !excludeAssetId.equals(a.getId()))
+                  .toList();
+        }
         return existingAssets.isEmpty();
       } else if ("EXTRA".equalsIgnoreCase(fieldType)) {
         // Check extra fields
@@ -1803,6 +1938,11 @@ public class AssetAPI {
         extraQuery.addCriteria(Criteria.where("value").regex("^" + Pattern.quote(fieldValue) + "$", "i"));
 
         List<AssetExtraFields> existingExtraFields = mongoTemplate.find(extraQuery, AssetExtraFields.class);
+        if (excludeAssetId != null) {
+          existingExtraFields = existingExtraFields.stream()
+                  .filter(e -> !excludeAssetId.equals(e.getAssetId()))
+                  .toList();
+        }
         return existingExtraFields.isEmpty();
       }
     } catch (Exception e) {
@@ -1824,6 +1964,15 @@ public class AssetAPI {
                                                    Long companyId, StringBuilder errorDesc,
                                                    Map<Integer, Boolean> errorCellMap, Map<Integer, String> headerMap,
                                                    Map<String, String> columnMap) {
+    return validateAllUniqueFieldsForImport(assetsDTO, extraFieldValues, companyId, errorDesc,
+            errorCellMap, headerMap, columnMap, null, "ADDING");
+  }
+
+  private boolean validateAllUniqueFieldsForImport(AssetsDTO assetsDTO, Map<String, String> extraFieldValues,
+                                                   Long companyId, StringBuilder errorDesc,
+                                                   Map<Integer, Boolean> errorCellMap, Map<Integer, String> headerMap,
+                                                   Map<String, String> columnMap, String excludeAssetId,
+                                                   String importAction) {
     List<AssetUniqueFieldConfiguration> uniqueConfigs;
     try {
       uniqueConfigs = assetUniqueFieldConfigurationRepository.findByCompanyIdAndIsUniqueTrue(companyId);
@@ -1883,21 +2032,21 @@ public class AssetAPI {
       if (fieldValue != null && !fieldValue.trim().isEmpty()) {
         boolean isValid;
         try {
-          isValid = isUniqueFieldValid(companyId, fieldName, fieldValue, fieldType);
+          isValid = isUniqueFieldValid(companyId, fieldName, fieldValue, fieldType, excludeAssetId);
         } catch (Exception e) {
           // FIX: don't silently kill the row with a blank error reason —
           // surface the failure into errorDesc and highlight the cell if known.
           log.error("Error checking uniqueness for field {} (value '{}'): {}",
                   fieldName, fieldValue, e.getMessage(), e);
           hasViolations = true;
-          violationMessages.add(fieldName.toUpperCase() + " - could not verify uniqueness (" + e.getMessage() + ")");
+          violationMessages.add("ERROR WHILE " + importAction + " IN " + fieldName.toUpperCase());
           if (cellIndex >= 0) errorCellMap.put(cellIndex, true);
           continue;
         }
 
         if (!isValid) {
           hasViolations = true;
-          violationMessages.add(fieldName.toUpperCase() + " (value: '" + fieldValue + "' already exists)");
+          violationMessages.add("ERROR WHILE " + importAction + " IN " + fieldName.toUpperCase());
           if (cellIndex >= 0) errorCellMap.put(cellIndex, true);
           log.warn("Unique field validation failed for {}: {}", fieldName, fieldValue);
         }
@@ -1905,16 +2054,20 @@ public class AssetAPI {
     }
 
     if (hasViolations) {
-      if (errorDesc.length() > 0) errorDesc.append(" | ");
-      errorDesc.append("DUPLICATE VALUES FOUND: ");
-      for (int i = 0; i < violationMessages.size(); i++) {
-        errorDesc.append(violationMessages.get(i));
-        if (i < violationMessages.size() - 1) errorDesc.append(" | ");
+      for (String violationMessage : violationMessages) {
+        appendAssetImportError(errorDesc, violationMessage);
       }
       return false;
     }
 
     return true;
+  }
+
+  private void appendAssetImportError(StringBuilder errorDesc, String message) {
+    if (errorDesc.length() > 0) {
+      errorDesc.append(", ");
+    }
+    errorDesc.append(message);
   }
 
   private long countFileRows(MultipartFile file) {

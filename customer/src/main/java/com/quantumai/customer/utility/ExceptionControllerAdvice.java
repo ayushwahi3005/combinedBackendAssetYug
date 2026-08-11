@@ -53,7 +53,7 @@ public class ExceptionControllerAdvice {
   @ExceptionHandler(UserException.class)
   public ResponseEntity<ErrorInfo> UserNotFound(UserException exception) {
     ErrorInfo errorInfo = new ErrorInfo();
-    errorInfo.setErrorMessage("User Already Invited");
+    errorInfo.setErrorMessage("User email already exists in AssetYug. Please use a different email address.");
     errorInfo.setErrorCode(HttpStatus.BAD_REQUEST.value());
     return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
   }
@@ -245,6 +245,48 @@ public class ExceptionControllerAdvice {
                     "message", ex.getMessage()
             ));
   }
+
+  @ExceptionHandler(UserInActiveException.class)
+  public ResponseEntity<Map<String, String>> UserInActiveException(UserInActiveException ex) {
+    return ResponseEntity
+            .status(HttpStatus.CONFLICT)  // 409
+            .body(Map.of(
+                    "errorMessage", "User is Inactive",
+                    "message", ex.getMessage()
+            ));
+  }
+
+  @ExceptionHandler(UserNotFoundException.class)
+  public ResponseEntity<Map<String, String>> UserNotFoundException(UserNotFoundException ex) {
+    return ResponseEntity
+            .status(HttpStatus.CONFLICT)  // 409
+            .body(Map.of(
+                    "errorMessage", "User is not yet registered",
+                    "message", ex.getMessage()
+            ));
+  }
+
+  @ExceptionHandler(TooManyAttemptException.class)
+  public ResponseEntity<Map<String, String>> TooManyAttemptException(TooManyAttemptException ex) {
+    return ResponseEntity
+            .status(HttpStatus.CONFLICT)  // 409
+            .body(Map.of(
+                    "errorMessage", "Too many attempts, please try again later",
+                    "message", ex.getMessage()
+            ));
+  }
+
+  @ExceptionHandler(FirebaseServiceException.class)
+  public ResponseEntity<Map<String, String>> FirebaseServiceException(FirebaseServiceException ex) {
+    return ResponseEntity
+            .status(HttpStatus.CONFLICT)  // 409
+            .body(Map.of(
+                    "errorMessage", "Firebase Service Exception",
+                    "message", ex.getMessage()
+            ));
+  }
+
+
 
   @ExceptionHandler(AssetUniqueFieldViolationException.class)
   public ResponseEntity<Map<String, Object>> handleAssetUniqueFieldViolation(AssetUniqueFieldViolationException exception) {

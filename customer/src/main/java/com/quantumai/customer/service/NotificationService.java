@@ -93,7 +93,7 @@ public class NotificationService {
 //            userNotificationList.add(userNotification);
             userNotificationRepository.save(userNotification);
             List<UserNotification> myList=userNotificationRepositoryImpl.findRecentNotificationsWithDetails(customer.getEmail());
-            System.out.println("Sending Message"+myList);
+//            System.out.println("Sending Message"+myList);
             simpMessagingTemplate.convertAndSend("/topic/user/" + customer.getEmail() + "/notifications", myList);
 
 

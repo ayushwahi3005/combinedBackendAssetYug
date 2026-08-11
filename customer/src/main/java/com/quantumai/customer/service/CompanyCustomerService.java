@@ -66,6 +66,9 @@ public interface CompanyCustomerService {
 
   public List<CompanyCustomerFileDTO> getCompanyCustomerFile(String companyCustomerId);
 
+  PaginatedResultDTO<CompanyCustomerFileDTO> getCompanyCustomerFilePaginated(
+      String companyCustomerId, int pageNumber, int pageSize);
+
   public CompanyCustomerFileDTO downloadFile(String id);
 
   public void deleteFile(String id);

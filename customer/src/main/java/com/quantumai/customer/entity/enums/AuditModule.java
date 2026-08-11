@@ -20,5 +20,6 @@ public enum AuditModule {
     BIN,
     NOTIFICATION,
     IMPORT,
-    ADMIN
+    ADMIN,
+    IMPORT_HISTORY,
 }

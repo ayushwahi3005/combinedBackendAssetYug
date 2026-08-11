@@ -22,4 +22,7 @@ public class Location {
   private String country;
   private StatusEnum status;
   private String zipCode;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

@@ -17,4 +17,7 @@ public class UserNotificationDTO {
     private LocalDateTime readAt;
     private LocalDateTime deliveredAt;
     private Notification notification;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

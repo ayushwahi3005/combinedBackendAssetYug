@@ -473,6 +473,21 @@ public class CustomerAPI {
     return customerService.getImportHistoryList(companyId, pageNumber, pageSize);
   }
 
+  @Operation(summary = "Cancel Import History", description = "Cancel Import History")
+  @PutMapping(value = "/cancelImport/{companyId}/{importHistoryId}")
+  public void cancelImportHistory( @PathVariable Long companyId,
+                         @PathVariable String importHistoryId) throws Exception {
+    // Fetch before deletion for audit snapshot
+    ImportHistory importHistory = importHistoryRepository.findById(importHistoryId).orElse(null);
+    if (importHistory != null) {
+      auditService.logDelete(AuditModule.IMPORT_HISTORY, String.valueOf(importHistory.getId()),
+              importHistory.getFileName(), importHistory.getCompanyId(),
+              Map.of("Import History Id", String.valueOf(importHistory.getId()),
+                      "Import Name", String.valueOf(importHistory.getFileName())));
+    }
+    customerService.cancelImportHistory(companyId, importHistoryId);
+  }
+
   @Operation(summary = "Update Import History", description = "Endpoint to update import history")
   @PutMapping(value = "/updateImportHistory")
 

@@ -18,4 +18,7 @@ public class ImportHistoryDTO {
   private Long companyId;
   private Boolean hasErrorReport;
   private String errorReportFileName;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

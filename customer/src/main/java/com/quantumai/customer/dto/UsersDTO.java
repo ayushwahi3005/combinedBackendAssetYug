@@ -20,4 +20,7 @@ public class UsersDTO {
   private UserStatusEnum status;
   private String title;
   private CustomRoleDTO role;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

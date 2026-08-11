@@ -1,5 +1,6 @@
 package com.quantumai.customer.controller;
 
+import com.quantumai.customer.exception.TooManyAttemptException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
@@ -174,7 +175,7 @@ public class AdminAPI {
   @PostMapping(value = "/resend-email-firebase-verification/{companyId}/{email}")
   public ResponseEntity<Map<String, String>> resendFirebaseVerificationEmail(
           @PathVariable Long companyId,
-          @PathVariable String email) throws UserException, TheMailException, FirebaseAuthException, UserEmailAlreadyVerifiedException {
+          @PathVariable String email) throws UserException, TheMailException, FirebaseAuthException, UserEmailAlreadyVerifiedException, TooManyAttemptException {
 
     userService.resendFirebaseVerificationEmail(email, companyId);
 

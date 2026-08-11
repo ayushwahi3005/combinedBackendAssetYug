@@ -13,4 +13,7 @@ public class CompanyCustomerExtraFieldName {
   private String type;
   private String email;
   private Long companyId;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

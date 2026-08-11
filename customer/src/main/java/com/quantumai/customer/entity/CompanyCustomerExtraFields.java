@@ -16,6 +16,9 @@ public class CompanyCustomerExtraFields {
   private String type;
   private Long companyId;
   private Long companyCustomerExtraFieldId;  // NEW: Unique sequential ID per company
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }
 
 

@@ -696,6 +696,22 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
+  public PaginatedResultDTO<AssetFileDTO> getAssetFilePaginated(String assetId, int pageNumber, int pageSize) {
+    Pageable pageable = PageRequest.of(pageNumber, pageSize, Sort.by(Sort.Direction.DESC, "uploadDateTime"));
+    Page<AssetFile> page = assetFileRepository.findByAssetId(assetId, pageable);
+
+    List<AssetFileDTO> assetFileDTOList = page.getContent().stream()
+        .map(assetFile -> {
+          AssetFileDTO assetFileDTO = modelMapper.map(assetFile, AssetFileDTO.class);
+          assetFileDTO.setFile(null);
+          return assetFileDTO;
+        })
+        .toList();
+
+    return new PaginatedResultDTO<>(assetFileDTOList, page.getTotalElements());
+  }
+
+  @Override
   public AssetFileDTO downloadFile(String id) {
     // TODO Auto-generated method stub
     Optional<AssetFile> assetFile = assetFileRepository.findById(id);
@@ -1170,7 +1186,7 @@ public class AssetsServiceImpl implements AssetsService {
       m.put("category", assetsDTO.getCategory());
       m.put("customer", assetsDTO.getCustomer());
       m.put("customerId", assetsDTO.getCustomerId());
-      m.put("location", assetsDTO.getLocation());
+      m.put("location", locationHierarchyUtil.resolveAssetLocationName(assetsList.get(i)));
       m.put("status", assetsDTO.getStatus());
       m.put("updatedAt", assetsDTO.getUpdatedAt());
       ObjectMapper objectMapper = new ObjectMapper();
@@ -1511,7 +1527,7 @@ public class AssetsServiceImpl implements AssetsService {
 
 
     Optional<AssetCategory> optionalAssetCategory =
-        assetCategoryRepository.findByNameAndCompanyId(categoryDTO.getName(),categoryDTO.getCompanyId());
+        assetCategoryRepository.findByNameIgnoreCaseAndCompanyId(categoryDTO.getName(),categoryDTO.getCompanyId());
 
     if (optionalAssetCategory.isEmpty()) {
       assetCategoryRepository.save(category);
@@ -1678,10 +1694,42 @@ public class AssetsServiceImpl implements AssetsService {
 
   @Override
   public List<AssetCategoryInspection> getAllActiveAssetInspectionByCategory(Long companyId, String category)  {
-    System.out.println("===================>>>" + category);
-    if (category.trim().isEmpty()) {
-      return new ArrayList<>();
-    }
+    System.out.println("===================>>>" + category+" "+companyId);
+//    if (category.trim().isEmpty()) {
+////      return new ArrayList<>();
+//
+//      return assetCategoryInspectionRepository.findByCompanyId(companyId)
+//              .stream()
+//              .filter(data -> {
+//
+//                if (data.getStatus() == null || !data.getStatus().equals(StatusEnum.active)) {
+//                  return false;
+//                }
+//
+//                // Include inspections having no category
+//                if (data.getCategoryName() == null|| data.getCategoryName().isEmpty()|| data.getCategoryName().toString().trim().isEmpty()) {
+//                  return true;
+//                }
+//
+//                return data.getCategoryName().stream()
+//                        .anyMatch(categoryObj -> {
+//                          try {
+//                            if (categoryObj instanceof Map) {
+//                              Map<?, ?> categoryMap = (Map<?, ?>) categoryObj;
+//                              Object categoryNameValue = categoryMap.get("categoryName");
+//                              return categoryNameValue != null &&
+//                                      categoryNameValue.toString().equalsIgnoreCase(category);
+//                            }
+//
+//                            return categoryObj != null &&
+//                                    categoryObj.toString().equalsIgnoreCase(category);
+//                          } catch (Exception e) {
+//                            return false;
+//                          }
+//                        });
+//              })
+//              .collect(Collectors.toList());
+//    }
 
     return assetCategoryInspectionRepository.findByCompanyId(companyId)
             .stream()
@@ -1929,13 +1977,14 @@ public class AssetsServiceImpl implements AssetsService {
         assetCheckInOutData.setAssetName(asset.getName());
         assetCheckInOutData.setAssetStatus(asset.getStatus());
         assetCheckInOutData.setAction("Checked In");
+        assetCheckInOutData.setUsername(asset.getCreatedBy());
         if (asset.getUpdatedAt() != null) {
           LocalDateTime date = LocalDateTime.parse(asset.getUpdatedAt());
           assetCheckInOutData.setDate(date);
           assetCheckInOutData.setTime(date.toLocalTime().withNano(0));
         }
         assetCheckInOutData.setLocation("NA");
-        assetCheckInOutData.setUsername("NA");
+//        assetCheckInOutData.setUsername("NA");
         assetCheckInOutData.setCustomerName(asset.getCustomer());
         populateCustomerId(asset, assetCheckInOutData, customerMap);
         assetCheckInOutDataList.add(assetCheckInOutData);

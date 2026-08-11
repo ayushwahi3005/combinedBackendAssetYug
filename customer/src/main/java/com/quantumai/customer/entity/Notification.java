@@ -11,7 +11,6 @@ import java.time.LocalDateTime;
 
 @Document
 @Data
-@AllArgsConstructor
 @NoArgsConstructor
 public class Notification {
 
@@ -24,4 +23,18 @@ public class Notification {
     private Long companyId; // null for global
     private LocalDateTime createdAt;
     private LocalDateTime expiryAt;
+    private String createdBy;
+    private String lastUpdatedBy;
+
+    public Notification(String id, String title, String message, NotificationType notificationType,
+                        String alertType, Long companyId, LocalDateTime createdAt, LocalDateTime expiryAt) {
+        this.id = id;
+        this.title = title;
+        this.message = message;
+        this.notificationType = notificationType;
+        this.alertType = alertType;
+        this.companyId = companyId;
+        this.createdAt = createdAt;
+        this.expiryAt = expiryAt;
+    }
 }

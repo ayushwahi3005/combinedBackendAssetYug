@@ -14,4 +14,7 @@ public class AssetCheckInOut {
   private String status;
   private Long companyId;
   private List<AssetCheckInOutDetails> detailsList;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

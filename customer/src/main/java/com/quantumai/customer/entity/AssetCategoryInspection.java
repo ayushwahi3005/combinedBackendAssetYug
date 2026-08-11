@@ -19,4 +19,7 @@ public class AssetCategoryInspection {
   private Long companyId;
   private List<InspectionStep> steps;
   private StatusEnum status;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

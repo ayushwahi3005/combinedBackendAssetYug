@@ -44,4 +44,7 @@ public class Payment {
   private String paymentIntentId;
   private String chargeId;
   private String invoiceId;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

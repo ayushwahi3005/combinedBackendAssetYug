@@ -13,4 +13,7 @@ public class AssetCheckInOutDetailsDTO {
   private String location;
   private Long companyId;
   private LocalDateTime updateTime;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

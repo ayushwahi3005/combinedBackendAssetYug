@@ -8,4 +8,7 @@ public class AccountLockInfoDTO {
   private String customerEmail;
   private Boolean lockedStatus;
   private Integer incorrectAttemptCount;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

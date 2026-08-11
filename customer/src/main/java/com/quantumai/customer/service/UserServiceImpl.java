@@ -14,7 +14,9 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 
+import jakarta.mail.internet.MimeMessage;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
@@ -25,6 +27,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -143,6 +146,146 @@ public class UserServiceImpl implements UserService {
     }
 
 
+    private static final String INVITATION_EMAIL_SUBJECT = "You're invited to join AssetYug";
+    private static final int INVITATION_EXPIRY_DAYS = 7;
+
+    @Override
+    public void sendInvitationEmail(Mail mail, String invitationLink, String organizationName)
+            throws TheMailException {
+        String firstName = resolveDisplayFirstName(mail.getFirstName(), mail.getEmail());
+        String invitedBy = mail.getFrom() != null && !mail.getFrom().trim().isEmpty()
+                ? mail.getFrom().trim()
+                : "your organization administrator";
+        String roleName = resolveRoleName(mail);
+        String orgName = organizationName != null && !organizationName.trim().isEmpty()
+                ? organizationName.trim()
+                : "your organization";
+        String expirationDate = LocalDateTime.now().plusDays(INVITATION_EXPIRY_DAYS)
+                .format(DateTimeFormatter.ofPattern("MMMM d, yyyy"));
+
+        try {
+            MimeMessage message = emailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+            helper.setTo(mail.getEmail());
+            helper.setSubject(INVITATION_EMAIL_SUBJECT);
+            helper.setText(
+                    buildInvitationEmailPlainText(
+                            firstName, invitedBy, orgName, roleName, mail.getEmail(), invitationLink, expirationDate),
+                    buildInvitationEmailHtml(
+                            firstName, invitedBy, orgName, roleName, mail.getEmail(), invitationLink, expirationDate));
+            emailSender.send(message);
+        } catch (Exception ex) {
+            MailException mailException = ex instanceof MailException
+                    ? (MailException) ex
+                    : new org.springframework.mail.MailSendException("Failed to send email: " + ex.getMessage(), ex);
+            throw new TheMailException("Failed to send email: " + ex.getMessage(), mailException);
+        }
+    }
+
+    private String resolveRoleName(Mail mail) {
+        if (mail.getRole() != null && mail.getRole().getName() != null && !mail.getRole().getName().isBlank()) {
+            return mail.getRole().getName();
+        }
+        return "Member";
+    }
+
+    private String resolveDisplayFirstName(String firstName, String email) {
+        if (firstName != null && !firstName.trim().isEmpty()) {
+            return firstName.trim();
+        }
+        if (email != null && email.contains("@")) {
+            return email.substring(0, email.indexOf('@'));
+        }
+        return "there";
+    }
+
+    private String buildInvitationEmailPlainText(
+            String firstName,
+            String invitedBy,
+            String organizationName,
+            String roleName,
+            String email,
+            String invitationLink,
+            String expirationDate) {
+        return String.format(
+                "Hello %s,%n%n"
+                        + "You've been invited by %s to join %s on AssetYug.%n%n"
+                        + "AssetYug is an intelligent asset management platform that helps organizations manage assets, "
+                        + "streamline inspections, monitor asset status, and maintain complete audit visibility from a single platform.%n%n"
+                        + "Your Account Details%n"
+                        + "Organization: %s%n"
+                        + "Role: %s%n"
+                        + "Email: %s%n%n"
+                        + "To activate your account and create your password, click the link below.%n%n"
+                        + "Accept Invitation:%n"
+                        + "%s%n%n"
+                        + "This invitation will expire on %s.%n%n"
+                        + "If the link above doesn't work, copy and paste it into your browser:%n"
+                        + "%s%n%n"
+                        + "If you weren't expecting this invitation, you can safely ignore this email. "
+                        + "No account will be created unless you accept the invitation.%n%n"
+                        + "If you need assistance, contact your organization administrator or reply to this email.%n%n"
+                        + "Welcome to AssetYug!%n%n"
+                        + "Best regards,%n"
+                        + "The AssetYug Team",
+                firstName,
+                invitedBy,
+                organizationName,
+                organizationName,
+                roleName,
+                email,
+                invitationLink,
+                expirationDate,
+                invitationLink);
+    }
+
+    private String buildInvitationEmailHtml(
+            String firstName,
+            String invitedBy,
+            String organizationName,
+            String roleName,
+            String email,
+            String invitationLink,
+            String expirationDate) {
+        return String.format(
+                """
+                <html>
+                <body style="font-family: Arial, sans-serif; color: #333333; line-height: 1.6;">
+                  <p>Hello %s,</p>
+                  <p>You've been invited by <strong>%s</strong> to join <strong>%s</strong> on <strong>AssetYug</strong>.</p>
+                  <p>AssetYug is an intelligent asset management platform that helps organizations manage assets, streamline inspections, monitor asset status, and maintain complete audit visibility from a single platform.</p>
+                  <h3 style="margin-bottom: 8px;">Your Account Details</h3>
+                  <ul style="padding-left: 20px;">
+                    <li><strong>Organization:</strong> %s</li>
+                    <li><strong>Role:</strong> %s</li>
+                    <li><strong>Email:</strong> %s</li>
+                  </ul>
+                  <p>To activate your account and create your password, click the button below.</p>
+                  <p style="margin: 24px 0;">
+                    <a href="%s" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">Accept Invitation</a>
+                  </p>
+                  <p>This invitation will expire on <strong>%s</strong>.</p>
+                  <p>If the button above doesn't work, copy and paste the following link into your browser:</p>
+                  <p><a href="%s">%s</a></p>
+                  <p>If you weren't expecting this invitation, you can safely ignore this email. No account will be created unless you accept the invitation.</p>
+                  <p>If you need assistance, contact your organization administrator or reply to this email.</p>
+                  <p>Welcome to AssetYug!</p>
+                  <p>Best regards,<br>The AssetYug Team</p>
+                </body>
+                </html>
+                """,
+                firstName,
+                invitedBy,
+                organizationName,
+                organizationName,
+                roleName,
+                email,
+                invitationLink,
+                expirationDate,
+                invitationLink,
+                invitationLink);
+    }
+
   @Override
   public void sendSimpleMessage(String to, String subject, String text) throws TheMailException {
     // TODO Auto-generated method stub
@@ -195,7 +338,20 @@ public class UserServiceImpl implements UserService {
     return usersListDTO;
   }
 
-  @Override
+    @Override
+    public List<UsersDTO> getAllActiveUsers(Long companyId) {
+        List<Users> usersList = usersRepository.findByCompanyId(companyId);
+        List<UsersDTO> usersListDTO = new ArrayList<>();
+        usersList.stream().filter(users -> users.getStatus() == UserStatusEnum.active)
+                .forEach(
+                        (user) -> {
+                            UsersDTO usersDTO = modelMapper.map(user, UsersDTO.class);
+                            usersListDTO.add(usersDTO);
+                        });
+        return usersListDTO;
+    }
+
+    @Override
   @Transactional
   public Users registerUser(Users user) throws UserException {
     // Check if user exists and is not already active

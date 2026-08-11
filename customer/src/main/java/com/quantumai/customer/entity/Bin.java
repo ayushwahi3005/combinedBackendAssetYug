@@ -18,4 +18,7 @@ public class Bin {
   String binNumber;
   private StatusEnum status;
   Long companyId;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

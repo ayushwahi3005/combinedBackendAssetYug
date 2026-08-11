@@ -20,4 +20,7 @@ public class Plans {
   private String description3;
   private String description4;
   private String description5;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

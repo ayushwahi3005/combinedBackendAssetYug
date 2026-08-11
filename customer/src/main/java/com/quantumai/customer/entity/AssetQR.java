@@ -13,4 +13,7 @@ public class AssetQR {
   private String custom;
   private String optional;
   private Long companyId;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

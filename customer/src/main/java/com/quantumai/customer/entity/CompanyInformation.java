@@ -21,4 +21,7 @@ public class CompanyInformation {
   private String zipCode;
   private String phoneNo;
   private String website;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

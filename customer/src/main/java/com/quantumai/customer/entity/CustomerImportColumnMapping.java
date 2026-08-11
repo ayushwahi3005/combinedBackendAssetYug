@@ -19,4 +19,6 @@ public class CustomerImportColumnMapping {
   private String createdBy;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
+
+  private String lastUpdatedBy;
 }

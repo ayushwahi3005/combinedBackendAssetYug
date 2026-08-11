@@ -19,17 +19,21 @@ public interface UserService {
    * @throws UserException If user is not found or already verified
    * @throws TheMailException If there's an error sending the email
    */
-  void resendFirebaseVerificationEmail(String email, Long companyId) throws UserException, TheMailException, FirebaseAuthException, UserEmailAlreadyVerifiedException;
+  void resendFirebaseVerificationEmail(String email, Long companyId) throws UserException, TheMailException, FirebaseAuthException, UserEmailAlreadyVerifiedException, TooManyAttemptException;
   
   void resendVerificationEmail(String email, Long companyId) throws UserException, TheMailException;
 
   public void sendSimpleMessage(String to, String subject, String text);
+
+  void sendInvitationEmail(Mail mail, String invitationLink, String organizationName) throws TheMailException;
 
   public AuthenticationResponseDTO generateToken(Mail mail);
 
   public Claims decodeDetails(String token);
 
   public List<UsersDTO> getAllUsers(Long companyId);
+
+  public List<UsersDTO> getAllActiveUsers(Long companyId);
 
   public Users registerUser(Users user) throws UserException;
 

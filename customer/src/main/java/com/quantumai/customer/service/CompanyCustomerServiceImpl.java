@@ -41,6 +41,9 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -152,7 +155,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   public CompanyCustomerDTO getCustomer(String id) {
     // TODO Auto-generated method stub
     Optional<CompanyCustomer> companyCustomerOptional = companyCustomerRepository.findById(id);
-    System.out.println(id);
+//    System.out.println(id);
     CompanyCustomerDTO companyCustomerDTO = modelMapper.map(companyCustomerOptional.get(), CompanyCustomerDTO.class);
     return companyCustomerDTO;
   }
@@ -673,6 +676,24 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   }
 
   @Override
+  public PaginatedResultDTO<CompanyCustomerFileDTO> getCompanyCustomerFilePaginated(
+      String companyCustomerId, int pageNumber, int pageSize) {
+    Pageable pageable = PageRequest.of(pageNumber, pageSize, Sort.by(Sort.Direction.DESC, "uploadDateTime"));
+    Page<CompanyCustomerFile> page =
+        companyCustomerFileRepository.findByCompanyCustomerId(companyCustomerId, pageable);
+
+    List<CompanyCustomerFileDTO> fileDTOList = page.getContent().stream()
+        .map(file -> {
+          CompanyCustomerFileDTO dto = modelMapper.map(file, CompanyCustomerFileDTO.class);
+          dto.setFile(null);
+          return dto;
+        })
+        .toList();
+
+    return new PaginatedResultDTO<>(fileDTOList, page.getTotalElements());
+  }
+
+  @Override
   public CompanyCustomerFileDTO downloadFile(String id) {
     // TODO Auto-generated method stub
     Optional<CompanyCustomerFile> companyCustomerFile = companyCustomerFileRepository.findById(id);
@@ -925,17 +946,17 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
                 return false;
               })
           .collect(Collectors.toList());
-      System.out.println("total->" + filteredAssetsWithAllFields.size());
+//      System.out.println("total->" + filteredAssetsWithAllFields.size());
       // Sorting if it is enabled
 
       System.out.println("Sort-" + sortField + " " + sortField.length());
       System.out.println("Search-" + searchData);
-      if (sortField != null && (sortField.trim().equals("") == false)) {
-        System.out.println("going inside-" + sortField);
+      if (!sortField.trim().isEmpty()) {
+//        System.out.println("going inside-" + sortField);
         ObjectMapper objectMapper = new ObjectMapper();
         Comparator<String> customComparator = Comparator.comparing(
             data -> {
-              System.out.println("inside comparator-" + (String) data);
+//              System.out.println("inside comparator-" + (String) data);
               Map<String, String> myMap = new HashMap<>();
               try {
                 myMap = objectMapper.readValue(
@@ -948,7 +969,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
               }
-              System.out.println(" comparator-" + myMap.get(sortField));
+//              System.out.println(" comparator-" + myMap.get(sortField));
               return myMap.get(sortField).toLowerCase();
             },
             String.CASE_INSENSITIVE_ORDER);
@@ -1011,7 +1032,7 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
     companyCustomerCategoryIdGeneratorRepository.save(companyCustomerCategoryIdGenerator);
 
     Optional<CompanyCustomerCategory> OptionalCompanyCustomerCategory = companyCustomerCategoryRepository
-        .findByNameAndCompanyId(categoryDTO.getName(), categoryDTO.getCompanyId());
+        .findByNameIgnoreCaseAndCompanyId(categoryDTO.getName(), categoryDTO.getCompanyId());
     if (OptionalCompanyCustomerCategory.isEmpty()) {
       companyCustomerCategoryRepository.save(category);
     } else {

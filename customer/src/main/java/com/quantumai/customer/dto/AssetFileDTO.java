@@ -12,4 +12,7 @@ public class AssetFileDTO {
   private String fileName;
   private LocalDateTime uploadDateTime;
   private String uploadedBy;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }

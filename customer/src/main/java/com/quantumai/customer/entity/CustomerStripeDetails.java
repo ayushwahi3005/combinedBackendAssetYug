@@ -14,4 +14,7 @@ public class CustomerStripeDetails {
   private String customerId;
   private Long companyId;
   private String email;
+
+  private String createdBy;
+  private String lastUpdatedBy;
 }
