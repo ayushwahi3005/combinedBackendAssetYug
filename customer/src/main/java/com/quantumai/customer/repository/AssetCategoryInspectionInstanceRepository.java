@@ -21,6 +21,9 @@ public interface AssetCategoryInspectionInstanceRepository
   public Optional<AssetCategoryInspectionInstance> findByAssetCategoryInspectionId(
       String assetCategoryInspectionId);
 
+  Optional<AssetCategoryInspectionInstance> findByAssetCategoryInspectionInstanceIdAndCompanyId(
+      Long assetCategoryInspectionInstanceId, Long companyId);
+
   public List<AssetCategoryInspectionInstance> findByCompanyId(Long companyId);
 
   public Page<AssetCategoryInspectionInstance> findByCompanyId(Long companyId, Pageable pageable);

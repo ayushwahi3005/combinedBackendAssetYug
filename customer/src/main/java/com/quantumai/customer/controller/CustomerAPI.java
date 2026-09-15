@@ -210,8 +210,10 @@ public class CustomerAPI {
       beforeState = customerService.getcompanyInformation(companyInformation.getId());
     }
     customerService.addCompanyInformation(companyInformation);
-    CompanyInformation afterState = customerService.getcompanyInformation(companyInformation.getId());
-    if (beforeState != null && afterState != null) {
+    Long savedId = companyInformation.getId();
+    CompanyInformation afterState = savedId != null
+            ? customerService.getcompanyInformation(savedId) : null;
+    if (afterState != null) {
       auditService.logUpdateWithComparison(AuditModule.COMPANY,
               String.valueOf(afterState.getId()), afterState.getCompanyName(),
               afterState.getId(), beforeState, afterState);

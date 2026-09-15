@@ -2,6 +2,7 @@ package com.quantumai.customer.service;
 
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
+import com.quantumai.customer.exception.CategoryDeletionException;
 import com.quantumai.customer.exception.CategoryException;
 import com.quantumai.customer.exception.EmailAlreadyExistsException;
 import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
@@ -92,9 +93,9 @@ public interface CompanyCustomerService {
 
   public List<CompanyCustomerCategory> getActiveCategoryList(Long companyId);
 
-  public void deleteCategory(String id);
+  public void deleteCategory(String id) throws CategoryDeletionException;
 
-  public void updateCategory(CategoryDTO categoryDTO);
+  public void updateCategory(CategoryDTO categoryDTO) throws CategoryException;
 
   public int countCompanyCustomerByCategory(String category);
 

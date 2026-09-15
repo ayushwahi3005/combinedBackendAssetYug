@@ -45,9 +45,30 @@ public class ExceptionControllerAdvice {
   @ExceptionHandler(CategoryException.class)
   public ResponseEntity<ErrorInfo> UserNotFound(CategoryException exception) {
     ErrorInfo errorInfo = new ErrorInfo();
-    errorInfo.setErrorMessage("Category Already Present");
+    errorInfo.setErrorMessage(exception.getMessage());
     errorInfo.setErrorCode(HttpStatus.BAD_REQUEST.value());
     return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
+  }
+
+  @ExceptionHandler(CategoryDeletionException.class)
+  public ResponseEntity<ErrorInfo> categoryDeletionException(CategoryDeletionException exception) {
+    ErrorInfo errorInfo = new ErrorInfo();
+    errorInfo.setErrorMessage(
+            "Category can't be deleted as data exists for "
+                    + exception.getCount()
+                    + " "
+                    + exception.getEntityLabel()
+                    + ", please make the category Inactive");
+    errorInfo.setErrorCode(HttpStatus.BAD_REQUEST.value());
+    return new ResponseEntity<>(errorInfo, HttpStatus.BAD_REQUEST);
+  }
+
+  @ExceptionHandler(TrialImportNotAllowedException.class)
+  public ResponseEntity<ErrorInfo> trialImportNotAllowedException(TrialImportNotAllowedException exception) {
+    ErrorInfo errorInfo = new ErrorInfo();
+    errorInfo.setErrorMessage(exception.getMessage());
+    errorInfo.setErrorCode(HttpStatus.PAYMENT_REQUIRED.value());
+    return new ResponseEntity<>(errorInfo, HttpStatus.PAYMENT_REQUIRED);
   }
 
   @ExceptionHandler(UserException.class)

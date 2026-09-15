@@ -1,8 +1,12 @@
 package com.quantumai.customer.service;
 
 
+import com.quantumai.customer.entity.CustomRole;
 import com.quantumai.customer.entity.CustomRoleType;
+import com.quantumai.customer.entity.Customer;
+import com.quantumai.customer.entity.RoleType;
 import com.quantumai.customer.entity.Users;
+import com.quantumai.customer.repository.CustomRoleRepository;
 import com.quantumai.customer.repository.UsersRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +34,7 @@ import java.util.Optional;
 public class AssetSecurityService {
 
     private final UsersRepository usersRepository;
+    private final CustomRoleRepository customRoleRepository;
 
     // ─── Internal helper ──────────────────────────────────────────────────────
 
@@ -56,18 +61,49 @@ public class AssetSecurityService {
             return false;
         }
 
+        if (isCompanyAdmin(auth, user)) {
+            return true;
+        }
+
+        CustomRole role = resolveUserRole(user);
+        if (role == null || role.getAssets() == null) {
+            log.warn("No asset role assigned for user {} (companyId={})", email, user.getCompanyId());
+            return false;
+        }
+
         // 🔒 Role level check — user's asset role must be >= required level
-        int userLevel  = user.getRole().getAssets().ordinal();
+        int userLevel  = role.getAssets().ordinal();
         int reqLevel   = required.ordinal();
 
         if (reqLevel > userLevel) {
             log.warn("Insufficient role for user {}. Required: {} ({}), has: {} ({})",
-                    email, required, reqLevel,
-                    user.getRole().getAssets(), userLevel);
+                    email, required, reqLevel, role.getAssets(), userLevel);
             return false;
         }
 
         return true;
+    }
+
+    private boolean isCompanyAdmin(Authentication auth, Users user) {
+        if (auth == null || auth.getPrincipal() == null || user.getCompanyId() == null) {
+            return false;
+        }
+        if (auth.getPrincipal() instanceof Customer customer) {
+            return "ADMIN".equalsIgnoreCase(customer.getRole())
+                    && user.getCompanyId().equals(customer.getCompanyId());
+        }
+        return false;
+    }
+
+    private CustomRole resolveUserRole(Users user) {
+        if (user.getRole() != null) {
+            return user.getRole();
+        }
+        if (user.getCompanyId() == null) {
+            return null;
+        }
+        return customRoleRepository.findByTypeAndCompanyId(RoleType.STANDARD, user.getCompanyId())
+                .orElse(null);
     }
 
     // ─── Public API used in @PreAuthorize ─────────────────────────────────────

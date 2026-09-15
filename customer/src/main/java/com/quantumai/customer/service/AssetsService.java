@@ -2,8 +2,10 @@ package com.quantumai.customer.service;
 
 import com.quantumai.customer.dto.*;
 import com.quantumai.customer.entity.*;
-import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
 import com.quantumai.customer.exception.AssetUniqueFieldViolationException;
+import com.quantumai.customer.exception.CategoryDeletionException;
+import com.quantumai.customer.exception.CategoryException;
+import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +51,9 @@ public interface AssetsService {
   public void addCheckInOut(AssetCheckInDTO checkInDTO);
 
   public List<AssetCheckInOutDTO> getCheckOutInList(String assetId);
+
+  PaginatedResultDTO<AssetCheckInOutDetailsDTO> getCheckOutInListPaginated(
+      String assetId, int pageNumber, int pageSize);
 
   public AssetFile addAssetFile(MultipartFile file, String assetId,String username) throws IOException;
 
@@ -102,13 +107,13 @@ public interface AssetsService {
 
   public void addCategory(CategoryDTO categoryDTO) throws Exception;
 
-  public void updateCategory(CategoryDTO categoryDTO);
+  public void updateCategory(CategoryDTO categoryDTO) throws CategoryException;
 
   public List<AssetCategory> getCategoryList(Long companyId);
 
 
 
-  public void deleteCategory(String id);
+  public void deleteCategory(String id) throws CategoryDeletionException;
 
   public AssetCategory getCategoryListById(Long companyId, String id);
 

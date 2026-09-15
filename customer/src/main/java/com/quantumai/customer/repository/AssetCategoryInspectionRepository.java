@@ -16,6 +16,9 @@ public interface AssetCategoryInspectionRepository
 
   public List<AssetCategoryInspection> findByCompanyId(Long companyId);
 
+  Optional<AssetCategoryInspection> findByAssetCategoryInspectionIdAndCompanyId(
+      Long assetCategoryInspectionId, Long companyId);
+
   @Query("{ 'companyId': ?0, '$or': [ { 'categoryName': { $regex: ?1, $options: 'i' } }, { 'categoryName': { $regex: '^none$', $options: 'i' } } ] }")
   List<AssetCategoryInspection> findByCompanyIdAndCategoryNameIgnoreCase(Long companyId, String category);
 

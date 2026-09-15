@@ -2,9 +2,13 @@ package com.quantumai.customer.service;
 
 import com.quantumai.customer.entity.Customer;
 import com.quantumai.customer.entity.Notification;
+import com.quantumai.customer.entity.Subscription;
+import com.quantumai.customer.entity.SubscriptionEnum;
 import com.quantumai.customer.entity.TrialStatus;
+import com.quantumai.customer.exception.TrialImportNotAllowedException;
 import com.quantumai.customer.repository.BlacklistedEmailRepository;
 import com.quantumai.customer.repository.CustomerRepository;
+import com.quantumai.customer.repository.SubscriptionRepository;
 import com.quantumai.customer.repository.TrialStatusRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -28,6 +32,9 @@ public class TrialService {
 
     @Autowired
     private BlacklistedEmailRepository blacklistedEmailRepository;
+
+    @Autowired
+    private SubscriptionRepository subscriptionRepository;
 
     /**
      * Initialize trial for a new customer.
@@ -228,5 +235,29 @@ public class TrialService {
      */
     public boolean isEligibleForTrial(String email) {
         return !blacklistedEmailRepository.existsByEmail(email);
+    }
+
+    /**
+     * Import is only allowed for companies with an active paid subscription.
+     */
+    public void validateImportAllowed(Long companyId) throws TrialImportNotAllowedException {
+        if (companyId == null) {
+            return;
+        }
+        if (subscriptionRepository.findByCompanyIdAndStatus(companyId, SubscriptionEnum.ACTIVE).isPresent()) {
+            return;
+        }
+        Optional<TrialStatus> trialStatus = trialStatusRepository.findByCompanyId(companyId);
+        if (trialStatus.isPresent()) {
+            TrialStatus trial = trialStatus.get();
+            boolean onActiveTrial = trial.isTrialActive()
+                    && !trial.isTrialExpired()
+                    && trial.getTrialEndDate() != null
+                    && LocalDateTime.now().isBefore(trial.getTrialEndDate());
+            if (onActiveTrial) {
+                throw new TrialImportNotAllowedException(
+                        "Import is not available during the trial period. Please subscribe to a plan.");
+            }
+        }
     }
 }

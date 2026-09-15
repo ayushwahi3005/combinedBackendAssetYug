@@ -2,7 +2,10 @@ package com.quantumai.customer.service;
 
 import com.quantumai.customer.entity.CustomRole;
 import com.quantumai.customer.entity.CustomRoleType;
+import com.quantumai.customer.entity.Customer;
+import com.quantumai.customer.entity.RoleType;
 import com.quantumai.customer.entity.Users;
+import com.quantumai.customer.repository.CustomRoleRepository;
 import com.quantumai.customer.repository.UsersRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +20,7 @@ import java.util.Optional;
 public class AppSecurityService {
 
     private final UsersRepository usersRepository;
+    private final CustomRoleRepository customRoleRepository;
 
     // ─── Internal helper ──────────────────────────────────────────────────────
 
@@ -43,10 +47,20 @@ public class AppSecurityService {
             return false;
         }
 
+        if (isCompanyAdmin(auth, user)) {
+            return true;
+        }
+
+        CustomRole role = resolveUserRole(user);
+        if (role == null) {
+            log.warn("No role assigned for user {} (companyId={})", email, user.getCompanyId());
+            return false;
+        }
+
         // 🔒 Dynamically resolve the module role level
-        CustomRoleType userModuleRole = resolveModuleRole(user.getRole(), module);
+        CustomRoleType userModuleRole = resolveModuleRole(role, module);
         if (userModuleRole == null) {
-            log.warn("Unknown module '{}' for user {}", module, email);
+            log.warn("Unknown module '{}' or missing permission for user {}", module, email);
             return false;
         }
 
@@ -108,7 +122,32 @@ public class AppSecurityService {
 
     // ─── Resolve which field to check based on module name ───────────────────
 
+    private boolean isCompanyAdmin(Authentication auth, Users user) {
+        if (auth == null || auth.getPrincipal() == null || user.getCompanyId() == null) {
+            return false;
+        }
+        if (auth.getPrincipal() instanceof Customer customer) {
+            return "ADMIN".equalsIgnoreCase(customer.getRole())
+                    && user.getCompanyId().equals(customer.getCompanyId());
+        }
+        return false;
+    }
+
+    private CustomRole resolveUserRole(Users user) {
+        if (user.getRole() != null) {
+            return user.getRole();
+        }
+        if (user.getCompanyId() == null) {
+            return null;
+        }
+        return customRoleRepository.findByTypeAndCompanyId(RoleType.STANDARD, user.getCompanyId())
+                .orElse(null);
+    }
+
     private CustomRoleType resolveModuleRole(CustomRole role, String module) {
+        if (role == null || module == null || module.isBlank()) {
+            return null;
+        }
         return switch (module.toLowerCase()) {
             case "assets"             -> role.getAssets();
             case "customers"          -> role.getCustomers();

@@ -10,6 +10,7 @@ import com.quantumai.customer.entity.IdGenerator.*;
 import com.quantumai.customer.entity.IdGenerator.AssetIdTable;
 import com.quantumai.customer.exception.AssetExtraFieldDeletionException;
 import com.quantumai.customer.exception.AssetUniqueFieldViolationException;
+import com.quantumai.customer.exception.CategoryDeletionException;
 import com.quantumai.customer.exception.CategoryException;
 import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
 import com.quantumai.customer.repository.*;
@@ -655,6 +656,44 @@ public class AssetsServiceImpl implements AssetsService {
     checkInOutDTOList.get(0).setDetailsList(myList);
     //		Collections.reverse(checkInOutDTOList);
     return checkInOutDTOList;
+  }
+
+  @Override
+  public PaginatedResultDTO<AssetCheckInOutDetailsDTO> getCheckOutInListPaginated(
+      String assetId, int pageNumber, int pageSize) {
+    Optional<AssetCheckInOut> checkInOutOptional = checkInOutRepository.findByAssetId(assetId);
+    if (checkInOutOptional.isEmpty()
+            || checkInOutOptional.get().getDetailsList() == null
+            || checkInOutOptional.get().getDetailsList().isEmpty()) {
+      return new PaginatedResultDTO<>(List.of(), 0);
+    }
+
+    List<AssetCheckInOutDetails> details = new ArrayList<>(checkInOutOptional.get().getDetailsList());
+    details.sort((d1, d2) -> {
+      if (d1.getUpdateTime() == null && d2.getUpdateTime() == null) {
+        return 0;
+      }
+      if (d1.getUpdateTime() == null) {
+        return 1;
+      }
+      if (d2.getUpdateTime() == null) {
+        return -1;
+      }
+      return d2.getUpdateTime().compareTo(d1.getUpdateTime());
+    });
+
+    long totalRecords = details.size();
+    int start = pageNumber * pageSize;
+    if (start >= totalRecords) {
+      return new PaginatedResultDTO<>(List.of(), totalRecords);
+    }
+    int end = Math.min(start + pageSize, (int) totalRecords);
+
+    List<AssetCheckInOutDetailsDTO> pageData = details.subList(start, end).stream()
+            .map(detail -> modelMapper.map(detail, AssetCheckInOutDetailsDTO.class))
+            .toList();
+
+    return new PaginatedResultDTO<>(pageData, totalRecords);
   }
 
   @Override
@@ -1537,10 +1576,36 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
-  public void updateCategory(CategoryDTO categoryDTO) {
-    AssetCategory category = modelMapper.map(categoryDTO, AssetCategory.class);
+  public void updateCategory(CategoryDTO categoryDTO) throws CategoryException {
+    if (categoryDTO.getId() == null || categoryDTO.getId().isBlank()) {
+      throw new CategoryException("Category not found");
+    }
+    Optional<AssetCategory> categoryOptional = assetCategoryRepository.findById(categoryDTO.getId());
+    if (categoryOptional.isEmpty()) {
+      throw new CategoryException("Category not found");
+    }
+    AssetCategory existing = categoryOptional.get();
 
-    assetCategoryRepository.save(category);
+    String oldName = existing.getName();
+    if (categoryDTO.getName() != null && !categoryDTO.getName().isBlank()) {
+      existing.setName(categoryDTO.getName());
+    }
+    if (categoryDTO.getStatus() != null) {
+      existing.setStatus(categoryDTO.getStatus());
+    }
+    if (categoryDTO.getCompanyId() != null) {
+      existing.setCompanyId(categoryDTO.getCompanyId());
+    }
+    assetCategoryRepository.save(existing);
+
+    if (categoryDTO.getName() != null
+            && oldName != null
+            && !categoryDTO.getName().equalsIgnoreCase(oldName)) {
+      Query query = new Query(Criteria.where("companyId").is(existing.getCompanyId())
+              .and("category").regex("^" + Pattern.quote(oldName) + "$", "i"));
+      Update update = new Update().set("category", categoryDTO.getName());
+      mongoTemplate.updateMulti(query, update, Assets.class);
+    }
   }
 
   @Override
@@ -1552,11 +1617,18 @@ public class AssetsServiceImpl implements AssetsService {
   }
 
   @Override
-  public void deleteCategory(String id) {
+  public void deleteCategory(String id) throws CategoryDeletionException {
     Optional<AssetCategory> category = assetCategoryRepository.findById(id);
-    if (category.isPresent()) {
-      assetCategoryRepository.delete(category.get());
+    if (category.isEmpty()) {
+      return;
     }
+    AssetCategory existing = category.get();
+    long count = assetsRepository.countByCategoryIgnoreCase(existing.getName());
+    if (count > 0) {
+      throw new CategoryDeletionException(
+              "Cannot delete category as it is in use", count, "assets");
+    }
+    assetCategoryRepository.delete(existing);
   }
 
   @Override

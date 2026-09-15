@@ -4,10 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 
-import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencsv.CSVReader;
@@ -23,6 +20,7 @@ import com.quantumai.customer.exception.*;
 import com.quantumai.customer.repository.*;
 import com.quantumai.customer.service.CompanyCustomerService;
 import com.quantumai.customer.service.CustomerService;
+import com.quantumai.customer.service.TrialService;
 import com.quantumai.customer.util.CustomerImportUtils;
 import com.quantumai.customer.util.PhoneUtils;
 import io.micrometer.common.util.StringUtils;
@@ -84,6 +82,7 @@ public class CompanyCustomerAPI {
   @Autowired private AuditService auditService;
   @Autowired private CompanyCustomerExtraFieldNameRepository companyCustomerExtraFieldNameRepository;
   @Autowired private CompanyCustomerFileRepository companyCustomerFileRepository;
+  @Autowired private TrialService trialService;
 
   private static final String DEFAULT_COUNTRY_CODE = "1"; // India
 
@@ -486,13 +485,12 @@ public class CompanyCustomerAPI {
           @RequestHeader Long companyId) throws NoSubscriptionError {
     try {
       CompanyCustomerFile savedFile = companyCustomerService.addCompanyCustomerFile(file, companyCustomerId);
+      String fileName = file.getOriginalFilename();
       companyCustomerRepository.findById(companyCustomerId).ifPresent(customer ->
-              auditService.log(AuditModule.CUSTOMER, AuditAction.CREATE,
+              auditService.logUpdate(AuditModule.CUSTOMER,
                       String.valueOf(customer.getCompanyCustomerId()), customer.getName(), companyId,
-                      "Uploaded file: " + file.getOriginalFilename(),
-                      Map.of("fileName", file.getOriginalFilename(),
-                              "fileId", savedFile.getId(),
-                              "action", "file_upload")));
+                      "Uploaded file: " + fileName,
+                      AuditChangeCalculator.fileUploadedChanges(fileName, savedFile.getId())));
       ResponseMessageDTO response = new ResponseMessageDTO();
       response.setResponseMessage("Uploaded the file successfully: " + file.getOriginalFilename());
       return new ResponseEntity<>(response, HttpStatus.ACCEPTED);
@@ -540,11 +538,10 @@ public class CompanyCustomerAPI {
           @RequestHeader Long companyId) throws NoSubscriptionError {
     companyCustomerFileRepository.findById(id).ifPresent(file -> {
       companyCustomerRepository.findById(file.getCompanyCustomerId()).ifPresent(customer ->
-              auditService.logDelete(AuditModule.CUSTOMER,
+              auditService.logUpdate(AuditModule.CUSTOMER,
                       String.valueOf(customer.getCompanyCustomerId()), customer.getName(), companyId,
-                      Map.of("fileName", file.getFileName(),
-                              "fileId", file.getId(),
-                              "action", "file_delete")));
+                      "Deleted file: " + file.getFileName(),
+                      AuditChangeCalculator.fileDeletedChanges(file.getFileName(), file.getId())));
     });
     companyCustomerService.deleteFile(id);
   }
@@ -596,7 +593,7 @@ public class CompanyCustomerAPI {
   @PreAuthorize("@appSecurity.canEdit(authentication, #companyId, 'customers')")
   public void updateCategory(
           @RequestBody CategoryDTO categoryDTO,
-          @RequestHeader Long companyId) throws NoSubscriptionError {
+          @RequestHeader Long companyId) throws NoSubscriptionError, CategoryException {
     Optional<CompanyCustomerCategory> beforeStateOpt =
             companyCustomerCategoryRepository.findById(categoryDTO.getId());
     companyCustomerService.updateCategory(categoryDTO);
@@ -616,7 +613,7 @@ public class CompanyCustomerAPI {
   @PreAuthorize("@appSecurity.canDelete(authentication, #companyId, 'customers')")
   public void deleteCategory(
           @PathVariable String id,
-          @RequestHeader Long companyId) throws NoSubscriptionError {
+          @RequestHeader Long companyId) throws NoSubscriptionError, CategoryDeletionException {
     companyCustomerCategoryRepository.findById(id).ifPresent(cat ->
             auditService.logDelete(AuditModule.CUSTOMER_CATEGORY,
                     String.valueOf(cat.getCompanyCustomerCategoryId()), cat.getName(),
@@ -730,8 +727,10 @@ public class CompanyCustomerAPI {
           @PathVariable Long companyId,
           @PathVariable String email)
           throws CsvValidationException, MessagingException, ImportFileRowException,
-          NoSubscriptionError, EmailAlreadyExistsException, NameColumnMissingException, ImportInProgressException {
+          NoSubscriptionError, EmailAlreadyExistsException, NameColumnMissingException, ImportInProgressException,
+          TrialImportNotAllowedException {
 
+    trialService.validateImportAllowed(companyId);
 
     boolean isInProgress = importHistoryRepository
             .findTopByCompanyIdAndStatusAndRecordTypeOrderByDateDesc(companyId, "In-Progress", ImportHistoryRecordType.ADDCUSTOMER)
@@ -765,56 +764,11 @@ public class CompanyCustomerAPI {
     }
     log.info("Mandatory Fields Map: {}", mandatoryFieldsMap);
 
-    Map<String, String> columnMap = new HashMap<>();
-
-    try {
-      JsonFactory jsonFactory = new JsonFactory();
-      JsonParser jsonParser = jsonFactory.createParser(columnMappings);
-
-      ObjectMapper objectMapper = new ObjectMapper();
-      Map<String, String> map= objectMapper.readValue(
-              columnMappings,
-              new TypeReference<Map<String, String>>() {}
-      );
-
-      if(!map.containsValue("Name")){
-        throw new NameColumnMissingException("Name Column Missing");
-      }
-
-      String key = "", val = "";
-      while (!jsonParser.isClosed()) {
-        JsonToken jsonToken = jsonParser.nextToken();
-        if (jsonToken == null) {
-          break;
-        }
-
-        if (!key.isEmpty()) {
-          columnMap.put(key, val);
-        }
-        switch (jsonToken) {
-          case START_OBJECT:
-            break;
-          case FIELD_NAME:
-            key = jsonParser.getCurrentName();
-            break;
-          case VALUE_STRING:
-            val = jsonParser.getText();
-            break;
-          case END_OBJECT:
-            break;
-          default:
-            break;
-        }
-      }
-
-      jsonParser.close();
+    Map<String, String> columnMap = parseCustomerImportColumnMappings(columnMappings);
+    if (!CustomerImportUtils.isNameMapped(columnMap.values())) {
+      throw new NameColumnMissingException("Name Column Missing");
     }
-    catch (NameColumnMissingException e) {
-      throw e;
-    }
-    catch (Exception e) {
-      e.printStackTrace();
-    }
+    log.info("Customer import column mappings: {}", columnMap);
 
     List<CompanyCustomerDTO> assetList = new ArrayList<CompanyCustomerDTO>();
     long totalCount = Integer.MAX_VALUE;
@@ -839,7 +793,7 @@ public class CompanyCustomerAPI {
 
       if (headers != null) {
         for (int i = 0; i < headers.length; i++) {
-          headerMap.put(i, headers[i]);
+          headerMap.put(i, headers[i] != null ? headers[i].trim() : null);
         }
       }
 
@@ -1155,10 +1109,8 @@ public class CompanyCustomerAPI {
             if (value.isEmpty()) {
               log.info("Value is empty");
               errorFlag = 1;
-              if(!errorDesc.isEmpty()){
-                errorDesc.append(". Mandatory field ").append(defaultName.toUpperCase()).append(" is not mapped.");
-              }
-
+              CustomerImportUtils.appendImportError(errorDesc,
+                      "ERROR WITH " + defaultName.toUpperCase() + " MANDATORY WHILE ADDING IN CUSTOMER");
             }
           }
         }
@@ -1305,8 +1257,10 @@ public class CompanyCustomerAPI {
           @PathVariable Long companyId,
           @PathVariable String email)
           throws CsvValidationException, JsonParseException, IOException,
-          MessagingException, ImportFileRowException, NoSubscriptionError, ImportInProgressException {
+          MessagingException, ImportFileRowException, NoSubscriptionError, ImportInProgressException,
+          TrialImportNotAllowedException {
 
+    trialService.validateImportAllowed(companyId);
 
     boolean isInProgress = importHistoryRepository
             .findTopByCompanyIdAndStatusAndRecordTypeOrderByDateDesc(companyId, "In-Progress", ImportHistoryRecordType.UPDATECUSTOMER)
@@ -1332,14 +1286,9 @@ public class CompanyCustomerAPI {
     importHistoryDTO.setComplete(0L);
     importHistoryDTO = customerService.addImportHistory(importHistoryDTO);
 
-    // Parse column mappings (expects a JSON object mapping CSV header -> field name)
-    Map<String, String> columnMap = new HashMap<>();
-    try {
-      ObjectMapper objectMapper = new ObjectMapper();
-      Map<String, String> parsed = objectMapper.readValue(columnMappings, new TypeReference<Map<String, String>>() {});
-      if (parsed != null) columnMap.putAll(parsed);
-    } catch (Exception ex) {
-      log.warn("Failed to parse columnMappings JSON, proceeding with empty map", ex);
+    Map<String, String> columnMap = parseCustomerImportColumnMappings(columnMappings);
+    if (!CustomerImportUtils.isNameMapped(columnMap.values())) {
+      log.warn("Customer update import missing Name column mapping: {}", columnMappings);
     }
 
     // Prepare import history
@@ -1370,7 +1319,7 @@ public class CompanyCustomerAPI {
       String[] headers = csvReader.readNext();
       Map<Integer, String> headerMap = new HashMap<>();
       if (headers != null) {
-        for (int i = 0; i < headers.length; i++) headerMap.put(i, headers[i]);
+        for (int i = 0; i < headers.length; i++) headerMap.put(i, headers[i] != null ? headers[i].trim() : null);
       }
 
       Workbook workbook = new XSSFWorkbook();
@@ -1985,6 +1934,29 @@ public class CompanyCustomerAPI {
         errorCellMap.put(j + 1, true);
       }
     }
+  }
+
+  private Map<String, String> parseCustomerImportColumnMappings(String columnMappings) {
+    Map<String, String> columnMap = new HashMap<>();
+    if (columnMappings == null || columnMappings.isBlank()) {
+      return columnMap;
+    }
+    try {
+      ObjectMapper objectMapper = new ObjectMapper();
+      com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(columnMappings);
+      com.fasterxml.jackson.databind.JsonNode mappingsNode = root;
+      if (root.has("columnMappings") && root.get("columnMappings").isObject()) {
+        mappingsNode = root.get("columnMappings");
+      }
+      mappingsNode.fields().forEachRemaining(entry -> {
+        if (entry.getKey() != null && entry.getValue() != null && !entry.getValue().isNull()) {
+          columnMap.put(entry.getKey().trim(), entry.getValue().asText().trim());
+        }
+      });
+    } catch (Exception e) {
+      log.error("Failed to parse customer import column mappings: {}", columnMappings, e);
+    }
+    return columnMap;
   }
 
   private void writeImportErrorRow(

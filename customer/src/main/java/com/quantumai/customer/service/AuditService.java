@@ -24,6 +24,12 @@ public interface AuditService {
                    Long companyId, Map<String, Object> changes);
 
     /**
+     * Log an update action with a custom description.
+     */
+    void logUpdate(AuditModule module, String entityId, String entityName,
+                   Long companyId, String description, Map<String, Object> changes);
+
+    /**
      * Log a delete action for any module.
      */
     void logDelete(AuditModule module, String entityId, String entityName,
@@ -48,7 +54,13 @@ public interface AuditService {
     PaginatedResultDTO<AuditLog> getAuditLogs(AuditLogFilterDTO filter);
 
     /**
-     * Retrieve all audit trail for a specific entity.
+     * Retrieve all audit trail for a specific entity, newest first.
      */
     List<AuditLog> getEntityAuditTrail(Long companyId, String entityId);
+
+    /**
+     * Retrieve audit trail filtered by entity + module, newest first.
+     * Pass null module to return all modules.
+     */
+    List<AuditLog> getEntityAuditTrail(Long companyId, String entityId, AuditModule module);
 }

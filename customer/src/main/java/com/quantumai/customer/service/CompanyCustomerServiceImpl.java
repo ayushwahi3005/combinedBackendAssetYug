@@ -11,6 +11,7 @@ import com.quantumai.customer.entity.*;
 import com.quantumai.customer.entity.IdGenerator.AssetCategoryIdGenerator;
 import com.quantumai.customer.entity.IdGenerator.CompanyCustomerCategoryIdGenerator;
 import com.quantumai.customer.entity.IdGenerator.CompanyCustomerIdTable;
+import com.quantumai.customer.exception.CategoryDeletionException;
 import com.quantumai.customer.exception.CategoryException;
 import com.quantumai.customer.exception.EmailAlreadyExistsException;
 import com.quantumai.customer.exception.ExtraFieldAlreadyPresentException;
@@ -1055,18 +1056,52 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
   }
 
   @Override
-  public void deleteCategory(String id) {
+  public void deleteCategory(String id) throws CategoryDeletionException {
     Optional<CompanyCustomerCategory> category = companyCustomerCategoryRepository.findById(id);
-    if (category.isPresent()) {
-      companyCustomerCategoryRepository.delete(category.get());
+    if (category.isEmpty()) {
+      return;
     }
+    CompanyCustomerCategory existing = category.get();
+    long count = companyCustomerRepository.countByCategory(existing.getName());
+    if (count > 0) {
+      throw new CategoryDeletionException(
+              "Cannot delete category as it is in use", count, "customers");
+    }
+    companyCustomerCategoryRepository.delete(existing);
   }
 
   @Override
-  public void updateCategory(CategoryDTO categoryDTO) {
-    CompanyCustomerCategory category = modelMapper.map(categoryDTO, CompanyCustomerCategory.class);
+  public void updateCategory(CategoryDTO categoryDTO) throws CategoryException {
+    if (categoryDTO.getId() == null || categoryDTO.getId().isBlank()) {
+      throw new CategoryException("Category not found");
+    }
+    Optional<CompanyCustomerCategory> categoryOptional =
+            companyCustomerCategoryRepository.findById(categoryDTO.getId());
+    if (categoryOptional.isEmpty()) {
+      throw new CategoryException("Category not found");
+    }
+    CompanyCustomerCategory existing = categoryOptional.get();
 
-    companyCustomerCategoryRepository.save(category);
+    String oldName = existing.getName();
+    if (categoryDTO.getName() != null && !categoryDTO.getName().isBlank()) {
+      existing.setName(categoryDTO.getName());
+    }
+    if (categoryDTO.getStatus() != null) {
+      existing.setStatus(categoryDTO.getStatus());
+    }
+    if (categoryDTO.getCompanyId() != null) {
+      existing.setCompanyId(categoryDTO.getCompanyId());
+    }
+    companyCustomerCategoryRepository.save(existing);
+
+    if (categoryDTO.getName() != null
+            && oldName != null
+            && !categoryDTO.getName().equalsIgnoreCase(oldName)) {
+      Query query = new Query(Criteria.where("companyId").is(existing.getCompanyId())
+              .and("category").regex("^" + Pattern.quote(oldName) + "$", "i"));
+      Update update = new Update().set("category", categoryDTO.getName());
+      mongoTemplate.updateMulti(query, update, CompanyCustomer.class);
+    }
   }
 
   @Override

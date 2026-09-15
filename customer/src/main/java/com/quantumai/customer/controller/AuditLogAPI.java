@@ -100,15 +100,18 @@ public class AuditLogAPI {
      */
     @Operation(
         summary = "Get entity audit trail",
-        description = "Full chronological audit history (CREATE → UPDATEs → DELETE) for a single entity using its business ID."
+        description = "Audit history for a single entity, newest first. " +
+                "Optionally filter by module to avoid cross-entity ID collisions (e.g. module=ASSET)."
     )
     @GetMapping("/trail/{companyId}/{entityId}")
     @PreAuthorize("@appSecurity.canView(authentication, #companyId, 'assets')")
     public List<AuditLog> getEntityAuditTrail(
             @PathVariable Long companyId,
             @Parameter(description = "Business ID of the entity (e.g. assetId, companyCustomerId, userId, locationId)")
-            @PathVariable String entityId) {
-        return auditService.getEntityAuditTrail(companyId, entityId);
+            @PathVariable String entityId,
+            @Parameter(description = "Optional module filter (e.g. ASSET, CUSTOMER, COMPANY). Prevents unrelated modules with the same ID from appearing.")
+            @RequestParam(required = false) AuditModule module) {
+        return auditService.getEntityAuditTrail(companyId, entityId, module);
     }
 
     /**

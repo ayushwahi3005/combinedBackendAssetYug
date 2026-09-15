@@ -80,8 +80,17 @@ public class UsersAPI {
     System.out.println("Spring Security"+ authentication.getName());
     Optional<Users> usersOptional=usersRepository.findByEmail(authentication.getName());
     if(usersOptional.isPresent()){
-      System.out.println(customRoleType.ordinal()+" "+usersOptional.get().getRole().getUsers().ordinal());
-      if(customRoleType.ordinal()>usersOptional.get().getRole().getUsers().ordinal()){
+      Users user = usersOptional.get();
+      CustomRole role = user.getRole();
+      if (role == null && user.getCompanyId() != null) {
+        role = customRoleRepository.findByTypeAndCompanyId(RoleType.STANDARD, user.getCompanyId()).orElse(null);
+      }
+      if (role == null || role.getUsers() == null) {
+        GenricErrorMessage genricErrorMessage=new GenricErrorMessage("User Dont Have access", HttpStatus.FORBIDDEN);
+        throw new UserAccessException(genricErrorMessage.getMessage());
+      }
+      System.out.println(customRoleType.ordinal()+" "+role.getUsers().ordinal());
+      if(customRoleType.ordinal()>role.getUsers().ordinal()){
         GenricErrorMessage genricErrorMessage=new GenricErrorMessage("User Dont Have access", HttpStatus.FORBIDDEN);
         throw new UserAccessException(genricErrorMessage.getMessage());
       }

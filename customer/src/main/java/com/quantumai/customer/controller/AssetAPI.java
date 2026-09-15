@@ -84,6 +84,7 @@ public class AssetAPI {
   @Autowired private AuditService auditService;
   @Autowired private AssetCategoryInspectionInstanceRepository assetCategoryInspectionInstanceRepository;;
   @Autowired private AssetFileRepository assetFileRepository;
+  @Autowired private TrialService trialService;
 
   private final ModelMapper modelMapper = new ModelMapper();
 
@@ -153,6 +154,18 @@ public class AssetAPI {
   @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
   public ResponseEntity<List<AssetCheckInOutDTO>> getCheckInOutList(@PathVariable String assetId) {
     return new ResponseEntity<>(assetsService.getCheckOutInList(assetId), HttpStatus.ACCEPTED);
+  }
+
+  @Operation(summary = "Get Check In Out List Paginated", description = "Endpoint to get paginated check-in/out history for an asset")
+  @GetMapping("/getCheckInOutList/{assetId}/{pageNumber}/{pageSize}")
+  @PreAuthorize("@appSecurity.canViewAny(authentication, 'assets')")
+  public PaginatedResultDTO<AssetCheckInOutDetailsDTO> getCheckInOutListPaginated(
+          @PathVariable String assetId,
+          @PathVariable Integer pageNumber,
+          @PathVariable Integer pageSize) {
+    if (pageNumber == null) pageNumber = 0;
+    if (pageSize == null) pageSize = 10;
+    return assetsService.getCheckOutInListPaginated(assetId, pageNumber, pageSize);
   }
 
   @Operation(summary = "Get Asset File", description = "Endpoint to get asset file")
@@ -478,6 +491,7 @@ public class AssetAPI {
         Map<String, Object> changes = AuditChangeCalculator.computeChanges(beforeState, afterState);
         Map<String, String> afterExtras = toAssetExtraFieldsMap(afterState.getId());
         changes.putAll(AuditChangeCalculator.computeExtraFieldValueChanges(beforeExtras, afterExtras));
+        resolveLocationInChanges(changes);
         if (!changes.isEmpty()) {
           auditService.logUpdate(AuditModule.ASSET,
                   String.valueOf(saved.getAssetId()), saved.getName(),
@@ -543,7 +557,10 @@ public class AssetAPI {
           @RequestParam("columnMappings") String columnMappings,
           @PathVariable Long companyId,
           @PathVariable String email)
-          throws ImportFileRowException, MessagingException, ImportInProgressException {
+          throws ImportFileRowException, MessagingException, ImportInProgressException,
+          TrialImportNotAllowedException {
+
+    trialService.validateImportAllowed(companyId);
 
     // ✅ STEP 1: Check if an import is already running for this company
     boolean isInProgress = importHistoryRepository
@@ -888,7 +905,10 @@ public class AssetAPI {
           @PathVariable Long companyId,
           @PathVariable String email)
           throws CsvValidationException, JsonParseException, IOException,
-          MessagingException, ImportFileRowException, NoSubscriptionError, ImportInProgressException {
+          MessagingException, ImportFileRowException, NoSubscriptionError, ImportInProgressException,
+          TrialImportNotAllowedException {
+
+    trialService.validateImportAllowed(companyId);
 
     boolean isInProgress = importHistoryRepository
             .findTopByCompanyIdAndStatusAndRecordTypeOrderByDateDesc(companyId, "In-Progress", ImportHistoryRecordType.UPDATEASSET)
@@ -1323,13 +1343,11 @@ public class AssetAPI {
     try {
       AssetFile savedFile = assetsService.addAssetFile(file, assetId, username);
       Assets asset = assetsRepository.findById(assetId).orElseThrow();
-      auditService.log(AuditModule.ASSET, AuditAction.CREATE,
+      String fileName = file.getOriginalFilename();
+      auditService.logUpdate(AuditModule.ASSET,
               String.valueOf(asset.getAssetId()), asset.getName(), asset.getCompanyId(),
-              "Uploaded file: " + file.getOriginalFilename(),
-              Map.of("fileName", file.getOriginalFilename(),
-                      "fileId", savedFile.getId(),
-                      "uploadedBy", username,
-                      "action", "file_upload"));
+              "Uploaded file: " + fileName,
+              AuditChangeCalculator.fileUploadedChanges(fileName, savedFile.getId()));
       ResponseMessageDTO r = new ResponseMessageDTO();
       r.setResponseMessage("Uploaded successfully: " + file.getOriginalFilename());
       return new ResponseEntity<>(r, HttpStatus.OK);
@@ -1438,29 +1456,57 @@ public class AssetAPI {
   @PreAuthorize("@appSecurity.canCreate(authentication, #assetCategoryInspection.companyId, 'inspections')")
   public void addAssetInspection(@RequestBody AssetCategoryInspection assetCategoryInspection) throws NoSubscriptionError {
     assetsService.addAssetInspection(assetCategoryInspection);
-    // Service mutates the object: assetCategoryInspectionId is set after save
+    Map<String, Object> changes = new LinkedHashMap<>();
+    changes.put("inspectionId", Map.of(
+            "old", "",
+            "new", String.valueOf(assetCategoryInspection.getAssetCategoryInspectionId())));
+    changes.put("name", Map.of(
+            "old", "",
+            "new", String.valueOf(assetCategoryInspection.getName())));
+    changes.putAll(AuditChangeCalculator.computeInspectionStepChanges(
+            List.of(), assetCategoryInspection.getSteps()));
     auditService.logCreate(AuditModule.ASSET_INSPECTION,
             String.valueOf(assetCategoryInspection.getAssetCategoryInspectionId()),
-            assetCategoryInspection.getName(), assetCategoryInspection.getCompanyId(),
-            Map.of("inspectionId", String.valueOf(assetCategoryInspection.getAssetCategoryInspectionId()),
-                    "name", String.valueOf(assetCategoryInspection.getName())));
+            assetCategoryInspection.getName(), assetCategoryInspection.getCompanyId(), changes);
   }
 
   @Operation(summary = "Add Asset Inspection Instance", description = "Endpoint to add asset inspection instance")
   @PostMapping(value = "/addAssetInspectionInstance")
   @PreAuthorize("@appSecurity.canCreateAny(authentication, 'inspections')")
   public void addAssetInspectionInstance(@RequestBody AssetCategoryInspectionInstance assetCategoryInspection) {
+    boolean isUpdate = assetCategoryInspection.getId() != null
+            && !assetCategoryInspection.getId().isBlank();
+    AssetCategoryInspectionInstance beforeState = isUpdate
+            ? findInspectionInstanceBefore(assetCategoryInspection) : null;
+
     assetsService.addAssetInspectionInstance(assetCategoryInspection);
-    String businessAssetId = resolveBusinessAssetId(assetCategoryInspection.getAssetId());
+
+    AssetCategoryInspectionInstance afterState = findInspectionInstanceAfter(assetCategoryInspection);
+    if (isUpdate && beforeState != null) {
+      logInspectionInstanceUpdate(beforeState, afterState);
+      return;
+    }
+
+    String businessAssetId = resolveBusinessAssetId(afterState.getAssetId());
+    Map<String, Object> changes = new LinkedHashMap<>();
+    changes.put("instanceId", Map.of(
+            "old", "",
+            "new", String.valueOf(afterState.getAssetCategoryInspectionInstanceId())));
+    changes.put("assetId", Map.of("old", "", "new", businessAssetId));
+    changes.put("inspectionName", Map.of(
+            "old", "",
+            "new", String.valueOf(afterState.getAssetCategoryInspectionName())));
+    changes.put("status", Map.of(
+            "old", "",
+            "new", String.valueOf(afterState.getStatus())));
+    changes.put("dueDate", Map.of(
+            "old", "",
+            "new", String.valueOf(afterState.getInspectionDueDate())));
+    changes.putAll(AuditChangeCalculator.computeInspectionInstanceValueChanges(null, afterState));
     auditService.logCreate(AuditModule.ASSET_INSPECTION_INSTANCE,
-            String.valueOf(assetCategoryInspection.getAssetCategoryInspectionInstanceId()),
-            assetCategoryInspection.getAssetCategoryInspectionName(),
-            assetCategoryInspection.getCompanyId(),
-            Map.of("instanceId", String.valueOf(assetCategoryInspection.getAssetCategoryInspectionInstanceId()),
-                    "assetId", businessAssetId,
-                    "inspectionName", String.valueOf(assetCategoryInspection.getAssetCategoryInspectionName()),
-                    "status", String.valueOf(assetCategoryInspection.getStatus()),
-                    "dueDate", String.valueOf(assetCategoryInspection.getInspectionDueDate())));
+            String.valueOf(afterState.getAssetCategoryInspectionInstanceId()),
+            afterState.getAssetCategoryInspectionName(),
+            afterState.getCompanyId(), changes);
   }
 
   // ─── Update endpoints ─────────────────────────────────────────────────────
@@ -1469,24 +1515,14 @@ public class AssetAPI {
   @PutMapping(value = "/addAssetInspectionInstance")
   @PreAuthorize("@appSecurity.canEdit(authentication, #assetCategoryInspection.companyId, 'inspections')")
   public void updateAssetInspectionInstance(@RequestBody AssetCategoryInspectionInstance assetCategoryInspection) throws NoSubscriptionError {
-    // Fetch current state before update
-    AssetCategoryInspectionInstance beforeState = assetCategoryInspectionInstanceRepository
-            .findById(assetCategoryInspection.getId()).orElse(null);
-    
+    AssetCategoryInspectionInstance beforeState = findInspectionInstanceBefore(assetCategoryInspection);
     assetsService.updateAssetInspectionInstance(assetCategoryInspection);
-
-    AssetCategoryInspectionInstance afterState = assetCategoryInspectionInstanceRepository
-            .findById(assetCategoryInspection.getId()).orElse(assetCategoryInspection);
-    
+    AssetCategoryInspectionInstance afterState = findInspectionInstanceAfter(assetCategoryInspection);
     if (beforeState != null) {
-      Map<String, Object> changes = AuditChangeCalculator.computeChanges(beforeState, afterState);
-      changes.put("assetId", Map.of(
-              "old", resolveBusinessAssetId(beforeState.getAssetId()),
-              "new", resolveBusinessAssetId(afterState.getAssetId())));
-      auditService.logUpdate(AuditModule.ASSET_INSPECTION_INSTANCE,
-              String.valueOf(afterState.getAssetCategoryInspectionInstanceId()),
-              afterState.getAssetCategoryInspectionName(),
-              afterState.getCompanyId(), changes);
+      logInspectionInstanceUpdate(beforeState, afterState);
+    } else {
+      log.warn("Inspection instance audit skipped: could not resolve before-state for mongoId={} businessId={}",
+              assetCategoryInspection.getId(), assetCategoryInspection.getAssetCategoryInspectionInstanceId());
     }
   }
 
@@ -1494,26 +1530,23 @@ public class AssetAPI {
   @PutMapping(value = "/updateAssetInspection")
   @PreAuthorize("@appSecurity.canEdit(authentication, #assetCategoryInspection.companyId, 'inspections')")
   public void updateAssetInspection(@RequestBody AssetCategoryInspection assetCategoryInspection) throws NoSubscriptionError {
-    // Fetch current state before update
-    AssetCategoryInspection beforeState = assetCategoryInspectionRepository
-            .findById(assetCategoryInspection.getId()).orElse(null);
-    
+    AssetCategoryInspection beforeState = findInspectionTemplateBefore(assetCategoryInspection);
     assetsService.updateAssetInspection(assetCategoryInspection);
     log.info("Update Asset Inspection");
-    
+
+    AssetCategoryInspection afterState = findInspectionTemplateAfter(assetCategoryInspection);
     if (beforeState != null) {
-      // Log with detailed field comparison
-      auditService.logUpdateWithComparison(AuditModule.ASSET_INSPECTION,
-              String.valueOf(assetCategoryInspection.getAssetCategoryInspectionId()),
-              assetCategoryInspection.getName(), assetCategoryInspection.getCompanyId(),
-              beforeState, assetCategoryInspection);
+      logInspectionTemplateUpdate(beforeState, afterState);
+    } else {
+      log.warn("Inspection template audit skipped: could not resolve before-state for mongoId={} businessId={}",
+              assetCategoryInspection.getId(), assetCategoryInspection.getAssetCategoryInspectionId());
     }
   }
 
   @Operation(summary = "Update Category", description = "Endpoint to update category")
   @PutMapping(value = "/updateCategory")
   @PreAuthorize("@appSecurity.canEdit(authentication, #categoryDTO.companyId, 'assets')")
-  public void updateCategory(@RequestBody CategoryDTO categoryDTO) throws NoSubscriptionError {
+  public void updateCategory(@RequestBody CategoryDTO categoryDTO) throws NoSubscriptionError, CategoryException {
     // Fetch current state before update
     Optional<AssetCategory> beforeStateOpt = assetCategoryRepository.findById(categoryDTO.getId());
     
@@ -1602,10 +1635,9 @@ public class AssetAPI {
       String entityId = asset != null ? String.valueOf(asset.getAssetId()) : file.getAssetId();
       String entityName = asset != null ? asset.getName() : file.getFileName();
       Long companyId = asset != null ? asset.getCompanyId() : file.getCompanyId();
-      auditService.logDelete(AuditModule.ASSET, entityId, entityName, companyId,
-              Map.of("fileName", file.getFileName(),
-                      "fileId", file.getId(),
-                      "action", "file_delete"));
+      auditService.logUpdate(AuditModule.ASSET, entityId, entityName, companyId,
+              "Deleted file: " + file.getFileName(),
+              AuditChangeCalculator.fileDeletedChanges(file.getFileName(), file.getId()));
     });
     assetsService.deleteFile(id);
   }
@@ -1613,7 +1645,7 @@ public class AssetAPI {
   @Operation(summary = "Delete Category", description = "Endpoint to delete category")
   @DeleteMapping(value = "/deleteCategory/{id}")
   @PreAuthorize("@appSecurity.canDeleteAny(authentication, 'assets')")
-  public void deleteCategory(@PathVariable String id) throws NoSubscriptionError {
+  public void deleteCategory(@PathVariable String id) throws NoSubscriptionError, CategoryDeletionException {
     assetCategoryRepository.findById(id).ifPresent(cat ->
             auditService.logDelete(AuditModule.ASSET_CATEGORY,
                     String.valueOf(cat.getAssetCategoryId()), cat.getName(),
@@ -2198,6 +2230,144 @@ public class AssetAPI {
     return assetsRepository.findById(mongoAssetId)
             .map(asset -> String.valueOf(asset.getAssetId()))
             .orElse(mongoAssetId);
+  }
+
+  /**
+   * Resolves an internal location/bin storage value ("location:mongoId" or "bin:mongoId")
+   * to a human-readable name for audit log display.
+   */
+  private String resolveLocationValue(String locationValue) {
+    if (locationValue == null || locationValue.isBlank()) {
+      return locationValue;
+    }
+    String[] parts = locationValue.split(":", 2);
+    if (parts.length == 2) {
+      if ("location".equalsIgnoreCase(parts[0])) {
+        return locationRepository.findById(parts[1])
+                .map(Location::getName)
+                .orElse(locationValue);
+      }
+      if ("bin".equalsIgnoreCase(parts[0])) {
+        return binRepository.findById(parts[1])
+                .map(Bin::getBinNumber)
+                .orElse(locationValue);
+      }
+    }
+    return locationValue;
+  }
+
+  /**
+   * Resolves the "location" key in a changes map from internal IDs to human-readable names.
+   */
+  @SuppressWarnings("unchecked")
+  private void resolveLocationInChanges(Map<String, Object> changes) {
+    if (!changes.containsKey("location")) {
+      return;
+    }
+    Object locationChange = changes.get("location");
+    if (locationChange instanceof Map<?, ?> changeDetail) {
+      Map<String, Object> resolved = new java.util.LinkedHashMap<>();
+      resolved.put("old", resolveLocationValue(
+              changeDetail.get("old") != null ? changeDetail.get("old").toString() : null));
+      resolved.put("new", resolveLocationValue(
+              changeDetail.get("new") != null ? changeDetail.get("new").toString() : null));
+      changes.put("location", resolved);
+    }
+  }
+
+  private AssetCategoryInspection findInspectionTemplateBefore(AssetCategoryInspection incoming) {
+    if (incoming == null) {
+      return null;
+    }
+    if (incoming.getId() != null && !incoming.getId().isBlank()) {
+      Optional<AssetCategoryInspection> byMongoId = assetCategoryInspectionRepository.findById(incoming.getId());
+      if (byMongoId.isPresent()) {
+        return byMongoId.get();
+      }
+    }
+    if (incoming.getAssetCategoryInspectionId() != null && incoming.getCompanyId() != null) {
+      return assetCategoryInspectionRepository
+              .findByAssetCategoryInspectionIdAndCompanyId(
+                      incoming.getAssetCategoryInspectionId(), incoming.getCompanyId())
+              .orElse(null);
+    }
+    return null;
+  }
+
+  private AssetCategoryInspection findInspectionTemplateAfter(AssetCategoryInspection incoming) {
+    if (incoming.getId() != null && !incoming.getId().isBlank()) {
+      return assetCategoryInspectionRepository.findById(incoming.getId()).orElse(incoming);
+    }
+    if (incoming.getAssetCategoryInspectionId() != null && incoming.getCompanyId() != null) {
+      return assetCategoryInspectionRepository
+              .findByAssetCategoryInspectionIdAndCompanyId(
+                      incoming.getAssetCategoryInspectionId(), incoming.getCompanyId())
+              .orElse(incoming);
+    }
+    return incoming;
+  }
+
+  private AssetCategoryInspectionInstance findInspectionInstanceBefore(
+          AssetCategoryInspectionInstance incoming) {
+    if (incoming == null) {
+      return null;
+    }
+    if (incoming.getId() != null && !incoming.getId().isBlank()) {
+      Optional<AssetCategoryInspectionInstance> byMongoId =
+              assetCategoryInspectionInstanceRepository.findById(incoming.getId());
+      if (byMongoId.isPresent()) {
+        return byMongoId.get();
+      }
+    }
+    if (incoming.getAssetCategoryInspectionInstanceId() != null && incoming.getCompanyId() != null) {
+      return assetCategoryInspectionInstanceRepository
+              .findByAssetCategoryInspectionInstanceIdAndCompanyId(
+                      incoming.getAssetCategoryInspectionInstanceId(), incoming.getCompanyId())
+              .orElse(null);
+    }
+    return null;
+  }
+
+  private AssetCategoryInspectionInstance findInspectionInstanceAfter(
+          AssetCategoryInspectionInstance incoming) {
+    if (incoming.getId() != null && !incoming.getId().isBlank()) {
+      return assetCategoryInspectionInstanceRepository.findById(incoming.getId()).orElse(incoming);
+    }
+    if (incoming.getAssetCategoryInspectionInstanceId() != null && incoming.getCompanyId() != null) {
+      return assetCategoryInspectionInstanceRepository
+              .findByAssetCategoryInspectionInstanceIdAndCompanyId(
+                      incoming.getAssetCategoryInspectionInstanceId(), incoming.getCompanyId())
+              .orElse(incoming);
+    }
+    return incoming;
+  }
+
+  private void logInspectionTemplateUpdate(
+          AssetCategoryInspection beforeState, AssetCategoryInspection afterState) {
+    Map<String, Object> changes = AuditChangeCalculator.computeChanges(beforeState, afterState);
+    changes.putAll(AuditChangeCalculator.computeInspectionStepChanges(
+            beforeState.getSteps(), afterState.getSteps()));
+    auditService.logUpdate(AuditModule.ASSET_INSPECTION,
+            String.valueOf(afterState.getAssetCategoryInspectionId()),
+            afterState.getName(), afterState.getCompanyId(), changes);
+  }
+
+  private void logInspectionInstanceUpdate(
+          AssetCategoryInspectionInstance beforeState, AssetCategoryInspectionInstance afterState) {
+    Map<String, Object> changes = AuditChangeCalculator.computeChanges(beforeState, afterState);
+    changes.putAll(AuditChangeCalculator.computeInspectionInstanceValueChanges(beforeState, afterState));
+    String oldAssetId = resolveBusinessAssetId(beforeState.getAssetId());
+    String newAssetId = resolveBusinessAssetId(afterState.getAssetId());
+    if (!Objects.equals(oldAssetId, newAssetId)) {
+      Map<String, Object> assetIdChange = new LinkedHashMap<>();
+      assetIdChange.put("old", oldAssetId);
+      assetIdChange.put("new", newAssetId);
+      changes.put("assetId", assetIdChange);
+    }
+    auditService.logUpdate(AuditModule.ASSET_INSPECTION_INSTANCE,
+            String.valueOf(afterState.getAssetCategoryInspectionInstanceId()),
+            afterState.getAssetCategoryInspectionName(),
+            afterState.getCompanyId(), changes);
   }
 }
 

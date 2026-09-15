@@ -22,6 +22,9 @@ public class CompanyInformation {
   private String phoneNo;
   private String website;
 
+  /** IANA timezone ID for this company, e.g. {@code America/New_York}. */
+  private String timeZone;
+
   private String createdBy;
   private String lastUpdatedBy;
 }

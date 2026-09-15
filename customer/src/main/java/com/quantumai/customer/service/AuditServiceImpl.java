@@ -51,11 +51,17 @@ public class AuditServiceImpl implements AuditService {
     @Override
     public void logUpdate(AuditModule module, String entityId, String entityName,
                           Long companyId, Map<String, Object> changes) {
+        logUpdate(module, entityId, entityName, companyId,
+                "Updated " + friendlyName(module) + ": " + entityName, changes);
+    }
+
+    @Override
+    public void logUpdate(AuditModule module, String entityId, String entityName,
+                          Long companyId, String description, Map<String, Object> changes) {
         String email = resolveCurrentUserEmail();
         String ip    = resolveClientIp();
         persist(module, AuditAction.UPDATE, entityId, entityName, companyId,
-                "Updated " + friendlyName(module) + ": " + entityName,
-                changes, email, ip);
+                description, changes, email, ip);
     }
 
     @Override
@@ -136,10 +142,18 @@ public class AuditServiceImpl implements AuditService {
 
     @Override
     public List<AuditLog> getEntityAuditTrail(Long companyId, String entityId) {
-        Query query = new Query(
-                Criteria.where("companyId").is(companyId)
-                        .and("entityId").is(entityId))
-                .with(Sort.by(Sort.Direction.ASC, "timestamp"));
+        return getEntityAuditTrail(companyId, entityId, null);
+    }
+
+    @Override
+    public List<AuditLog> getEntityAuditTrail(Long companyId, String entityId, AuditModule module) {
+        Criteria criteria = Criteria.where("companyId").is(companyId)
+                .and("entityId").is(entityId);
+        if (module != null) {
+            criteria = criteria.and("module").is(module);
+        }
+        Query query = new Query(criteria)
+                .with(Sort.by(Sort.Direction.DESC, "timestamp"));
         return mongoTemplate.find(query, AuditLog.class);
     }
 
